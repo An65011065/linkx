@@ -1,6 +1,6 @@
 import React from "react";
-// import Header from "./Header";
-// import CategoryBreakdown from "./CategoryBreakdown";
+import Header from "./Header";
+import CategoryBreakdown from "./CategoryBreakdown";
 // import RecentSessions from "./RecentSessions";
 // import SecondaryMetrics from "./SecondaryMetrics";
 // import ActionControls from "./ActionControls";
@@ -20,12 +20,12 @@ const PopupApp: React.FC = () => {
                 lineHeight: 1.4,
             }}
         >
-            {/* <Header />
+            <Header />
             <CategoryBreakdown />
-            <RecentSessions />
-            <SecondaryMetrics />
-            <ActionControls />
-            <StatusBar /> */}
+            {/* <RecentSessions /> */}
+            {/* <SecondaryMetrics /> */}
+            {/* <ActionControls /> */}
+            {/* <StatusBar /> */}
         </div>
     );
 };
