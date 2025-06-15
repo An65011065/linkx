@@ -4,6 +4,5 @@
     "version": "1.0.0",
     "action": { "default_popup": "index.html" },
     "description": "See Your History Like Never Before",
-
     "permissions": ["tabs", "storage"]
 }
