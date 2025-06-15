@@ -8,8 +8,8 @@ export default defineConfig({
     build: {
         rollupOptions: {
             input: {
-                popup: "src/popup/popup.tsx",
-                graph: "src/graph/graph.tsx",
+                popup: "src/popup/popup.html",
+                graph: "src/graph/graph.html",
             },
         },
     },
