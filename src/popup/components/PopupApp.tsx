@@ -1,7 +1,7 @@
 import React from "react";
 import Header from "./Header";
 import CategoryBreakdown from "./CategoryBreakdown";
-// import RecentSessions from "./RecentSessions";
+import RecentSessions from "./RecentSessions";
 // import SecondaryMetrics from "./SecondaryMetrics";
 // import ActionControls from "./ActionControls";
 // import StatusBar from "./StatusBar";
@@ -22,7 +22,7 @@ const PopupApp: React.FC = () => {
         >
             <Header />
             <CategoryBreakdown />
-            {/* <RecentSessions /> */}
+            <RecentSessions />
             {/* <SecondaryMetrics /> */}
             {/* <ActionControls /> */}
             {/* <StatusBar /> */}
