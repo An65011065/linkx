@@ -5,7 +5,6 @@ const PopupApp: React.FC = () => {
         <div style={{ width: "400px", height: "600px", padding: "20px" }}>
             <h1>LINKx Extension</h1>
             <p>Hello from React popup!</p>
-            <button onClick={() => alert("Popup works!")}>Test Button</button>
         </div>
     );
 };

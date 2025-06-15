@@ -3,8 +3,10 @@
     "name": "LINKx",
     "version": "1.0.0",
     "description": "See Your History Like Never Before",
-    "permissions": ["tabs", "storage"],
-    "action": { "default_popup": "src/popup/popup.html" },
+    "permissions": ["tabs", "storage", "activeTab"],
+    "action": {
+        "default_popup": "src/popup/popup.html"
+    },
     "background": {
         "service_worker": "src/background.ts"
     },
