@@ -2,16 +2,16 @@ import React from "react";
 import Header from "./Header";
 import CategoryBreakdown from "./CategoryBreakdown";
 import RecentSessions from "./RecentSessions";
-// import SecondaryMetrics from "./SecondaryMetrics";
+import SecondaryMetrics from "./SecondaryMetrics";
 import ActionControls from "./ActionControls";
-// import StatusBar from "./StatusBar";
+import StatusBar from "./StatusBar";
 
 const PopupApp: React.FC = () => {
     return (
         <div
             style={{
-                width: "380px",
-                height: "580px",
+                width: "350px",
+                height: "500px",
                 padding: "16px",
                 fontFamily:
                     '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
@@ -23,9 +23,9 @@ const PopupApp: React.FC = () => {
             <Header />
             <CategoryBreakdown />
             <RecentSessions />
-            {/* <SecondaryMetrics /> */}
+            <SecondaryMetrics />
             <ActionControls />
-            {/* <StatusBar /> */}
+            <StatusBar />
         </div>
     );
 };

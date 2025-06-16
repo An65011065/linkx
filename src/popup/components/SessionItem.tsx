@@ -45,7 +45,7 @@ const SessionItem: React.FC<SessionItemProps> = ({ session }) => {
                 marginBottom: "4px",
                 borderRadius: "6px",
                 backgroundColor: "#fafbfc",
-                border: `1px solid ${getTypeColor(session.type)}20`,
+                // border: `1px solid ${getTypeColor(session.type)}20`,
             }}
         >
             <div style={{ display: "flex", alignItems: "center", flex: 1 }}>
