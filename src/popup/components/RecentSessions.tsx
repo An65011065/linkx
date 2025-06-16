@@ -1,55 +1,136 @@
+// src/popup/components/RecentSessions.tsx
 import React, { useState } from "react";
-import SessionItem from "./SessionItem";
+import TabItem from "./TabItem";
 
-export interface Session {
-    id: number;
+// Updated interface for tab-based structure
+export interface TabUrl {
     domain: string;
-    type: "work" | "social" | "other";
-    timeAgo: string;
+    path: string;
     duration: string;
+    fullUrl: string;
 }
 
+export interface Tab {
+    id: number;
+    tabNumber: number; // For display: "Tab 1", "Tab 2", etc.
+    type: "work" | "social" | "other";
+    totalTime: number; // in minutes
+    timeAgo: string;
+    isActive: boolean;
+    urls: TabUrl[];
+}
+
+// TODO: Add parseUrl function back when integrating real data
+// const parseUrl = (url: string): { domain: string; path: string } => { ... }
+
 const RecentSessions: React.FC = () => {
-    const [sortBy, setSortBy] = useState<"time" | "created">("time");
+    const [expandedTabs, setExpandedTabs] = useState<Set<number>>(new Set());
+    const [sortBy, setSortBy] = useState<"time" | "duration">("time");
 
     // TODO: Replace with real data from useExtensionData hook
-    const sessions: Session[] = [
+    const tabs: Tab[] = [
         {
             id: 1,
-            domain: "docs.google.com",
+            tabNumber: 1,
             type: "work",
-            timeAgo: "2m ago",
-            duration: "23m",
+            totalTime: 38,
+            timeAgo: "2m",
+            isActive: true,
+            urls: [
+                {
+                    domain: "docs.google.com",
+                    path: "/project-spec",
+                    duration: "23m",
+                    fullUrl:
+                        "https://docs.google.com/document/d/abc123/project-spec",
+                },
+                {
+                    domain: "github.com",
+                    path: "/repo/issues",
+                    duration: "10m",
+                    fullUrl: "https://github.com/user/repo/issues",
+                },
+                {
+                    domain: "stackoverflow.com",
+                    path: "/questions/12345",
+                    duration: "5m",
+                    fullUrl:
+                        "https://stackoverflow.com/questions/12345/how-to-fix",
+                },
+            ],
         },
         {
             id: 2,
-            domain: "youtube.com",
+            tabNumber: 2,
             type: "social",
-            timeAgo: "5m ago",
-            duration: "47m",
+            totalTime: 47,
+            timeAgo: "5m",
+            isActive: false,
+            urls: [
+                {
+                    domain: "youtube.com",
+                    path: "/watch?v=dQw4w9W...",
+                    duration: "47m",
+                    fullUrl: "https://youtube.com/watch?v=dQw4w9WgXcQ",
+                },
+            ],
         },
         {
             id: 3,
-            domain: "github.com",
+            tabNumber: 3,
             type: "work",
-            timeAgo: "12m ago",
-            duration: "15m",
+            totalTime: 22,
+            timeAgo: "15m",
+            isActive: false,
+            urls: [
+                {
+                    domain: "wikipedia.org",
+                    path: "/Machine_Learning",
+                    duration: "12m",
+                    fullUrl: "https://en.wikipedia.org/wiki/Machine_Learning",
+                },
+                {
+                    domain: "medium.com",
+                    path: "/@author/ai-article",
+                    duration: "10m",
+                    fullUrl: "https://medium.com/@author/ai-article",
+                },
+            ],
         },
         {
             id: 4,
-            domain: "reddit.com",
-            type: "social",
-            timeAgo: "18m ago",
-            duration: "8m",
-        },
-        {
-            id: 5,
-            domain: "wikipedia.org",
+            tabNumber: 4,
             type: "other",
-            timeAgo: "25m ago",
-            duration: "12m",
+            totalTime: 15,
+            timeAgo: "25m",
+            isActive: false,
+            urls: [
+                {
+                    domain: "amazon.com",
+                    path: "/dp/B08N5WRWNW",
+                    duration: "15m",
+                    fullUrl: "https://amazon.com/dp/B08N5WRWNW",
+                },
+            ],
         },
     ]; // PLACEHOLDER DATA
+
+    const toggleTab = (tabId: number) => {
+        const newExpanded = new Set(expandedTabs);
+        if (newExpanded.has(tabId)) {
+            newExpanded.delete(tabId);
+        } else {
+            newExpanded.add(tabId);
+        }
+        setExpandedTabs(newExpanded);
+    };
+
+    const formatTime = (minutes: number): string => {
+        if (minutes < 60) return `${minutes}m`;
+        const hours = Math.floor(minutes / 60);
+        const mins = minutes % 60;
+        return `${hours}h ${mins}m`;
+    };
 
     return (
         <div style={{ marginBottom: "20px" }}>
@@ -69,12 +150,12 @@ const RecentSessions: React.FC = () => {
                         margin: 0,
                     }}
                 >
-                    Recent Sessions
+                    Recent Tabs
                 </h3>
                 <select
                     value={sortBy}
                     onChange={(e) =>
-                        setSortBy(e.target.value as "time" | "created")
+                        setSortBy(e.target.value as "time" | "duration")
                     }
                     style={{
                         fontSize: "11px",
@@ -85,14 +166,20 @@ const RecentSessions: React.FC = () => {
                         color: "#636e72",
                     }}
                 >
-                    <option value="time">By Time</option>
-                    <option value="created">By Created</option>
+                    <option value="time">Recent</option>
+                    <option value="duration">Duration</option>
                 </select>
             </div>
 
             <div style={{ maxHeight: "160px", overflowY: "auto" }}>
-                {sessions.map((session) => (
-                    <SessionItem key={session.id} session={session} />
+                {tabs.map((tab) => (
+                    <TabItem
+                        key={tab.id}
+                        tab={tab}
+                        isExpanded={expandedTabs.has(tab.id)}
+                        onToggle={() => toggleTab(tab.id)}
+                        formatTime={formatTime}
+                    />
                 ))}
             </div>
         </div>
