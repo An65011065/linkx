@@ -26,15 +26,6 @@ const Header: React.FC = () => {
             >
                 {totalUrls} sites visited
             </div>
-            <div
-                style={{
-                    fontSize: "11px",
-                    color: "#636e72",
-                    fontWeight: 500,
-                }}
-            >
-                Browsing timeline today
-            </div>
         </div>
     );
 };

@@ -66,7 +66,7 @@ const ActionControls: React.FC = () => {
                     cursor: "pointer",
                 }}
             >
-                View Full Graph
+                View links
             </button>
         </div>
     );

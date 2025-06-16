@@ -21,6 +21,16 @@ const StatsPanel: React.FC = () => {
         >
             <div
                 style={{
+                    fontSize: "11px",
+                    fontWeight: 500,
+                    color: "#636e72",
+                    marginBottom: "6px",
+                }}
+            >
+                Today's browsing:
+            </div>
+            <div
+                style={{
                     fontSize: "24px",
                     fontWeight: 800,
                     color: "#2d3436",

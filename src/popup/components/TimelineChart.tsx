@@ -104,9 +104,9 @@ const TimelineChart: React.FC = () => {
         const svg = d3.select(svgRef.current);
         svg.selectAll("*").remove(); // Clear previous render
 
-        const margin = { top: 30, right: 16, bottom: 16, left: 30 };
+        const margin = { top: 15, right: 10, bottom: 0, left: 30 };
         const width = 280 - margin.left - margin.right;
-        const height = 160 - margin.top - margin.bottom;
+        const height = 120 - margin.top - margin.bottom;
 
         // Scales with dynamic time range
         const xScale = d3
@@ -264,7 +264,7 @@ const TimelineChart: React.FC = () => {
                     borderRadius: "12px",
                     padding: "16px",
                     marginBottom: "16px",
-                    height: "160px",
+                    height: "120px",
                     position: "relative",
                 }}
             >
