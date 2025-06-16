@@ -104,7 +104,7 @@ const TimelineChart: React.FC = () => {
         const svg = d3.select(svgRef.current);
         svg.selectAll("*").remove(); // Clear previous render
 
-        const margin = { top: 30, right: 16, bottom: 16, left: 16 };
+        const margin = { top: 30, right: 16, bottom: 16, left: 30 };
         const width = 280 - margin.left - margin.right;
         const height = 160 - margin.top - margin.bottom;
 
@@ -216,6 +216,10 @@ const TimelineChart: React.FC = () => {
                             .attr("height", barHeight + 2)
                             .attr("y", yPos - 1);
 
+                        const svgRect = svgRef.current!.getBoundingClientRect();
+                        const x = event.clientX - svgRect.left;
+                        const y = event.clientY - svgRect.top;
+
                         tooltip
                             .style("opacity", 1)
                             .html(
@@ -223,8 +227,8 @@ const TimelineChart: React.FC = () => {
                                     visit.start,
                                 )} • ${Math.round(visit.duration * 60)}m`,
                             )
-                            .style("left", event.pageX + 10 + "px")
-                            .style("top", event.pageY - 10 + "px");
+                            .style("left", x + 10 + "px")
+                            .style("top", y - 10 + "px");
                     })
                     .on("mouseleave", function () {
                         // Reset fragment appearance
@@ -236,9 +240,13 @@ const TimelineChart: React.FC = () => {
                         tooltip.style("opacity", 0);
                     })
                     .on("mousemove", function (event) {
+                        const svgRect = svgRef.current!.getBoundingClientRect();
+                        const x = event.clientX - svgRect.left;
+                        const y = event.clientY - svgRect.top;
+
                         tooltip
-                            .style("left", event.pageX + 10 + "px")
-                            .style("top", event.pageY - 10 + "px");
+                            .style("left", x + 10 + "px")
+                            .style("top", y - 10 + "px");
                     });
             });
         });
