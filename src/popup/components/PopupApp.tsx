@@ -1,9 +1,9 @@
 import React from "react";
 import Header from "./Header";
 import StatsPanel from "./StatsPanel";
-// import TimelineChart from "./TimelineChart";
+import TimelineChart from "./TimelineChart";
 import ActionControls from "./ActionControls";
-import StatusBar from "./StatusBar";
+// import StatusBar from "./StatusBar";
 
 const PopupApp: React.FC = () => {
     return (
@@ -22,9 +22,9 @@ const PopupApp: React.FC = () => {
         >
             <Header />
             <StatsPanel />
-            {/* <TimelineChart /> */}
+            <TimelineChart />
             <ActionControls />
-            <StatusBar />
+            {/* <StatusBar /> */}
         </div>
     );
 };
