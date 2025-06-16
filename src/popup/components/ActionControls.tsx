@@ -1,6 +1,5 @@
-// ActionButtons.tsx - View Graph, Clear, Pause buttons
 import React, { useState } from "react";
-import { Play, Pause, BarChart3, Trash2 } from "lucide-react";
+import { Play, Pause } from "lucide-react";
 
 const ActionControls: React.FC = () => {
     const [isPaused, setIsPaused] = useState(false);
@@ -13,34 +12,14 @@ const ActionControls: React.FC = () => {
 
     const handleViewGraph = () => {
         // TODO: Implement graph navigation
-        chrome.tabs.create({
-            url: chrome.runtime.getURL("src/graph/graph.html"),
-        });
-    };
-
-    const handleClear = () => {
-        if (
-            confirm(
-                "Are you sure you want to clear all browsing data? This cannot be undone.",
-            )
-        ) {
-            // TODO: Implement clear data logic
-            console.log("Clearing data");
+        if (typeof chrome !== "undefined" && chrome.tabs) {
+            chrome.tabs.create({
+                url: chrome.runtime.getURL("src/graph/graph.html"),
+            });
+        } else {
+            // For development
+            window.open("graph.html", "_blank");
         }
-    };
-
-    const buttonStyle = {
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: "6px",
-        padding: "8px 16px",
-        border: "none",
-        borderRadius: "5px",
-        fontSize: "12px",
-        fontWeight: 600,
-        cursor: "pointer",
-        transition: "all 0.2s ease",
     };
 
     return (
@@ -54,40 +33,40 @@ const ActionControls: React.FC = () => {
             <button
                 onClick={handleToggleTracking}
                 style={{
-                    ...buttonStyle,
+                    flex: 1,
+                    padding: "10px",
+                    border: "none",
+                    borderRadius: "8px",
+                    fontSize: "11px",
+                    fontWeight: 600,
                     backgroundColor: isPaused ? "#28a745" : "#ffc107",
                     color: isPaused ? "white" : "#212529",
-                    flex: 1,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "6px",
                 }}
             >
-                {isPaused ? <Play size={14} /> : <Pause size={14} />}
+                {isPaused ? <Play size={12} /> : <Pause size={12} />}
                 {isPaused ? "Resume" : "Pause"}
             </button>
 
             <button
                 onClick={handleViewGraph}
                 style={{
-                    ...buttonStyle,
+                    flex: 2,
+                    padding: "10px",
+                    border: "none",
+                    borderRadius: "8px",
+                    fontSize: "11px",
+                    fontWeight: 600,
                     backgroundColor: "#4285f4",
                     color: "white",
-                    flex: 2,
+                    cursor: "pointer",
                 }}
             >
-                <BarChart3 size={14} />
-                View Graph
-            </button>
-
-            <button
-                onClick={handleClear}
-                style={{
-                    ...buttonStyle,
-                    backgroundColor: "#dc3545",
-                    color: "white",
-                    flex: 1,
-                }}
-            >
-                <Trash2 size={14} />
-                Clear
+                View Full Graph
             </button>
         </div>
     );

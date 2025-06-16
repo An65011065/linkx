@@ -1,8 +1,7 @@
 import React from "react";
 import Header from "./Header";
-import CategoryBreakdown from "./CategoryBreakdown";
-import RecentSessions from "./RecentSessions";
-import SecondaryMetrics from "./SecondaryMetrics";
+// import StatsPanel from "./StatsPanel";
+// import TimelineChart from "./TimelineChart";
 import ActionControls from "./ActionControls";
 import StatusBar from "./StatusBar";
 
@@ -10,20 +9,20 @@ const PopupApp: React.FC = () => {
     return (
         <div
             style={{
-                width: "350px",
+                width: "340px",
                 height: "500px",
-                padding: "16px",
+                padding: "20px",
                 fontFamily:
                     '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                 backgroundColor: "white",
-                color: "#2d3436",
-                lineHeight: 1.4,
+                borderRadius: "16px",
+                boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
+                position: "relative",
             }}
         >
             <Header />
-            <CategoryBreakdown />
-            <RecentSessions />
-            <SecondaryMetrics />
+            {/* <StatsPanel />
+            <TimelineChart /> */}
             <ActionControls />
             <StatusBar />
         </div>
