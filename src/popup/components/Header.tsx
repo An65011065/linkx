@@ -1,8 +1,8 @@
 import React from "react";
+import { useStatsData } from "../../shared/services/useExtensionData";
 
 const Header: React.FC = () => {
-    // TODO: Replace with real data from useExtensionData hook
-    const totalUrls = 12; // Dynamic count based on timeline data
+    const { stats, loading } = useStatsData();
 
     return (
         <div style={{ textAlign: "center", marginBottom: "16px" }}>
@@ -24,7 +24,7 @@ const Header: React.FC = () => {
                     marginBottom: "4px",
                 }}
             >
-                {totalUrls} sites visited
+                {loading ? "..." : `${stats.totalUrls} sites visited`}
             </div>
         </div>
     );

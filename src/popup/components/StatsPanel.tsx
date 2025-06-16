@@ -1,13 +1,59 @@
 // StatsPanel.tsx - Stats display (visits, time, domains)
 import React from "react";
+import { useStatsData } from "../../shared/services/useExtensionData";
 
 const StatsPanel: React.FC = () => {
-    // TODO: Replace with real data from useExtensionData hook
-    // For now, calculate from mock timeline data
-    const totalActiveTime = 3.2; // hours
-    const workTime = 1.9; // hours
-    const socialTime = 0.9; // hours
-    const otherTime = 0.4; // hours
+    const { stats, totalActiveTime, loading, error } = useStatsData();
+
+    if (loading) {
+        return (
+            <div
+                style={{
+                    textAlign: "center",
+                    marginBottom: "20px",
+                    padding: "12px",
+                    backgroundColor: "#f8f9fa",
+                    borderRadius: "8px",
+                }}
+            >
+                <div
+                    style={{
+                        fontSize: "11px",
+                        fontWeight: 500,
+                        color: "#636e72",
+                        marginBottom: "6px",
+                    }}
+                >
+                    Loading...
+                </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div
+                style={{
+                    textAlign: "center",
+                    marginBottom: "20px",
+                    padding: "12px",
+                    backgroundColor: "#ffe8e8",
+                    borderRadius: "8px",
+                }}
+            >
+                <div
+                    style={{
+                        fontSize: "11px",
+                        fontWeight: 500,
+                        color: "#d63031",
+                        marginBottom: "6px",
+                    }}
+                >
+                    Error: {error}
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div
@@ -49,17 +95,28 @@ const StatsPanel: React.FC = () => {
                 }}
             >
                 <span style={{ color: "#4285f4" }}>
-                    Work {workTime.toFixed(1)}h
+                    Work {stats.workTime.toFixed(1)}h
                 </span>
                 <span style={{ color: "#ff6b47" }}>
-                    Social {socialTime.toFixed(1)}h
+                    Social {stats.socialTime.toFixed(1)}h
                 </span>
-                {otherTime > 0.1 && (
+                {stats.otherTime > 0.1 && (
                     <span style={{ color: "#6c757d" }}>
-                        Other {otherTime.toFixed(1)}h
+                        Other {stats.otherTime.toFixed(1)}h
                     </span>
                 )}
             </div>
+            {stats.totalUrls > 0 && (
+                <div
+                    style={{
+                        fontSize: "9px",
+                        color: "#636e72",
+                        marginTop: "6px",
+                    }}
+                >
+                    {stats.totalUrls} sites • {stats.uniqueDomains} domains
+                </div>
+            )}
         </div>
     );
 };
