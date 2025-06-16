@@ -2,40 +2,38 @@ import React from "react";
 
 const Header: React.FC = () => {
     // TODO: Replace with real data from useExtensionData hook
-    const totalUrls = 127; // PLACEHOLDER
+    const totalUrls = 12; // Dynamic count based on timeline data
 
     return (
-        <div
-            style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                marginBottom: "20px",
-                padding: "16px 0 12px 0",
-            }}
-        >
+        <div style={{ textAlign: "center", marginBottom: "16px" }}>
             <div
                 style={{
                     fontSize: "24px",
                     fontWeight: 700,
                     color: "#2d3436",
-                    letterSpacing: "-0.5px",
+                    marginBottom: "6px",
                 }}
             >
                 LINKx
-                <span
-                    style={{
-                        color: "#4285f4",
-                        fontSize: "20px",
-                        fontWeight: 800,
-                        backgroundColor: "#f0f4ff",
-                        padding: "2px 6px",
-                        borderRadius: "4px",
-                        margin: "0 0 0 1px",
-                    }}
-                >
-                    {totalUrls}
-                </span>
+            </div>
+            <div
+                style={{
+                    fontSize: "13px",
+                    color: "#4285f4",
+                    fontWeight: 600,
+                    marginBottom: "4px",
+                }}
+            >
+                {totalUrls} sites visited
+            </div>
+            <div
+                style={{
+                    fontSize: "11px",
+                    color: "#636e72",
+                    fontWeight: 500,
+                }}
+            >
+                Browsing timeline today
             </div>
         </div>
     );
