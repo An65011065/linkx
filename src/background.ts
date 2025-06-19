@@ -18,6 +18,15 @@ class BackgroundTracker {
     private setupListeners() {
         console.log("🔧 Setting up Chrome API listeners...");
 
+        // Message passing for dashboard communication
+        chrome.runtime.onMessage.addListener(
+            (request, sender, sendResponse) => {
+                // Handle async message processing
+                this.handleMessage(request, sender, sendResponse);
+                return true; // Keep the message channel open for async responses
+            },
+        );
+
         // Tab lifecycle tracking
         chrome.tabs.onCreated.addListener((tab) => {
             this.handleTabCreated(tab);
@@ -61,6 +70,43 @@ class BackgroundTracker {
 
         // Log current state
         this.logCurrentState();
+    }
+
+    private handleMessage(
+        request: { type: string; [key: string]: unknown },
+        sender: chrome.runtime.MessageSender,
+        sendResponse: (response: {
+            success: boolean;
+            data?: unknown;
+            error?: string;
+        }) => void,
+    ) {
+        console.log(
+            "📨 Received message:",
+            request.type,
+            "from:",
+            sender.tab?.url,
+        );
+
+        // Handle async operations properly
+        (async () => {
+            try {
+                switch (request.type) {
+                    default:
+                        console.log("❓ Unknown message type:", request.type);
+                        sendResponse({
+                            success: false,
+                            error: "Unknown message type",
+                        });
+                        break;
+                }
+            } catch (error) {
+                console.error("❌ Error handling message:", error);
+                const errorMessage =
+                    error instanceof Error ? error.message : "Unknown error";
+                sendResponse({ success: false, error: errorMessage });
+            }
+        })();
     }
 
     private async logCurrentState() {

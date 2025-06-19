@@ -11,14 +11,14 @@ const ActionControls: React.FC = () => {
     };
 
     const handleViewGraph = () => {
-        // TODO: Implement graph navigation
+        // TODO: Implement dashboard navigation
         if (typeof chrome !== "undefined" && chrome.tabs) {
             chrome.tabs.create({
-                url: chrome.runtime.getURL("src/graph/graph.html"),
+                url: chrome.runtime.getURL("src/dashboard/dashboard.html"),
             });
         } else {
             // For development
-            window.open("graph.html", "_blank");
+            window.open("dashboard.html", "_blank");
         }
     };
 

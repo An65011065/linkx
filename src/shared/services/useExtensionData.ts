@@ -91,3 +91,70 @@ export const useTimelineData = () => {
         error,
     };
 };
+
+// Helper hook for activity data (hourly work and media data for last 24 hours)
+export const useActivityData = () => {
+    const { session, loading, error } = useExtensionData();
+
+    const getHourlyActivityData = () => {
+        if (!session) return [];
+
+        const now = new Date();
+        const hourlyData = [];
+
+        // Generate 24 hours of data (current hour - 23 hours to current hour)
+        for (let i = 23; i >= 0; i--) {
+            const hourStart = new Date(now);
+            hourStart.setHours(hourStart.getHours() - i, 0, 0, 0);
+            const hourEnd = new Date(hourStart);
+            hourEnd.setHours(hourEnd.getHours() + 1);
+
+            let workTime = 0;
+            let mediaTime = 0; // Using socialTime as media time
+
+            // Aggregate time for this hour from all tab sessions
+            session.tabSessions.forEach((tabSession) => {
+                tabSession.urlVisits.forEach((visit) => {
+                    if (!visit.isActive) return;
+
+                    const visitStart = new Date(visit.startTime);
+                    const visitEnd = visit.endTime
+                        ? new Date(visit.endTime)
+                        : new Date();
+
+                    // Check if visit overlaps with this hour
+                    if (visitStart < hourEnd && visitEnd > hourStart) {
+                        const overlapStart =
+                            visitStart > hourStart ? visitStart : hourStart;
+                        const overlapEnd =
+                            visitEnd < hourEnd ? visitEnd : hourEnd;
+                        const overlapDuration =
+                            (overlapEnd.getTime() - overlapStart.getTime()) /
+                            (1000 * 60 * 60); // in hours
+
+                        if (visit.category === "work") {
+                            workTime += overlapDuration;
+                        } else if (visit.category === "social") {
+                            mediaTime += overlapDuration;
+                        }
+                    }
+                });
+            });
+
+            hourlyData.push({
+                hour: hourStart.getHours(),
+                date: hourStart,
+                workTime: Math.max(0, workTime),
+                mediaTime: Math.max(0, mediaTime),
+            });
+        }
+
+        return hourlyData;
+    };
+
+    return {
+        activityData: getHourlyActivityData(),
+        loading,
+        error,
+    };
+};

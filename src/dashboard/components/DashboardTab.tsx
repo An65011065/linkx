@@ -1,4 +1,6 @@
 import React from "react";
+import MainStats from "./MainStats";
+import Activity from "./Activity";
 
 const DashboardTab: React.FC = () => {
     return (
@@ -45,6 +47,8 @@ const DashboardTab: React.FC = () => {
                 >
                     DASHBOARD
                 </h1>
+                <MainStats />
+                <Activity />
             </div>
         </div>
     );

@@ -11,6 +11,7 @@ export default defineConfig(({ mode }) => ({
             input: {
                 popup: "src/popup/popup.html",
                 graph: "src/graph/graph.html",
+                dashboard: "src/dashboard/dashboard.html",
             },
         },
     },
