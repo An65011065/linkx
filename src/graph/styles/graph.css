@@ -1,0 +1,48 @@
+.tooltip {
+    position: absolute;
+    padding: 10px;
+    background: rgb(0, 0, 0);
+    color: white;
+    border-radius: 8px;
+    font-family: "Nunito-Regular", Arial, sans-serif;
+    font-size: 12px;
+    pointer-events: none;
+    z-index: 1000;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    max-width: 300px;
+    backdrop-filter: none;
+}
+
+.tooltip .url {
+    font-family: "Nunito-Bold", Arial, sans-serif;
+    font-size: 14px;
+    margin-bottom: 4px;
+    word-break: break-word;
+    line-height: 1.4;
+}
+
+.tooltip .url span {
+    font-family: "Nunito-Regular", Arial, sans-serif;
+    font-size: 12px;
+    opacity: 0.8;
+}
+
+.tooltip .time {
+    color: #dfe6e9;
+    font-size: 12px;
+}
+
+.tooltip .metrics {
+    font-size: 11px;
+    color: #b2bec3;
+}
+
+.tooltip .metrics div {
+    margin: 2px 0;
+    display: flex;
+    justify-content: space-between;
+}
+
+.tooltip hr {
+    opacity: 0.2;
+}

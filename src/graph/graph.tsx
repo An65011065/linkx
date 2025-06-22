@@ -1,11 +1,26 @@
 import React from "react";
-import ReactDOM from "react-dom/client";
-import App from "./components/App";
-import "./styles/graph.css";
+import { createRoot } from "react-dom/client";
+import GraphVisualization from "./components/GraphVisualization";
 import "../shared/styles/global.css";
 
-ReactDOM.createRoot(document.getElementById("root")!).render(
-    <React.StrictMode>
-        <App />
-    </React.StrictMode>,
-);
+const GraphPage: React.FC = () => {
+    return (
+        <div
+            style={{
+                width: "100vw",
+                height: "100vh",
+                display: "flex",
+                flexDirection: "column",
+                backgroundColor: "#f8f9fa",
+            }}
+        >
+            <GraphVisualization />
+        </div>
+    );
+};
+
+const container = document.getElementById("app");
+if (container) {
+    const root = createRoot(container);
+    root.render(<GraphPage />);
+}
