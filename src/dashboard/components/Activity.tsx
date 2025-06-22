@@ -6,7 +6,7 @@ interface HourlyData {
     hour: number;
     date: Date;
     workTime: number;
-    mediaTime: number;
+    otherTime: number;
 }
 
 const Activity: React.FC = () => {
@@ -21,19 +21,24 @@ const Activity: React.FC = () => {
         const svg = d3.select(svgRef.current);
         svg.selectAll("*").remove(); // Clear previous render
 
-        // Dimensions with more space for labels
-        const margin = { top: 10, right: 20, bottom: 40, left: 40 };
-        const width = 700 - margin.left - margin.right;
+        // Dimensions - reduced width as requested
+        const margin = { top: 10, right: 20, bottom: 50, left: 50 };
+        const width = 500 - margin.left - margin.right; // Reduced from 700
         const height = 250 - margin.top - margin.bottom;
 
-        // Create scales
+        // Sort data by hour for proper timeline
+        const sortedData = [...activityData].sort(
+            (a, b) => a.date.getHours() - b.date.getHours(),
+        );
+
+        // Create scales with time formatting
         const xScale = d3
             .scaleTime()
-            .domain(d3.extent(activityData, (d) => d.date) as [Date, Date])
+            .domain(d3.extent(sortedData, (d) => d.date) as [Date, Date])
             .range([0, width]);
 
         const maxTime =
-            d3.max(activityData, (d) => Math.max(d.workTime, d.mediaTime)) || 1;
+            d3.max(sortedData, (d) => Math.max(d.workTime, d.otherTime)) || 1;
         const yScale = d3.scaleLinear().domain([0, maxTime]).range([height, 0]);
 
         // Create main group
@@ -41,27 +46,35 @@ const Activity: React.FC = () => {
             .append("g")
             .attr("transform", `translate(${margin.left},${margin.top})`);
 
-        // Create line generators only (no areas)
+        // Create line generators
         const workLine = d3
             .line<HourlyData>()
             .x((d) => xScale(d.date))
             .y((d) => yScale(d.workTime))
             .curve(d3.curveMonotoneX);
 
-        const mediaLine = d3
+        const otherLine = d3
             .line<HourlyData>()
             .x((d) => xScale(d.date))
-            .y((d) => yScale(d.mediaTime))
+            .y((d) => yScale(d.otherTime))
             .curve(d3.curveMonotoneX);
 
-        // Add axes with proper labels
+        // Create time formatter for x-axis
+        const timeFormat = (date: Date) => {
+            const hour = date.getHours();
+            if (hour === 0) return "12 AM";
+            if (hour < 12) return `${hour} AM`;
+            if (hour === 12) return "12 PM";
+            return `${hour - 12} PM`;
+        };
+
+        // Add axes with time labels
         const xAxis = d3
             .axisBottom(xScale)
-            .tickFormat((domainValue: d3.NumberValue) => {
-                const hour = (domainValue as Date).getHours();
-                return hour.toString().padStart(2, "0");
-            })
-            .ticks(7);
+            .tickFormat((domainValue: d3.NumberValue) =>
+                timeFormat(domainValue as Date),
+            )
+            .ticks(6);
 
         const yAxis = d3
             .axisLeft(yScale)
@@ -72,16 +85,16 @@ const Activity: React.FC = () => {
             .attr("transform", `translate(0,${height})`)
             .call(xAxis)
             .selectAll("text")
-            .style("font-family", "Nunito-Regular, Arial, sans-serif")
-            .style("font-size", "10px")
-            .style("fill", "#999");
+            .style("font-family", "Gaegu-Regular, Arial, sans-serif")
+            .style("font-size", "14px") // Increased from 12px
+            .style("fill", "#666");
 
         g.append("g")
             .call(yAxis)
             .selectAll("text")
-            .style("font-family", "Nunito-Regular, Arial, sans-serif")
-            .style("font-size", "10px")
-            .style("fill", "#999");
+            .style("font-family", "Gaegu-Regular, Arial, sans-serif")
+            .style("font-size", "14px") // Increased from 12px
+            .style("fill", "#666");
 
         // Add horizontal grid lines
         g.selectAll(".horizontal-grid")
@@ -96,22 +109,22 @@ const Activity: React.FC = () => {
             .style("stroke", "#f0f0f0")
             .style("stroke-width", "1px");
 
-        // Add axis labels
+        // Add axis labels with larger fonts
         g.append("text")
-            .attr("transform", `translate(${width / 2}, ${height + 35})`)
+            .attr("transform", `translate(${width / 2}, ${height + 40})`)
             .style("text-anchor", "middle")
-            .style("font-family", "Nunito-Regular, Arial, sans-serif")
-            .style("font-size", "12px")
+            .style("font-family", "Gaegu-Bold, Arial, sans-serif")
+            .style("font-size", "16px") // Increased from 14px
             .style("fill", "#666")
-            .text("Hours");
+            .text("Time");
 
         g.append("text")
             .attr("transform", "rotate(-90)")
-            .attr("y", 0 - margin.left + 10)
+            .attr("y", 0 - margin.left + 15)
             .attr("x", 0 - height / 2)
             .style("text-anchor", "middle")
-            .style("font-family", "Nunito-Regular, Arial, sans-serif")
-            .style("font-size", "12px")
+            .style("font-family", "Gaegu-Bold, Arial, sans-serif")
+            .style("font-size", "16px") // Increased from 14px
             .style("fill", "#666")
             .text("Time (h)");
 
@@ -124,25 +137,25 @@ const Activity: React.FC = () => {
             .style("stroke", "#ddd")
             .style("stroke-width", "1px");
 
-        // Add lines only (no areas)
+        // Add lines
         g.append("path")
-            .datum(activityData)
+            .datum(sortedData)
             .attr("fill", "none")
             .attr("stroke", "#ff9500")
             .attr("stroke-width", 2)
             .attr("d", workLine);
 
         g.append("path")
-            .datum(activityData)
+            .datum(sortedData)
             .attr("fill", "none")
-            .attr("stroke", "#a855f7")
+            .attr("stroke", "#64748b")
             .attr("stroke-width", 2)
-            .attr("d", mediaLine);
+            .attr("d", otherLine);
 
-        // Add invisible hover areas instead of visible dots
+        // Add hover areas
         const workHoverAreas = g
             .selectAll(".work-hover")
-            .data(activityData)
+            .data(sortedData)
             .enter()
             .append("circle")
             .attr("class", "work-hover")
@@ -152,51 +165,43 @@ const Activity: React.FC = () => {
             .attr("fill", "transparent")
             .style("cursor", "pointer");
 
-        const mediaHoverAreas = g
-            .selectAll(".media-hover")
-            .data(activityData)
+        const otherHoverAreas = g
+            .selectAll(".other-hover")
+            .data(sortedData)
             .enter()
             .append("circle")
-            .attr("class", "media-hover")
+            .attr("class", "other-hover")
             .attr("cx", (d) => xScale(d.date))
-            .attr("cy", (d) => yScale(d.mediaTime))
+            .attr("cy", (d) => yScale(d.otherTime))
             .attr("r", 8)
             .attr("fill", "transparent")
             .style("cursor", "pointer");
 
-        // Tooltip functionality with proper positioning
+        // Tooltip functionality
         const tooltip = d3.select(tooltipRef.current);
 
         const showTooltip = (
             event: MouseEvent,
             d: HourlyData,
-            type: "work" | "media",
+            type: "work" | "other",
         ) => {
-            const time = type === "work" ? d.workTime : d.mediaTime;
-            const formattedTime = d.date.toLocaleTimeString([], {
-                hour: "numeric",
-                minute: "2-digit",
-                hour12: true,
-            });
+            const time = type === "work" ? d.workTime : d.otherTime;
+            const formattedTime = timeFormat(d.date);
 
-            // Get the SVG container position for proper tooltip positioning
-            const svgElement = svgRef.current;
-            const svgRect = svgElement?.getBoundingClientRect();
-
-            if (svgRect) {
-                tooltip
-                    .style("opacity", 1)
-                    .style("left", event.clientX + 10 + "px")
-                    .style("top", event.clientY - 10 + "px").html(`
-                        <div style="font-weight: bold; color: ${
-                            type === "work" ? "#ff9500" : "#a855f7"
-                        }">
-                            ${type === "work" ? "Work" : "Media"}
-                        </div>
-                        <div>${time.toFixed(2)} hours</div>
-                        <div>${formattedTime}</div>
-                    `);
-            }
+            tooltip
+                .style("opacity", 1)
+                .style("left", event.clientX + 10 + "px")
+                .style("top", event.clientY - 10 + "px").html(`
+                    <div style="font-family: 'Gaegu-Bold, Arial, sans-serif'; font-weight: bold; color: ${
+                        type === "work" ? "#ff9500" : "#64748b"
+                    }; font-size: 16px;">
+                        ${type === "work" ? "Work" : "Other"}
+                    </div>
+                    <div style="font-family: 'Gaegu-Regular, Arial, sans-serif'; font-size: 16px;">${time.toFixed(
+                        2,
+                    )} hours</div>
+                    <div style="font-family: 'Gaegu-Regular, Arial, sans-serif'; font-size: 16px;">${formattedTime}</div>
+                `);
         };
 
         const hideTooltip = () => {
@@ -209,9 +214,9 @@ const Activity: React.FC = () => {
             )
             .on("mouseout", hideTooltip);
 
-        mediaHoverAreas
+        otherHoverAreas
             .on("mouseover", (event: MouseEvent, d: HourlyData) =>
-                showTooltip(event, d, "media"),
+                showTooltip(event, d, "other"),
             )
             .on("mouseout", hideTooltip);
     }, [activityData, loading, error]);
@@ -228,9 +233,9 @@ const Activity: React.FC = () => {
             <div
                 style={{
                     padding: "20px 0",
-                    fontFamily: "Nunito-Regular, Arial, sans-serif",
+                    fontFamily: "Gaegu-Regular, Arial, sans-serif",
                     color: "#666",
-                    fontSize: "14px",
+                    fontSize: "16px",
                 }}
             >
                 Loading activity data...
@@ -243,9 +248,9 @@ const Activity: React.FC = () => {
             <div
                 style={{
                     padding: "20px 0",
-                    fontFamily: "Nunito-Regular, Arial, sans-serif",
+                    fontFamily: "Gaegu-Regular, Arial, sans-serif",
                     color: "#d63031",
-                    fontSize: "14px",
+                    fontSize: "16px",
                 }}
             >
                 Error loading activity data: {error}
@@ -257,17 +262,17 @@ const Activity: React.FC = () => {
         <>
             <style>{`
                 @font-face {
-                    font-family: 'Nunito-Regular';
+                    font-family: 'Gaegu-Regular';
                     src: url('${chrome.runtime.getURL(
-                        "src/assets/fonts/Nunito-Regular.ttf",
+                        "src/assets/fonts/Gaegu-Regular.ttf",
                     )}') format('truetype');
                     font-weight: 400;
                     font-style: normal;
                 }
                 @font-face {
-                    font-family: 'Nunito-Bold';
+                    font-family: 'Gaegu-Bold';
                     src: url('${chrome.runtime.getURL(
-                        "src/assets/fonts/Nunito-Bold.ttf",
+                        "src/assets/fonts/Gaegu-Bold.ttf",
                     )}') format('truetype');
                     font-weight: 700;
                     font-style: normal;
@@ -277,16 +282,11 @@ const Activity: React.FC = () => {
                 style={{
                     marginTop: "40px",
                     width: "100%",
-                    maxWidth: "700px",
+                    maxWidth: "500px",
                 }}
             >
                 {/* Header */}
-                <div
-                    style={{
-                        marginBottom: "20px",
-                    }}
-                >
-                    {/* Activity title and legend/date on same line */}
+                <div style={{ marginBottom: "20px" }}>
                     <div
                         style={{
                             display: "flex",
@@ -295,10 +295,9 @@ const Activity: React.FC = () => {
                             width: "100%",
                         }}
                     >
-                        {/* Activity title */}
                         <h2
                             style={{
-                                fontFamily: "Nunito-Bold, Arial, sans-serif",
+                                fontFamily: "Gaegu-Bold, Arial, sans-serif",
                                 fontSize: "24px",
                                 fontWeight: "700",
                                 color: "#000",
@@ -308,7 +307,6 @@ const Activity: React.FC = () => {
                             Activity
                         </h2>
 
-                        {/* Legend and Date on the right */}
                         <div
                             style={{
                                 display: "flex",
@@ -334,7 +332,7 @@ const Activity: React.FC = () => {
                                 <span
                                     style={{
                                         fontFamily:
-                                            "Nunito-Regular, Arial, sans-serif",
+                                            "Gaegu-Regular, Arial, sans-serif",
                                         fontSize: "14px",
                                         color: "#666",
                                     }}
@@ -353,19 +351,19 @@ const Activity: React.FC = () => {
                                     style={{
                                         width: "16px",
                                         height: "16px",
-                                        backgroundColor: "#a855f7",
+                                        backgroundColor: "#64748b",
                                         borderRadius: "2px",
                                     }}
                                 ></div>
                                 <span
                                     style={{
                                         fontFamily:
-                                            "Nunito-Regular, Arial, sans-serif",
+                                            "Gaegu-Regular, Arial, sans-serif",
                                         fontSize: "14px",
                                         color: "#666",
                                     }}
                                 >
-                                    Media
+                                    Other
                                 </span>
                             </div>
                             <div
@@ -383,7 +381,7 @@ const Activity: React.FC = () => {
                                 <span
                                     style={{
                                         fontFamily:
-                                            "Nunito-Regular, Arial, sans-serif",
+                                            "Gaegu-Regular, Arial, sans-serif",
                                         fontSize: "14px",
                                         color: "#666",
                                     }}
@@ -412,24 +410,26 @@ const Activity: React.FC = () => {
                 <div style={{ position: "relative" }}>
                     <svg
                         ref={svgRef}
-                        width={700}
+                        width={500}
                         height={300}
-                        style={{ display: "block" }}
+                        style={{
+                            display: "block",
+                            fontFamily: "Gaegu-Regular, Arial, sans-serif",
+                        }}
                     />
                     <div
                         ref={tooltipRef}
                         style={{
                             position: "fixed",
-                            backgroundColor: "rgba(0,0,0,0.8)",
-                            color: "white",
-                            padding: "8px 12px",
-                            borderRadius: "4px",
-                            fontSize: "12px",
-                            fontFamily: "Nunito-Regular, Arial, sans-serif",
+                            backgroundColor: "white",
+                            padding: "12px 16px", // Increased padding
+                            borderRadius: "6px",
+                            boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
                             pointerEvents: "none",
                             opacity: 0,
                             transition: "opacity 0.2s",
                             zIndex: 1000,
+                            fontFamily: "Gaegu-Regular, Arial, sans-serif",
                         }}
                     />
                 </div>

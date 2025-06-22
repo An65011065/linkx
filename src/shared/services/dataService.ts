@@ -2,7 +2,7 @@ import type {
     UrlVisit,
     TabSession,
     BrowsingSession,
-} from "../types/common.types";
+} from "../types/browsing.types";
 
 class DataService {
     private static instance: DataService;
@@ -14,6 +14,47 @@ class DataService {
             DataService.instance = new DataService();
         }
         return DataService.instance;
+    }
+
+    // Get today's session data
+    async getTodaySession(): Promise<BrowsingSession> {
+        return this.getCurrentSession();
+    }
+
+    // Get current session data
+    async getCurrentSession(): Promise<BrowsingSession> {
+        const today = this.getTodayDateString();
+        const key = `session_${today}`;
+
+        try {
+            const result = await chrome.storage.local.get(key);
+            const session = result[key] as BrowsingSession;
+
+            if (session) {
+                return session;
+            }
+        } catch (error) {
+            console.error("Error loading session:", error);
+        }
+
+        // Create new session if none exists
+        const newSession: BrowsingSession = {
+            date: today,
+            startTime: Date.now(),
+            endTime: Date.now(),
+            totalActiveTime: 0,
+            tabSessions: [],
+            stats: {
+                totalUrls: 0,
+                uniqueDomains: 0,
+                workTime: 0,
+                socialTime: 0,
+                otherTime: 0,
+            },
+        };
+
+        await this.saveSession(newSession);
+        return newSession;
     }
 
     // Category classification based on domain
@@ -103,20 +144,6 @@ class DataService {
         return { category: "other", confidence: 0.5 };
     }
 
-    // Extract domain from URL
-    private extractDomain(url: string): string {
-        try {
-            return new URL(url).hostname;
-        } catch {
-            return url;
-        }
-    }
-
-    // Generate unique ID
-    private generateId(): string {
-        return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    }
-
     // Get today's date string
     private getTodayDateString(): string {
         return new Date().toISOString().split("T")[0];
@@ -125,7 +152,7 @@ class DataService {
     // Storage methods
     async saveTabSession(tabSession: TabSession): Promise<void> {
         const today = this.getTodayDateString();
-        const session = await this.getTodaySession();
+        const session = await this.getCurrentSession();
 
         const existingIndex = session.tabSessions.findIndex(
             (ts) => ts.tabId === tabSession.tabId,
@@ -144,78 +171,55 @@ class DataService {
             session.stats.otherTime;
         session.endTime = Date.now();
 
-        await chrome.storage.local.set({ [`session_${today}`]: session });
+        await this.saveSession(session);
     }
 
-    async getTodaySession(): Promise<BrowsingSession> {
-        const today = this.getTodayDateString();
-        const result = await chrome.storage.local.get([`session_${today}`]);
-
-        if (result[`session_${today}`]) {
-            return result[`session_${today}`];
-        }
-
-        // Create new session for today
-        const newSession: BrowsingSession = {
-            date: today,
-            startTime: Date.now(),
-            endTime: Date.now(),
-            totalActiveTime: 0,
-            tabSessions: [],
-            stats: {
-                totalUrls: 0,
-                uniqueDomains: 0,
-                workTime: 0,
-                socialTime: 0,
-                otherTime: 0,
-            },
-        };
-
-        await chrome.storage.local.set({ [`session_${today}`]: newSession });
-        return newSession;
-    }
-
-    async addUrlVisit(urlVisit: UrlVisit): Promise<void> {
-        const session = await this.getTodaySession();
+    async addUrlVisit(visit: UrlVisit): Promise<void> {
+        // Get current session
+        const session = await this.getCurrentSession();
 
         // Find or create tab session
         let tabSession = session.tabSessions.find(
-            (ts) => ts.tabId === urlVisit.tabId,
+            (ts) => ts.tabId === visit.tabId,
         );
         if (!tabSession) {
             tabSession = {
-                tabId: urlVisit.tabId,
-                windowId: urlVisit.windowId,
-                openedAt: Date.now(),
+                tabId: visit.tabId,
+                windowId: visit.windowId,
+                openedAt: visit.startTime,
                 totalActiveTime: 0,
                 urlVisits: [],
             };
             session.tabSessions.push(tabSession);
         }
 
-        // Add or update URL visit
+        // Update or add URL visit
         const existingVisitIndex = tabSession.urlVisits.findIndex(
-            (v) => v.id === urlVisit.id,
+            (v) => v.id === visit.id,
         );
         if (existingVisitIndex >= 0) {
-            tabSession.urlVisits[existingVisitIndex] = urlVisit;
+            tabSession.urlVisits[existingVisitIndex] = visit;
         } else {
-            tabSession.urlVisits.push(urlVisit);
+            tabSession.urlVisits.push(visit);
         }
 
-        // Recalculate tab's total active time
-        tabSession.totalActiveTime = tabSession.urlVisits
-            .filter((v) => v.isActive)
-            .reduce((sum, v) => sum + v.duration, 0);
+        // Update tab session stats
+        tabSession.totalActiveTime = tabSession.urlVisits.reduce((total, v) => {
+            return total + (v.isActive ? v.duration : 0);
+        }, 0);
 
-        await this.saveTabSession(tabSession);
+        // Update session stats
+        this.updateSessionStats(session);
+
+        // Save session
+        await this.saveSession(session);
     }
 
     async updateTabActiveTime(
         tabId: number,
         additionalTime: number,
     ): Promise<void> {
-        const session = await this.getTodaySession();
+        const session = await this.getCurrentSession();
         const tabSession = session.tabSessions.find((ts) => ts.tabId === tabId);
 
         if (tabSession && tabSession.urlVisits.length > 0) {
@@ -231,7 +235,7 @@ class DataService {
     }
 
     async closeTab(tabId: number): Promise<void> {
-        const session = await this.getTodaySession();
+        const session = await this.getCurrentSession();
         const tabSession = session.tabSessions.find((ts) => ts.tabId === tabId);
 
         if (tabSession) {
@@ -253,23 +257,26 @@ class DataService {
         url: string,
         tabId: number,
         windowId: number,
-        navigationSource: UrlVisit["navigationSource"],
+        creationMode: "chain" | "hyperlink",
+        sourceInfo?: { nodeId: string; url: string; tabId: number },
         title?: string,
     ): UrlVisit {
-        const domain = this.extractDomain(url);
+        const now = Date.now();
+        const domain = new URL(url).hostname;
         const categoryResult = this.categorizeUrl(url, domain);
 
         return {
-            id: this.generateId(),
+            id: `${now}-${Math.random().toString(36).substr(2, 9)}`,
             url,
             domain,
             title,
-            startTime: Date.now(),
+            startTime: now,
             duration: 0,
             tabId,
             windowId,
             isActive: false,
-            navigationSource,
+            creationMode,
+            sourceInfo,
             category: categoryResult.category,
             categoryConfidence: categoryResult.confidence,
         };
@@ -317,7 +324,7 @@ class DataService {
 
     // Get browsing timeline for display (last N hours)
     async getBrowsingTimeline(hoursBack: number = 3): Promise<TabSession[]> {
-        const session = await this.getTodaySession();
+        const session = await this.getCurrentSession();
         const cutoffTime = Date.now() - hoursBack * 60 * 60 * 1000;
 
         return session.tabSessions
@@ -334,6 +341,42 @@ class DataService {
                 ),
             }))
             .filter((tabSession) => tabSession.urlVisits.length > 0);
+    }
+
+    async getAllUrlVisits(): Promise<UrlVisit[]> {
+        const session = await this.getCurrentSession();
+        return session.tabSessions.flatMap((ts) => ts.urlVisits);
+    }
+
+    private async saveSession(session: BrowsingSession): Promise<void> {
+        const key = `session_${session.date}`;
+        try {
+            await chrome.storage.local.set({ [key]: session });
+        } catch (error) {
+            console.error("Error saving session:", error);
+        }
+    }
+
+    private updateSessionStats(session: BrowsingSession): void {
+        const allVisits = session.tabSessions.flatMap((ts) => ts.urlVisits);
+        const uniqueDomains = new Set(allVisits.map((v) => v.domain));
+
+        session.stats = {
+            totalUrls: allVisits.length,
+            uniqueDomains: uniqueDomains.size,
+            workTime: this.calculateCategoryTime(allVisits, "work"),
+            socialTime: this.calculateCategoryTime(allVisits, "social"),
+            otherTime: this.calculateCategoryTime(allVisits, "other"),
+        };
+    }
+
+    private calculateCategoryTime(
+        visits: UrlVisit[],
+        category: "work" | "social" | "other",
+    ): number {
+        return visits
+            .filter((v) => v.category === category)
+            .reduce((total, v) => total + v.duration, 0);
     }
 }
 

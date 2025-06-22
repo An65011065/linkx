@@ -28,7 +28,13 @@
                 "src/assets/fonts/Nunito-Bold.ttf",
                 "src/assets/fonts/Nunito-Medium.ttf",
                 "src/assets/fonts/Nunito-Regular.ttf",
-                "src/assets/fonts/Nunito-SemiBold.ttf"
+                "src/assets/fonts/Nunito-SemiBold.ttf",
+                "src/assets/fonts/Gaegu-Bold.ttf",
+                "src/assets/fonts/Gaegu-Light.ttf",
+                "src/assets/fonts/Gaegu-Regular.ttf",
+                "src/assets/fonts/gaegu-v8-latin-regular.ttf",
+                "src/assets/fonts/indie-flower-v11-latin-regular.ttf",
+                "packages/roughviz.es.js"
             ],
             "matches": ["<all_urls>"]
         }

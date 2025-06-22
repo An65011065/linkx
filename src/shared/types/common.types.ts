@@ -1,4 +1,5 @@
-interface UrlVisit {
+// URL visit with source tracking
+export interface UrlVisit {
     id: string; // unique identifier
     url: string;
     domain: string; // extracted for easy filtering
@@ -9,26 +10,18 @@ interface UrlVisit {
     tabId: number;
     windowId: number;
     isActive: boolean; // was this tab actually focused
-
-    // Navigation context
-    navigationSource: {
-        type:
-            | "typed"
-            | "link"
-            | "reload"
-            | "back_forward"
-            | "auto_bookmark"
-            | "generated";
-        sourceUrl?: string; // if came from a link
-        sourceTabId?: number;
+    creationMode: "chain" | "hyperlink";
+    sourceInfo?: {
+        nodeId: string;
+        url: string;
+        tabId: number;
     };
-
-    // Calculated fields
     category: "work" | "social" | "other";
     categoryConfidence?: number; // 0-1 how sure we are
 }
 
-interface TabSession {
+// Tab session containing URL visits
+export interface TabSession {
     tabId: number;
     windowId: number;
     openedAt: number; // timestamp
@@ -40,7 +33,8 @@ interface TabSession {
     displayNumber?: number; // "Tab 1", "Tab 2" etc (assigned at display time)
 }
 
-interface BrowsingSession {
+// Daily browsing session
+export interface BrowsingSession {
     date: string; // 'YYYY-MM-DD'
     startTime: number;
     endTime: number;
@@ -58,10 +52,64 @@ interface BrowsingSession {
 }
 
 // For real-time tracking state
-interface ActiveTabInfo {
+export interface ActiveTabInfo {
     tabId: number;
     startTime: number;
     windowId: number;
 }
 
-export type { UrlVisit, TabSession, BrowsingSession, ActiveTabInfo };
+export interface RoughVizLineOptions {
+    element: string;
+    data: string;
+    y1: string;
+    y2: string;
+    width: number;
+    height: number;
+    margin: { top: number; right: number; bottom: number; left: number };
+    roughness: number;
+    strokeWidth: number;
+    circleRadius: number;
+    circleRoughness: number;
+    colors: string[];
+    interactive: boolean;
+    legend: boolean;
+    xLabel: string;
+    yLabel: string;
+    font: string;
+    axisFontSize: string;
+    labelFontSize: string;
+    tooltipFontSize: string;
+}
+
+export interface RoughVizRectangleOptions {
+    element: string;
+    data: string;
+    labels: string;
+    values: string;
+    width: number;
+    height: number;
+    roughness: number;
+    strokeWidth: number;
+    fillWeight: number;
+    fillStyle: string;
+    stroke: string;
+    interactive: boolean;
+    title?: string;
+    margin?: { top: number; right: number; bottom: number; left: number };
+    axisFontSize?: string;
+    labelFontSize?: string;
+}
+
+export interface RoughViz {
+    Line?: new (options: RoughVizLineOptions) => void;
+    Rectangle?: new (options: RoughVizRectangleOptions) => void;
+}
+
+declare global {
+    interface Window {
+        roughViz?: RoughViz;
+        Line?: new (options: RoughVizLineOptions) => void;
+        Rectangle?: new (options: RoughVizRectangleOptions) => void;
+        StandaloneRectangle?: new (options: RoughVizRectangleOptions) => void;
+    }
+}

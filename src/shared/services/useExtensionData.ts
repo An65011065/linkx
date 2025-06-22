@@ -1,5 +1,9 @@
 import { useState, useEffect } from "react";
-import type { BrowsingSession, TabSession } from "../types/common.types";
+import type {
+    BrowsingSession,
+    TabSession,
+    UrlVisit,
+} from "../types/browsing.types";
 import DataService from "./dataService";
 
 interface ExtensionData {
@@ -92,12 +96,68 @@ export const useTimelineData = () => {
     };
 };
 
-// Helper hook for activity data (hourly work and media data for last 24 hours)
+// Helper hook for activity data (hourly work and other data for last 24 hours)
 export const useActivityData = () => {
     const { session, loading, error } = useExtensionData();
 
     const getHourlyActivityData = () => {
-        if (!session) return [];
+        if (!session) {
+            console.log("No session data available");
+            return [];
+        }
+
+        console.log("Current session:", {
+            date: session.date,
+            tabCount: session.tabSessions.length,
+            totalUrls: session.tabSessions.reduce(
+                (sum, tab) => sum + tab.urlVisits.length,
+                0,
+            ),
+            stats: session.stats,
+        });
+
+        // Log categorized URLs and time spent
+        const categoryStats = {
+            work: { urls: new Set<string>(), timeSpent: 0 },
+            social: { urls: new Set<string>(), timeSpent: 0 },
+            other: { urls: new Set<string>(), timeSpent: 0 },
+        };
+
+        session.tabSessions.forEach((tabSession, idx) => {
+            console.log(`Tab session ${idx}:`, {
+                tabId: tabSession.tabId,
+                visitCount: tabSession.urlVisits.length,
+                activeVisits: tabSession.urlVisits.filter((v) => v.isActive)
+                    .length,
+            });
+
+            tabSession.urlVisits.forEach((visit) => {
+                if (!visit.isActive) return;
+
+                const timeInHours = visit.duration / (1000 * 60 * 60);
+                categoryStats[visit.category].urls.add(visit.url);
+                categoryStats[visit.category].timeSpent += timeInHours;
+
+                // Log individual visits for debugging
+                console.log(`Visit in tab ${tabSession.tabId}:`, {
+                    url: visit.url,
+                    category: visit.category,
+                    duration: timeInHours.toFixed(2) + "h",
+                    isActive: visit.isActive,
+                });
+            });
+        });
+
+        // Convert Sets to Arrays for better console logging
+        const formattedStats = Object.entries(categoryStats).map(
+            ([category, data]) => ({
+                category,
+                urls: Array.from(data.urls),
+                timeSpent: Number(data.timeSpent.toFixed(2)),
+            }),
+        );
+
+        console.log("Category Statistics:", formattedStats);
 
         const now = new Date();
         const hourlyData = [];
@@ -110,7 +170,7 @@ export const useActivityData = () => {
             hourEnd.setHours(hourEnd.getHours() + 1);
 
             let workTime = 0;
-            let mediaTime = 0; // Using socialTime as media time
+            let otherTime = 0; // Combined non-work time
 
             // Aggregate time for this hour from all tab sessions
             session.tabSessions.forEach((tabSession) => {
@@ -134,8 +194,9 @@ export const useActivityData = () => {
 
                         if (visit.category === "work") {
                             workTime += overlapDuration;
-                        } else if (visit.category === "social") {
-                            mediaTime += overlapDuration;
+                        } else {
+                            // Combine both social and other into otherTime
+                            otherTime += overlapDuration;
                         }
                     }
                 });
@@ -145,7 +206,7 @@ export const useActivityData = () => {
                 hour: hourStart.getHours(),
                 date: hourStart,
                 workTime: Math.max(0, workTime),
-                mediaTime: Math.max(0, mediaTime),
+                otherTime: Math.max(0, otherTime),
             });
         }
 
@@ -154,6 +215,68 @@ export const useActivityData = () => {
 
     return {
         activityData: getHourlyActivityData(),
+        loading,
+        error,
+    };
+};
+
+// Helper hook for channel-specific data
+export const useChannelData = () => {
+    const { session, loading, error } = useExtensionData();
+
+    const calculateChannelTime = (
+        urlVisits: UrlVisit[],
+        domainPatterns: string[],
+    ): number => {
+        return (
+            urlVisits.reduce((total, visit) => {
+                if (!visit.isActive) return total;
+
+                const domain = visit.domain.toLowerCase();
+                const matchesDomain = domainPatterns.some((pattern) =>
+                    domain.includes(pattern),
+                );
+
+                if (matchesDomain) {
+                    const duration = visit.duration || 0;
+                    return total + duration;
+                }
+                return total;
+            }, 0) /
+            (1000 * 60 * 60)
+        ); // Convert to hours
+    };
+
+    const getChannelData = () => {
+        if (!session) {
+            return {
+                gmail: 0,
+                outlook: 0,
+                youtube: 0,
+                chatgpt: 0,
+            };
+        }
+
+        const allVisits = session.tabSessions.flatMap((tab) => tab.urlVisits);
+
+        return {
+            gmail: calculateChannelTime(allVisits, ["gmail", "mail.google"]),
+            outlook: calculateChannelTime(allVisits, [
+                "outlook",
+                "office.com",
+                "live.com",
+            ]),
+            youtube: calculateChannelTime(allVisits, ["youtube", "youtu.be"]),
+            chatgpt: calculateChannelTime(allVisits, [
+                "chatgpt",
+                "chat.openai",
+                "openai.com",
+            ]),
+        };
+    };
+
+    return {
+        channelData: getChannelData(),
         loading,
         error,
     };

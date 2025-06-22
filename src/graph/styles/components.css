@@ -1,0 +1,249 @@
+.graph-container {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+    background: #f8f9fa;
+}
+
+/* Loading state */
+.loading-text {
+    font-family: "Nunito-Regular", Arial, sans-serif;
+    font-size: 18px;
+    fill: #2d3436;
+    opacity: 0;
+    animation: fadeIn 0.3s ease-in forwards;
+}
+
+/* Node and link animations */
+.node circle {
+    transition:
+        r 0.3s ease-out,
+        fill 0.3s ease-out,
+        stroke 0.3s ease-out;
+    will-change: transform;
+}
+
+.node text {
+    font-family: "Nunito-Regular", Arial, sans-serif;
+    transition: opacity 0.4s ease-out;
+    will-change: opacity, transform;
+}
+
+.links path {
+    transition:
+        stroke-width 0.3s ease-out,
+        opacity 0.3s ease-out;
+    will-change: d, opacity;
+}
+
+/* Cluster styling with transitions */
+.cluster-group {
+    pointer-events: none;
+    z-index: 1;
+    will-change: transform, opacity;
+}
+
+.cluster-hull {
+    pointer-events: none;
+    z-index: 1;
+    transition:
+        d 0.3s ease-out,
+        opacity 0.3s ease-out;
+    will-change: d, opacity;
+}
+
+.cluster-time-label {
+    pointer-events: none;
+    z-index: 2;
+    transition: transform 0.3s ease-out;
+    will-change: transform;
+}
+
+.cluster-time-label text {
+    font-family: "Nunito-Bold", sans-serif;
+    text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.8);
+}
+
+.cluster-time-background {
+    fill: #fff3bf;
+    fill-opacity: 0.9;
+    stroke: #ffd700;
+    stroke-opacity: 0.3;
+    rx: 4;
+}
+
+@keyframes pulse {
+    0% {
+        stroke-opacity: 0.1;
+    }
+    50% {
+        stroke-opacity: 0.4;
+    }
+    100% {
+        stroke-opacity: 0.1;
+    }
+}
+
+.cluster-hull {
+    animation: pulse 3s ease-in-out infinite;
+}
+
+/* Z-index layering */
+.links {
+    z-index: 0;
+}
+
+.nodes {
+    z-index: 3;
+}
+
+.tooltip {
+    position: absolute;
+    padding: 12px 16px;
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    border-radius: 8px;
+    pointer-events: none;
+    font-family: "Nunito-Regular", Arial, sans-serif;
+    font-size: 13px;
+    line-height: 1.4;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 1000;
+    max-width: 280px;
+    width: max-content;
+    min-width: 200px;
+    opacity: 0;
+    transition: opacity 0.2s ease-out;
+}
+
+.tooltip.show {
+    opacity: 1;
+}
+
+.tooltip .url {
+    color: #4285f4;
+    font-weight: 700;
+    margin-bottom: 6px;
+    word-wrap: break-word;
+    white-space: normal;
+    line-height: 1.5;
+}
+
+.tooltip .time {
+    color: #ffffff;
+    font-size: 12px;
+    padding-top: 2px;
+    font-weight: 700;
+}
+
+.tooltip .metrics {
+    margin-top: 8px;
+    font-size: 11px;
+    color: #b2bec3;
+}
+
+.tooltip .metrics div {
+    display: flex;
+    justify-content: space-between;
+    margin: 2px 0;
+}
+
+.tooltip hr {
+    border: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    margin: 8px 0;
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes expandOut {
+    from {
+        transform: scale(0.8) translate(-50%, -50%);
+    }
+    to {
+        transform: scale(1) translate(-50%, -50%);
+    }
+}
+
+/* Performance optimizations */
+.nodes,
+.links,
+.clusters {
+    transform-origin: center center;
+    backface-visibility: hidden;
+    perspective: 1000px;
+    transform: translateZ(0);
+}
+
+.search-button {
+    background-color: #ff6b6b;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(255, 107, 107, 0.2);
+}
+
+.search-button:hover {
+    background-color: #ff5252;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(255, 107, 107, 0.3);
+}
+
+.search-input {
+    width: 300px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 2px solid #ff6b6b;
+    outline: none;
+    font-size: 14px;
+    transition: all 0.2s ease;
+    background: white;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.search-input:focus {
+    border-color: #ff5252;
+    box-shadow: 0 0 0 3px rgba(255, 107, 107, 0.2);
+}
+
+.search-input-container {
+    display: flex;
+    align-items: center;
+    opacity: 0;
+    animation: fadeIn 0.2s ease forwards;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.nodes circle {
+    transition: stroke-width 0.15s ease-out;
+}
+
+.nodes circle:hover {
+    stroke-width: 5px;
+}

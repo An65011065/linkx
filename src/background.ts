@@ -1,22 +1,100 @@
 import DataService from "./shared/services/dataService";
-import type { ActiveTabInfo, UrlVisit } from "./shared/types/common.types";
+import type { UrlVisit } from "./shared/types/browsing.types";
 
 console.log("🟢 Background script loaded!", new Date().toISOString());
+
+interface ActiveTabInfo {
+    tabId: number;
+    windowId: number;
+    startTime: number;
+}
 
 class BackgroundTracker {
     private dataService: DataService;
     private currentActiveTab: ActiveTabInfo | null = null;
-    private currentUrlVisits: Map<number, UrlVisit> = new Map();
+    private currentUrlVisits: Map<number, UrlVisit>;
+    private sourceUrlMap: Map<
+        number,
+        { url: string; nodeId: string; tabId: number }
+    >;
     private isUserIdle: boolean = false;
 
     constructor() {
         this.dataService = DataService.getInstance();
+        this.currentUrlVisits = new Map();
+        this.sourceUrlMap = new Map();
         this.setupListeners();
         console.log("🚀 BackgroundTracker initialized");
     }
 
     private setupListeners() {
         console.log("🔧 Setting up Chrome API listeners...");
+
+        // Track when links are opened in new tabs (hyperlink navigation)
+        chrome.webNavigation.onCreatedNavigationTarget.addListener(
+            async (details) => {
+                const sourceTabs = await chrome.tabs.query({
+                    active: true,
+                    currentWindow: true,
+                });
+                const sourceTab = sourceTabs[0];
+                if (sourceTab?.url && sourceTab?.id) {
+                    const sourceVisit = this.currentUrlVisits.get(sourceTab.id);
+                    if (sourceVisit) {
+                        this.sourceUrlMap.set(details.tabId, {
+                            url: sourceTab.url,
+                            nodeId: sourceVisit.id,
+                            tabId: sourceTab.id,
+                        });
+                    }
+                }
+            },
+        );
+
+        // Handle URL updates
+        chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+            if (!changeInfo.url || !tab.windowId) return;
+
+            // Check if this is a hyperlink navigation
+            const sourceInfo = this.sourceUrlMap.get(tabId);
+            const creationMode = sourceInfo ? "hyperlink" : "chain";
+
+            // Get previous visit in the same tab for chain navigation
+            const previousVisit = this.currentUrlVisits.get(tabId);
+            const chainSourceInfo = previousVisit
+                ? {
+                      nodeId: previousVisit.id,
+                      url: previousVisit.url,
+                      tabId: previousVisit.tabId,
+                  }
+                : undefined;
+
+            // Create new URL visit
+            const newVisit = this.dataService.createUrlVisit(
+                changeInfo.url,
+                tabId,
+                tab.windowId,
+                creationMode,
+                sourceInfo || chainSourceInfo,
+                changeInfo.title || tab.title,
+            );
+
+            // End previous visit in this tab if it exists
+            if (previousVisit) {
+                previousVisit.endTime = Date.now();
+                previousVisit.duration =
+                    previousVisit.endTime - previousVisit.startTime;
+                await this.dataService.addUrlVisit(previousVisit);
+            }
+
+            this.currentUrlVisits.set(tabId, newVisit);
+            await this.dataService.addUrlVisit(newVisit);
+
+            // Clear source info after using it
+            if (sourceInfo) {
+                this.sourceUrlMap.delete(tabId);
+            }
+        });
 
         // Message passing for dashboard communication
         chrome.runtime.onMessage.addListener(
@@ -41,30 +119,67 @@ class BackgroundTracker {
         });
 
         // Active time tracking
-        chrome.tabs.onActivated.addListener((activeInfo) => {
-            this.handleTabActivated(activeInfo);
+        chrome.tabs.onActivated.addListener(async (activeInfo) => {
+            const now = Date.now();
+
+            // Update previous active tab
+            if (this.currentActiveTab) {
+                const previousVisit = this.currentUrlVisits.get(
+                    this.currentActiveTab.tabId,
+                );
+                if (previousVisit) {
+                    previousVisit.isActive = false;
+                    await this.dataService.addUrlVisit(previousVisit);
+                }
+            }
+
+            // Update new active tab
+            const currentVisit = this.currentUrlVisits.get(activeInfo.tabId);
+            if (currentVisit) {
+                currentVisit.isActive = true;
+                await this.dataService.addUrlVisit(currentVisit);
+            }
+
+            this.currentActiveTab = {
+                tabId: activeInfo.tabId,
+                windowId: activeInfo.windowId,
+                startTime: now,
+            };
         });
 
-        chrome.windows.onFocusChanged.addListener((windowId) => {
-            this.handleWindowFocusChanged(windowId);
+        chrome.windows.onFocusChanged.addListener(async (windowId) => {
+            if (windowId === chrome.windows.WINDOW_ID_NONE) {
+                if (this.currentActiveTab) {
+                    const visit = this.currentUrlVisits.get(
+                        this.currentActiveTab.tabId,
+                    );
+                    if (visit) {
+                        visit.isActive = false;
+                        await this.dataService.addUrlVisit(visit);
+                    }
+                }
+                this.currentActiveTab = null;
+            }
         });
 
         // Idle state tracking
-        chrome.idle.onStateChanged.addListener((state) => {
-            this.handleIdleStateChanged(state);
+        chrome.idle.onStateChanged.addListener(async (state) => {
+            this.isUserIdle = state !== "active";
+            if (this.isUserIdle && this.currentActiveTab) {
+                const visit = this.currentUrlVisits.get(
+                    this.currentActiveTab.tabId,
+                );
+                if (visit) {
+                    visit.isActive = false;
+                    await this.dataService.addUrlVisit(visit);
+                }
+            }
         });
 
         // Navigation tracking
-        chrome.webNavigation.onBeforeNavigate.addListener((details) => {
-            this.handleBeforeNavigate(details);
-        });
-
-        chrome.webNavigation.onCompleted.addListener((details) => {
-            this.handleNavigationCompleted(details);
-        });
-
-        // Set idle detection interval (30 seconds)
-        chrome.idle.setDetectionInterval(30);
+        chrome.webNavigation.onBeforeNavigate.addListener(
+            this.handleBeforeNavigate.bind(this),
+        );
 
         console.log("✅ All Chrome API listeners set up successfully");
 
@@ -230,120 +345,17 @@ class BackgroundTracker {
         }
     }
 
-    private async handleTabActivated(activeInfo: chrome.tabs.TabActiveInfo) {
-        console.log("Tab activated:", activeInfo.tabId, activeInfo.windowId);
-
-        // End previous active time
-        await this.endCurrentActiveTime();
-
-        // Start tracking new active tab (only if not idle)
-        if (!this.isUserIdle) {
-            this.currentActiveTab = {
-                tabId: activeInfo.tabId,
-                startTime: Date.now(),
-                windowId: activeInfo.windowId,
-            };
-
-            // Mark current URL visit as active
-            const currentVisit = this.currentUrlVisits.get(activeInfo.tabId);
-            if (currentVisit) {
-                currentVisit.isActive = true;
-                await this.dataService.addUrlVisit(currentVisit);
-            }
-        }
-    }
-
-    private async handleWindowFocusChanged(windowId: number) {
-        console.log("Window focus changed:", windowId);
-
-        if (windowId === chrome.windows.WINDOW_ID_NONE) {
-            // Browser lost focus
-            await this.endCurrentActiveTime();
-        } else {
-            // Browser gained focus - get active tab in focused window
-            try {
-                const tabs = await chrome.tabs.query({
-                    active: true,
-                    windowId,
-                });
-                if (tabs[0]) {
-                    await this.handleTabActivated({
-                        tabId: tabs[0].id!,
-                        windowId: windowId,
-                    });
-                }
-            } catch (error) {
-                console.error("Error getting active tab:", error);
-            }
-        }
-    }
-
-    private async handleIdleStateChanged(state: chrome.idle.IdleState) {
-        console.log("Idle state changed:", state);
-
-        this.isUserIdle = state !== "active";
-
-        if (this.isUserIdle) {
-            await this.endCurrentActiveTime();
-        } else {
-            // User became active - resume tracking current tab
-            try {
-                const tabs = await chrome.tabs.query({
-                    active: true,
-                    currentWindow: true,
-                });
-                if (tabs[0] && tabs[0].id) {
-                    await this.handleTabActivated({
-                        tabId: tabs[0].id,
-                        windowId: tabs[0].windowId!,
-                    });
-                }
-            } catch (error) {
-                console.error("Error resuming active tracking:", error);
-            }
-        }
-    }
-
     private async handleBeforeNavigate(
         details: chrome.webNavigation.WebNavigationParentedCallbackDetails,
     ) {
         if (details.frameId !== 0) return; // Only track main frame navigations
 
-        console.log("Before navigate:", details.tabId, details.url);
-        // Navigation source will be determined in handleNavigationCompleted
-    }
-
-    private async handleNavigationCompleted(
-        details: chrome.webNavigation.WebNavigationFramedCallbackDetails,
-    ) {
-        if (details.frameId !== 0) return; // Only track main frame navigations
-
-        console.log("Navigation completed:", details.tabId, details.url);
-
-        // Update navigation source for current URL visit (set to default since transitionType is not available)
-        const currentVisit = this.currentUrlVisits.get(details.tabId);
-        if (currentVisit && currentVisit.url === details.url) {
-            // Keep default navigation source type since transition info not readily available
-            await this.dataService.addUrlVisit(currentVisit);
-        }
-    }
-
-    private getNavigationType(
-        transitionType: string,
-    ): UrlVisit["navigationSource"]["type"] {
-        switch (transitionType) {
-            case "typed":
-                return "typed";
-            case "auto_bookmark":
-                return "auto_bookmark";
-            case "reload":
-                return "reload";
-            case "generated":
-                return "generated";
-            case "link":
-                return "link";
-            default:
-                return "link";
+        const previousVisit = this.currentUrlVisits.get(details.tabId);
+        if (previousVisit) {
+            previousVisit.endTime = Date.now();
+            previousVisit.duration =
+                previousVisit.endTime - previousVisit.startTime;
+            await this.dataService.addUrlVisit(previousVisit);
         }
     }
 
@@ -388,6 +400,45 @@ chrome.runtime.onStartup.addListener(() => {
 
 chrome.runtime.onInstalled.addListener(() => {
     console.log("Extension installed");
+});
+
+// Debug: Log storage contents
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    console.log("📨 Received message:", message.type, "from:", sender.url);
+
+    if (message.type === "DEBUG_GET_STORAGE") {
+        chrome.storage.local.get(null).then((result) => {
+            console.log("Current storage contents:", result);
+            const todaySession = Object.entries(result).find(([key]) =>
+                key.startsWith("session_"),
+            );
+            if (todaySession) {
+                const [key, session] = todaySession;
+                console.log("Active session found:", {
+                    key,
+                    tabCount: session.tabSessions?.length || 0,
+                    startTime: new Date(session.startTime).toLocaleString(),
+                    endTime: new Date(session.endTime).toLocaleString(),
+                    totalUrls:
+                        session.tabSessions?.reduce(
+                            (
+                                sum: number,
+                                tab: {
+                                    urlVisits: Array<{ isActive: boolean }>;
+                                },
+                            ) =>
+                                sum +
+                                tab.urlVisits.filter((v) => v.isActive).length,
+                            0,
+                        ) || 0,
+                });
+            } else {
+                console.log("No active session found");
+            }
+            sendResponse(result);
+        });
+        return true; // Will respond asynchronously
+    }
 });
 
 export {};

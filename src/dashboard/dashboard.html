@@ -7,6 +7,33 @@
     </head>
     <body>
         <div id="root"></div>
+
+        <!-- Load RoughViz before your React app -->
+        <script>
+            // Try to load RoughViz with multiple fallback paths
+            const loadRoughViz = async () => {
+                const possiblePaths = [
+                    chrome.runtime.getURL("packages/roughviz.es.js"),
+                    "./packages/roughviz.es.js",
+                    "../packages/roughviz.es.js",
+                ];
+
+                for (const path of possiblePaths) {
+                    try {
+                        console.log(`Trying to load RoughViz from: ${path}`);
+                        const module = await import(path);
+                        window.roughViz = module;
+                        console.log("RoughViz loaded successfully!");
+                        break;
+                    } catch (error) {
+                        console.warn(`Failed to load from ${path}:`, error);
+                    }
+                }
+            };
+
+            loadRoughViz();
+        </script>
+
         <script type="module" src="./dashboard.tsx"></script>
     </body>
 </html>
