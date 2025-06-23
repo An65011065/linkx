@@ -1,7 +1,5 @@
 // NetworkMetricsCalculator.ts - Network metrics calculation service
-
-import type { NetworkNode, NetworkLink } from "../hooks/useNetworkData";
-
+import type { NetworkNode, NetworkLink } from "../types/network.types";
 interface NetworkMetrics {
     pageRank: number;
     betweenness: number;

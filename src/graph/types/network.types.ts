@@ -1,6 +1,5 @@
 // network.types.ts - Network-related type definitions
 
-import * as d3 from "d3";
 import type { YouTubeMetadata } from "../utils/youtubeMetadata";
 
 export interface NetworkNode {
@@ -60,7 +59,7 @@ export interface SimNetworkNode extends NetworkNode {
     fy: number | null;
 }
 
-export interface SimNetworkLink extends NetworkLink {
+export interface SimNetworkLink extends Omit<NetworkLink, "source" | "target"> {
     source: SimNetworkNode;
     target: SimNetworkNode;
 }

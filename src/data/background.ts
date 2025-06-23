@@ -303,6 +303,13 @@ class BackgroundTracker {
     private async handleTabActivated(
         activeInfo: chrome.tabs.TabActiveInfo,
     ): Promise<void> {
+        console.log(
+            "🔵 Tab activated:",
+            activeInfo.tabId,
+            "window:",
+            activeInfo.windowId,
+        );
+
         const { tabId, windowId } = activeInfo;
         this.focusedTabId = tabId;
 
@@ -330,21 +337,38 @@ class BackgroundTracker {
         }
     }
 
-    // Handle when a tab's URL changes or loads
     private async handleTabUpdated(
         tabId: number,
         changeInfo: chrome.tabs.TabChangeInfo,
         tab: chrome.tabs.Tab,
     ): Promise<void> {
-        if (!tab.url) return;
+        console.log(
+            "🟢 Tab updated:",
+            tabId,
+            "changeInfo:",
+            changeInfo,
+            "url:",
+            tab.url,
+        );
+
+        if (!tab.url) {
+            console.log("❌ No URL in tab, skipping");
+            return;
+        }
 
         const state = this.tabStates.get(tabId) || { isActive: false };
 
-        if (changeInfo.status === "complete" && changeInfo.url) {
+        if (changeInfo.status === "complete" && tab.url) {
+            console.log("✅ Page completed loading:", changeInfo.url);
+
             let previousVisitInfo: { id: string; url: string } | undefined;
 
             // End previous visit if exists
             if (state.currentVisit) {
+                console.log(
+                    "📋 Finalizing previous visit:",
+                    state.currentVisit.url,
+                );
                 this.finalizeVisit(state.currentVisit);
                 previousVisitInfo = {
                     id: state.currentVisit.id,
@@ -359,6 +383,10 @@ class BackgroundTracker {
             let creationMode: "chain" | "hyperlink" = "chain";
 
             if (linkInfo) {
+                console.log(
+                    "🔗 Hyperlink navigation detected from:",
+                    linkInfo.sourceUrl,
+                );
                 // This tab was created from a link click (hyperlink navigation)
                 sourceInfo = {
                     nodeId: linkInfo.sourceVisitId || "",
@@ -368,6 +396,10 @@ class BackgroundTracker {
                 creationMode = "hyperlink";
                 this.linkCreatedTabs.delete(tabId);
             } else if (previousVisitInfo) {
+                console.log(
+                    "⛓️ Chain navigation detected from:",
+                    previousVisitInfo.url,
+                );
                 // This is navigation within the same tab (chain navigation)
                 sourceInfo = {
                     nodeId: previousVisitInfo.id,
@@ -377,6 +409,7 @@ class BackgroundTracker {
             }
 
             // Create and save new visit
+            console.log("📝 Creating new visit for:", tab.url);
             state.currentVisit = this.createUrlVisit(
                 tab.url,
                 tabId,
@@ -388,8 +421,14 @@ class BackgroundTracker {
 
             state.previousUrl = tab.url;
             this.tabStates.set(tabId, state);
+            console.log("💾 Saving visit to storage");
             await this.dataService.addUrlVisit(state.currentVisit);
+            console.log("✅ Visit saved successfully");
         } else if (changeInfo.title && state.currentVisit) {
+            console.log(
+                "📄 Title updated for existing visit:",
+                changeInfo.title,
+            );
             // Update title for existing visit
             state.currentVisit.title = changeInfo.title;
             await this.dataService.addUrlVisit(state.currentVisit);
@@ -463,7 +502,7 @@ class BackgroundTracker {
 
     // Handle web navigation events (for tracking URL changes)
     private async handleNavigation(
-        details: chrome.webNavigation.WebNavigationFrameCallbackDetails,
+        details: chrome.webNavigation.WebNavigationFramedCallbackDetails,
     ): Promise<void> {
         // Only handle main frame navigation
         if (details.frameId !== 0) return;

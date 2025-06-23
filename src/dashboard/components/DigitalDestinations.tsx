@@ -1,95 +1,117 @@
 import React from "react";
 import { useExtensionData } from "../../data/useExtensionData";
+import type { TabSession } from "../../data/dataService";
+import UrlVisit from "../../data/dataService";
 
-interface TopSite {
-    url: string;
-    timeSpent: number;
-    percentage: number;
+interface DomainData {
+    domain: string;
+    visits: number;
+    totalTime: number;
+    category: "work" | "social" | "other";
 }
 
 const DigitalDestinations: React.FC = () => {
-    const { session, loading, error } = useExtensionData();
+    const { currentSession, isLoading, error } = useExtensionData();
 
-    // Calculate top sites data
-    const calculateTopSites = (): TopSite[] => {
-        if (!session) return [];
-
-        // Calculate total time spent across all URLs
-        let totalTime = 0;
-        const urlTimeMap = new Map<string, number>();
-
-        session.tabSessions.forEach((tabSession) => {
-            tabSession.urlVisits.forEach((visit) => {
-                if (!visit.isActive) return;
-
-                const duration = visit.duration;
-                totalTime += duration;
-
-                const url = visit.url;
-                urlTimeMap.set(url, (urlTimeMap.get(url) || 0) + duration);
-            });
-        });
-
-        // Convert to array and sort by time spent
-        const topSites = Array.from(urlTimeMap.entries())
-            .map(([url, duration]) => ({
-                url,
-                timeSpent: duration / (1000 * 60), // Convert milliseconds to minutes
-                percentage: (duration / totalTime) * 100,
-            }))
-            .sort((a, b) => b.timeSpent - a.timeSpent)
-            .slice(0, 3); // Get top 3 sites
-
-        return topSites;
-    };
-
-    if (loading) {
+    if (isLoading) {
         return (
-            <div
-                style={{
-                    padding: "20px 0",
-                    fontFamily: "Nunito-Regular, Arial, sans-serif",
-                    color: "#666",
-                    fontSize: "14px",
-                }}
-            >
-                Loading digital destinations data...
+            <div style={{ margin: "40px 24px", width: "auto" }}>
+                <div
+                    style={{
+                        fontFamily: "Nunito-Regular, Arial, sans-serif",
+                        fontSize: "14px",
+                        color: "#666",
+                        padding: "20px 0",
+                    }}
+                >
+                    Loading destinations...
+                </div>
             </div>
         );
     }
 
     if (error) {
         return (
-            <div
-                style={{
-                    padding: "20px 0",
-                    fontFamily: "Nunito-Regular, Arial, sans-serif",
-                    color: "#d63031",
-                    fontSize: "14px",
-                }}
-            >
-                Error loading digital destinations data: {error}
+            <div style={{ margin: "40px 24px", width: "auto" }}>
+                <div
+                    style={{
+                        fontFamily: "Nunito-Regular, Arial, sans-serif",
+                        fontSize: "14px",
+                        color: "#d63031",
+                        padding: "20px 0",
+                    }}
+                >
+                    Error loading destinations: {error}
+                </div>
             </div>
         );
     }
 
-    const topSites = calculateTopSites();
+    if (!currentSession) {
+        return (
+            <div style={{ margin: "40px 24px", width: "auto" }}>
+                <div
+                    style={{
+                        fontFamily: "Nunito-Regular, Arial, sans-serif",
+                        fontSize: "14px",
+                        color: "#666",
+                        padding: "20px 0",
+                    }}
+                >
+                    No destination data available
+                </div>
+            </div>
+        );
+    }
 
-    const formatTime = (minutes: number): string => {
+    // Calculate top destinations from currentSession
+    const getTopDestinations = (): DomainData[] => {
+        const domainMap = new Map<string, DomainData>();
+
+        currentSession.tabSessions.forEach((tabSession: TabSession) => {
+            tabSession.urlVisits.forEach((visit: UrlVisit) => {
+                const domain = visit.domain;
+                const existing = domainMap.get(domain);
+
+                if (existing) {
+                    existing.visits += 1;
+                    existing.totalTime += visit.duration || 0;
+                } else {
+                    domainMap.set(domain, {
+                        domain,
+                        visits: 1,
+                        totalTime: visit.duration || 0,
+                        category: visit.category as "work" | "social" | "other",
+                    });
+                }
+            });
+        });
+
+        return Array.from(domainMap.values())
+            .sort((a, b) => b.totalTime - a.totalTime)
+            .slice(0, 10);
+    };
+
+    const topDestinations = getTopDestinations();
+
+    const formatTime = (milliseconds: number): string => {
+        const minutes = Math.floor(milliseconds / (1000 * 60));
         if (minutes < 60) {
-            return `${Math.round(minutes)}m`;
+            return `${minutes}m`;
         }
         const hours = Math.floor(minutes / 60);
-        const remainingMinutes = Math.round(minutes % 60);
+        const remainingMinutes = minutes % 60;
         return `${hours}h ${remainingMinutes}m`;
     };
 
-    const formatUrl = (url: string): string => {
-        try {
-            const urlObj = new URL(url);
-            return urlObj.hostname.replace("www.", "");
-        } catch {
-            return url;
+    const getCategoryColor = (category: string): string => {
+        switch (category) {
+            case "work":
+                return "#4285f4";
+            case "social":
+                return "#ff6b47";
+            default:
+                return "#6c757d";
         }
     };
 
@@ -113,128 +135,74 @@ const DigitalDestinations: React.FC = () => {
                     font-style: normal;
                 }
             `}</style>
-            <div
-                style={{
-                    marginTop: "40px",
-                    width: "100%",
-                    maxWidth: "600px",
-                    height: "300px", // Match Activity height
-                }}
-            >
-                {/* Header */}
-                <div
+            <div style={{ margin: "40px 24px", width: "auto" }}>
+                <h2
                     style={{
-                        marginBottom: "10px",
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
+                        fontFamily: "Nunito-Bold, Arial, sans-serif",
+                        fontSize: "20px",
+                        color: "#2d3436",
+                        marginBottom: "20px",
                     }}
                 >
-                    <h2
-                        style={{
-                            fontFamily: "Nunito-Bold, Arial, sans-serif",
-                            fontSize: "24px",
-                            fontWeight: "700",
-                            color: "#000",
-                            margin: "0",
-                        }}
-                    >
-                        Digital Champions
-                    </h2>
-                </div>
-
-                {/* Sites List */}
+                    Top Digital Destinations
+                </h2>
                 <div
                     style={{
-                        // backgroundColor: "#fff",
-                        padding: "0px",
-                        // boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
-                        height: "calc(100% - 60px)", // Account for header height
                         display: "flex",
                         flexDirection: "column",
-                        justifyContent: "space-between",
+                        gap: "12px",
                     }}
                 >
-                    {topSites.map((site, index) => (
+                    {topDestinations.map((destination, index) => (
                         <div
-                            key={site.url}
+                            key={destination.domain}
                             style={{
                                 display: "flex",
-                                alignItems: "center",
                                 justifyContent: "space-between",
-                                padding: "16px 0",
-                                borderBottom:
-                                    index < topSites.length - 1
-                                        ? "1px solid #f0f0f0"
-                                        : "none",
-                                flex: 1,
+                                alignItems: "center",
+                                padding: "12px 16px",
+                                backgroundColor: "#f8f9fa",
+                                borderRadius: "8px",
+                                borderLeft: `4px solid ${getCategoryColor(
+                                    destination.category,
+                                )}`,
                             }}
                         >
-                            <div
-                                style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "16px",
-                                }}
-                            >
+                            <div>
                                 <div
                                     style={{
-                                        width: "40px",
-                                        height: "40px",
-                                        backgroundColor: "#f0f0f0",
-                                        borderRadius: "8px",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
                                         fontFamily:
                                             "Nunito-Bold, Arial, sans-serif",
-                                        fontSize: "18px",
-                                        color: "#666",
+                                        fontSize: "14px",
+                                        color: "#2d3436",
+                                        marginBottom: "4px",
                                     }}
                                 >
-                                    {index + 1}
+                                    {destination.domain}
                                 </div>
                                 <div
                                     style={{
                                         fontFamily:
                                             "Nunito-Regular, Arial, sans-serif",
-                                        fontSize: "14px",
-                                        color: "#333",
+                                        fontSize: "12px",
+                                        color: "#636e72",
                                     }}
                                 >
-                                    {formatUrl(site.url)}
+                                    {destination.visits} visits •{" "}
+                                    {destination.category}
                                 </div>
                             </div>
                             <div
                                 style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "24px",
+                                    fontFamily:
+                                        "Nunito-Bold, Arial, sans-serif",
+                                    fontSize: "14px",
+                                    color: getCategoryColor(
+                                        destination.category,
+                                    ),
                                 }}
                             >
-                                <div
-                                    style={{
-                                        fontFamily:
-                                            "Nunito-Regular, Arial, sans-serif",
-                                        fontSize: "14px",
-                                        color: "#666",
-                                    }}
-                                >
-                                    {formatTime(site.timeSpent)}
-                                </div>
-                                <div
-                                    style={{
-                                        fontFamily:
-                                            "Nunito-Bold, Arial, sans-serif",
-                                        fontSize: "14px",
-                                        color: "#10b981",
-                                        backgroundColor: "#e9f5f3",
-                                        padding: "4px 12px",
-                                        borderRadius: "12px",
-                                    }}
-                                >
-                                    {Math.round(site.percentage)}%
-                                </div>
+                                {formatTime(destination.totalTime)}
                             </div>
                         </div>
                     ))}

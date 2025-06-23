@@ -1,7 +1,7 @@
 // SearchComponent.tsx - Search functionality component
 
 import React, { useState, useRef, useEffect } from "react";
-import type { NetworkNode } from "../hooks/useNetworkData";
+import type { NetworkNode } from "../types/network.types";
 import "../styles/components.css";
 
 interface SearchComponentProps {
@@ -9,10 +9,7 @@ interface SearchComponentProps {
     onSearch: (searchTerm: string) => void;
 }
 
-const SearchComponent: React.FC<SearchComponentProps> = ({
-    nodes,
-    onSearch,
-}) => {
+const SearchComponent: React.FC<SearchComponentProps> = ({ onSearch }) => {
     const [isExpanded, setIsExpanded] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
     const inputRef = useRef<HTMLInputElement>(null);

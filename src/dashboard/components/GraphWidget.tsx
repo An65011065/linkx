@@ -2,41 +2,44 @@ import React from "react";
 import { useExtensionData } from "../../data/useExtensionData";
 
 const GraphWidget: React.FC = () => {
-    const { loading, error } = useExtensionData();
+    const { isLoading, error } = useExtensionData();
 
-    const handleGraphClick = () => {
-        // Open the graph visualization in a new tab
+    const openGraph = () => {
         chrome.tabs.create({
             url: chrome.runtime.getURL("src/graph/graph.html"),
         });
     };
 
-    if (loading) {
+    if (isLoading) {
         return (
-            <div
-                style={{
-                    padding: "20px 0",
-                    fontFamily: "Nunito-Regular, Arial, sans-serif",
-                    color: "#666",
-                    fontSize: "14px",
-                }}
-            >
-                Loading graph data...
+            <div style={{ margin: "40px 24px", width: "auto" }}>
+                <div
+                    style={{
+                        fontFamily: "Nunito-Regular, Arial, sans-serif",
+                        fontSize: "14px",
+                        color: "#666",
+                        padding: "20px 0",
+                    }}
+                >
+                    Loading graph...
+                </div>
             </div>
         );
     }
 
     if (error) {
         return (
-            <div
-                style={{
-                    padding: "20px 0",
-                    fontFamily: "Nunito-Regular, Arial, sans-serif",
-                    color: "#d63031",
-                    fontSize: "14px",
-                }}
-            >
-                Error loading graph data: {error}
+            <div style={{ margin: "40px 24px", width: "auto" }}>
+                <div
+                    style={{
+                        fontFamily: "Nunito-Regular, Arial, sans-serif",
+                        fontSize: "14px",
+                        color: "#d63031",
+                        padding: "20px 0",
+                    }}
+                >
+                    Error loading graph: {error}
+                </div>
             </div>
         );
     }
@@ -60,84 +63,59 @@ const GraphWidget: React.FC = () => {
                     font-weight: 700;
                     font-style: normal;
                 }
-
-                .graph-widget {
-                    cursor: pointer;
-                    transition: transform 0.2s ease-in-out;
-                }
-
-                .graph-widget:hover {
-                    transform: scale(1.02);
-                }
-
-                .graph-preview {
-                    width: 100%;
-                    height: 100%;
-                    border-radius: 12px;
-                    background: linear-gradient(135deg, #f5f7fa 0%, #e4e7eb 100%);
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    font-family: 'Nunito-Regular', Arial, sans-serif;
-                    color: #666;
-                    text-align: center;
-                    padding: 20px;
-                }
             `}</style>
-            <div
-                style={{
-                    marginTop: "40px",
-                    width: "100%",
-                    maxWidth: "600px",
-                    height: "300px",
-                }}
-            >
-                {/* Header */}
-                <div
+            <div style={{ margin: "40px 24px", width: "auto" }}>
+                <h2
                     style={{
-                        marginBottom: "10px",
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
+                        fontFamily: "Nunito-Bold, Arial, sans-serif",
+                        fontSize: "20px",
+                        color: "#2d3436",
+                        marginBottom: "20px",
                     }}
                 >
-                    <h2
+                    Network Graph
+                </h2>
+                <div
+                    style={{
+                        backgroundColor: "#f8f9fa",
+                        borderRadius: "12px",
+                        padding: "24px",
+                        textAlign: "center",
+                    }}
+                >
+                    <div
                         style={{
-                            fontFamily: "Nunito-Bold, Arial, sans-serif",
-                            fontSize: "24px",
-                            fontWeight: "700",
-                            color: "#000",
-                            margin: "0",
+                            fontFamily: "Nunito-Regular, Arial, sans-serif",
+                            fontSize: "14px",
+                            color: "#636e72",
+                            marginBottom: "16px",
                         }}
                     >
-                        Browsing Graph
-                    </h2>
-                </div>
-
-                {/* Graph Preview */}
-                <div
-                    className="graph-widget"
-                    onClick={handleGraphClick}
-                    style={{
-                        height: "calc(100% - 60px)", // Account for header height
-                    }}
-                >
-                    <div className="graph-preview">
-                        <div>
-                            <div
-                                style={{
-                                    fontSize: "18px",
-                                    marginBottom: "10px",
-                                }}
-                            >
-                                Click to explore your browsing patterns
-                            </div>
-                            <div style={{ fontSize: "14px", opacity: 0.8 }}>
-                                View detailed network analysis and
-                                visualizations
-                            </div>
-                        </div>
+                        Visualize your browsing patterns as an interactive
+                        network
                     </div>
+                    <button
+                        onClick={openGraph}
+                        style={{
+                            backgroundColor: "#4285f4",
+                            color: "white",
+                            border: "none",
+                            borderRadius: "8px",
+                            padding: "12px 24px",
+                            fontFamily: "Nunito-Bold, Arial, sans-serif",
+                            fontSize: "14px",
+                            cursor: "pointer",
+                            transition: "background-color 0.2s",
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = "#3367d6";
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = "#4285f4";
+                        }}
+                    >
+                        Open Network Graph
+                    </button>
                 </div>
             </div>
         </>
