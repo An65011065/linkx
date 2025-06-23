@@ -1,18 +1,20 @@
 import React from "react";
 import ChannelCard from "./ChannelCard";
-import { useExtensionData } from "../../shared/services/useExtensionData";
-import { useChannelData } from "../../shared/services/useExtensionData";
+import {
+    useExtensionData,
+    getChannelData,
+    getChannelUrlCounts,
+} from "../../data/useExtensionData";
 
 const Channel: React.FC = () => {
-    const { session, loading, error } = useExtensionData();
-    const { channelData } = useChannelData();
+    const { currentSession, isLoading, error } = useExtensionData();
 
     // Format time to one decimal place and add "h" suffix
     const formatTime = (hours: number): string => {
         return `${hours.toFixed(1)}h`;
     };
 
-    if (loading) {
+    if (isLoading) {
         return (
             <div style={{ margin: "40px 24px", width: "auto" }}>
                 <div
@@ -46,59 +48,8 @@ const Channel: React.FC = () => {
         );
     }
 
-    // Calculate URL counts for each domain
-    const getUrlCounts = () => {
-        if (!session) {
-            return {
-                gmail: 0,
-                outlook: 0,
-                youtube: 0,
-                chatgpt: 0,
-            };
-        }
-
-        const counts = {
-            gmail: 0,
-            outlook: 0,
-            youtube: 0,
-            chatgpt: 0,
-        };
-
-        session.tabSessions.forEach((tabSession) => {
-            tabSession.urlVisits.forEach((visit) => {
-                if (!visit.isActive) return;
-
-                const domain = visit.domain.toLowerCase();
-                if (
-                    domain.includes("gmail") ||
-                    domain.includes("mail.google")
-                ) {
-                    counts.gmail++;
-                } else if (
-                    domain.includes("outlook") ||
-                    domain.includes("office.com") ||
-                    domain.includes("live.com")
-                ) {
-                    counts.outlook++;
-                } else if (
-                    domain.includes("youtube") ||
-                    domain.includes("youtu.be")
-                ) {
-                    counts.youtube++;
-                } else if (
-                    domain.includes("chatgpt") ||
-                    domain.includes("chat.openai") ||
-                    domain.includes("openai.com")
-                ) {
-                    counts.chatgpt++;
-                }
-            });
-        });
-
-        return counts;
-    };
-
-    const urlCounts = getUrlCounts();
+    const channelData = getChannelData(currentSession);
+    const urlCounts = getChannelUrlCounts(currentSession);
 
     return (
         <>

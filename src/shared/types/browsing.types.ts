@@ -14,12 +14,13 @@ export interface UrlVisit {
     endTime?: number;
     duration: number;
     isActive: boolean;
+    activeTime: number;
+    lastActiveTime?: number;
     tabId: number;
     windowId: number;
     creationMode: "chain" | "hyperlink";
     sourceInfo?: SourceInfo;
     category: "work" | "social" | "other";
-    categoryConfidence: number;
 }
 
 // Tab session containing URL visits
@@ -46,5 +47,6 @@ export interface BrowsingSession {
         workTime: number;
         socialTime: number;
         otherTime: number;
+        totalTime: number;
     };
 }

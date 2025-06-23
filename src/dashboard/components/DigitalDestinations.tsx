@@ -1,5 +1,5 @@
 import React from "react";
-import { useExtensionData } from "../../shared/services/useExtensionData";
+import { useExtensionData } from "../../data/useExtensionData";
 
 interface TopSite {
     url: string;

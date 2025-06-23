@@ -9,6 +9,7 @@ export default defineConfig(({ mode }) => ({
         watch: mode === "development" ? {} : undefined,
         rollupOptions: {
             input: {
+                background: "src/data/background.ts",
                 popup: "src/popup/popup.html",
                 graph: "src/graph/graph.html",
                 dashboard: "src/dashboard/dashboard.html",

@@ -1,8 +1,14 @@
 import React from "react";
-import { useStatsData } from "../../shared/services/useExtensionData";
+import { useExtensionData } from "../../data/useExtensionData";
 
 const Header: React.FC = () => {
-    const { stats, loading } = useStatsData();
+    const { currentSession, isLoading } = useExtensionData();
+
+    const totalUrls =
+        currentSession?.tabSessions.reduce(
+            (total, tab) => total + tab.urlVisits.length,
+            0,
+        ) || 0;
 
     return (
         <div style={{ textAlign: "center", marginBottom: "16px" }}>
@@ -24,7 +30,7 @@ const Header: React.FC = () => {
                     marginBottom: "4px",
                 }}
             >
-                {loading ? "..." : `${stats.totalUrls} sites visited`}
+                {isLoading ? "..." : `${totalUrls} sites visited`}
             </div>
         </div>
     );

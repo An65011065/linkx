@@ -1,7 +1,7 @@
 // useNetworkData.ts - Hook for managing network data
 
 import { useEffect, useState } from "react";
-import DataService from "../../shared/services/dataService";
+import DataService from "../../data/dataService";
 import type { UrlVisit } from "../../shared/types/browsing.types";
 import type {
     NetworkData,

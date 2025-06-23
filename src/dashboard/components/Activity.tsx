@@ -1,6 +1,9 @@
 import React, { useEffect, useRef } from "react";
 import * as d3 from "d3";
-import { useActivityData } from "../../shared/services/useExtensionData";
+import {
+    useExtensionData,
+    getActivitySummary,
+} from "../../data/useExtensionData";
 
 interface HourlyData {
     hour: number;
@@ -12,7 +15,7 @@ interface HourlyData {
 const Activity: React.FC = () => {
     const svgRef = useRef<SVGSVGElement>(null);
     const tooltipRef = useRef<HTMLDivElement>(null);
-    const { activityData, loading, error } = useActivityData();
+    const { activityData, loading, error } = useExtensionData();
 
     useEffect(() => {
         if (!svgRef.current || loading || error || activityData.length === 0)

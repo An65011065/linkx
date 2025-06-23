@@ -1,7 +1,17 @@
 import React, { useEffect, useRef } from "react";
 import * as d3 from "d3";
-import { useTimelineData } from "../../shared/services/useExtensionData";
-import type { UrlVisit } from "../../shared/types/common.types";
+import { useExtensionData } from "../../data/useExtensionData";
+import type { TabSession } from "../../data/dataService";
+import type { UrlVisit } from "../../data/background";
+
+// Safe domain extraction
+const extractDomain = (url: string): string => {
+    try {
+        return new URL(url).hostname.replace(/^www\./, "");
+    } catch {
+        return url.split("/")[2]?.replace(/^www\./, "") || url;
+    }
+};
 
 const getTypeColor = (type: string, isActive = false) => {
     const colors = {
@@ -24,11 +34,10 @@ const formatTime = (timestamp: number) => {
 const TimelineChart: React.FC = () => {
     const svgRef = useRef<SVGSVGElement>(null);
     const tooltipRef = useRef<HTMLDivElement>(null);
-    const { timeline, loading, error } = useTimelineData();
+    const { currentSession, isLoading, error } = useExtensionData();
 
     useEffect(() => {
-        if (!svgRef.current || loading || error || timeline.length === 0)
-            return;
+        if (!svgRef.current || isLoading || error || !currentSession) return;
 
         const svg = d3.select(svgRef.current);
         svg.selectAll("*").remove(); // Clear previous render
@@ -43,7 +52,7 @@ const TimelineChart: React.FC = () => {
 
         // Get all URL visits from timeline
         const allVisits: Array<UrlVisit & { tabDisplayNumber: number }> = [];
-        timeline.forEach((tabSession) => {
+        currentSession.tabSessions.forEach((tabSession: TabSession) => {
             tabSession.urlVisits.forEach((visit) => {
                 allVisits.push({
                     ...visit,
@@ -77,7 +86,11 @@ const TimelineChart: React.FC = () => {
 
         const yScale = d3
             .scaleBand()
-            .domain(timeline.map((tab) => (tab.displayNumber || 1).toString()))
+            .domain(
+                currentSession.tabSessions.map((tab) =>
+                    (tab.displayNumber || 1).toString(),
+                ),
+            )
             .range([0, height])
             .paddingInner(0.1);
 
@@ -113,7 +126,7 @@ const TimelineChart: React.FC = () => {
 
         // Tab labels
         g.selectAll(".tab-label")
-            .data(timeline)
+            .data(currentSession.tabSessions)
             .enter()
             .append("text")
             .attr("class", "tab-label")
@@ -146,7 +159,7 @@ const TimelineChart: React.FC = () => {
             .style("z-index", "10");
 
         // Draw timeline fragments for each tab
-        timeline.forEach((tab) => {
+        currentSession.tabSessions.forEach((tab) => {
             const tabGroup = g.append("g").attr("class", `tab-${tab.tabId}`);
             const yPos =
                 yScale((tab.displayNumber || 1).toString())! +
@@ -178,7 +191,10 @@ const TimelineChart: React.FC = () => {
                         .attr("rx", 3)
                         .attr(
                             "fill",
-                            getTypeColor(visit.category, visit.isActive),
+                            getTypeColor(
+                                visit.category || "other",
+                                visit.isActive,
+                            ),
                         )
                         .style("cursor", "pointer")
                         .style("opacity", 0.9)
@@ -196,7 +212,7 @@ const TimelineChart: React.FC = () => {
                             const durationMinutes = Math.round(
                                 visit.duration / (1000 * 60),
                             );
-                            const displayUrl = visit.domain || visit.url;
+                            const displayUrl = extractDomain(visit.url);
 
                             tooltip
                                 .style("opacity", 1)
@@ -228,14 +244,16 @@ const TimelineChart: React.FC = () => {
                         });
                 });
         });
-    }, [timeline, loading, error]);
+    }, [currentSession, isLoading, error]);
 
     // Calculate if we have "other" category for legend
-    const hasOther = timeline.some((tab) =>
-        tab.urlVisits.some((visit) => visit.category === "other"),
+    const hasOther = currentSession?.tabSessions.some((tab) =>
+        tab.urlVisits.some(
+            (visit) => !visit.category || visit.category === "other",
+        ),
     );
 
-    if (loading) {
+    if (isLoading) {
         return (
             <div style={{ marginBottom: "16px" }}>
                 <div
@@ -250,7 +268,13 @@ const TimelineChart: React.FC = () => {
                         justifyContent: "center",
                     }}
                 >
-                    <div style={{ fontSize: "12px", color: "#636e72" }}>
+                    <div
+                        style={{
+                            fontSize: "11px",
+                            fontWeight: 500,
+                            color: "#636e72",
+                        }}
+                    >
                         Loading timeline...
                     </div>
                 </div>
@@ -273,8 +297,14 @@ const TimelineChart: React.FC = () => {
                         justifyContent: "center",
                     }}
                 >
-                    <div style={{ fontSize: "12px", color: "#d63031" }}>
-                        Error loading timeline: {error}
+                    <div
+                        style={{
+                            fontSize: "11px",
+                            fontWeight: 500,
+                            color: "#d63031",
+                        }}
+                    >
+                        Error: {error}
                     </div>
                 </div>
             </div>
@@ -283,124 +313,36 @@ const TimelineChart: React.FC = () => {
 
     return (
         <div style={{ marginBottom: "16px" }}>
-            {/* Timeline Chart Container */}
             <div
                 style={{
                     backgroundColor: "#fafbfc",
                     borderRadius: "12px",
                     padding: "16px",
                     marginBottom: "16px",
-                    height: "120px",
-                    position: "relative",
                 }}
             >
-                <button
-                    onClick={() => {
-                        // Open graph in new tab
-                        window.open("graph.html", "_blank");
-                    }}
-                    style={{
-                        position: "absolute",
-                        top: "12px",
-                        right: "12px",
-                        width: "20px",
-                        height: "20px",
-                        border: "none",
-                        borderRadius: "4px",
-                        backgroundColor: "#f0f4ff",
-                        color: "#4285f4",
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: "10px",
-                        transition: "all 0.2s ease",
-                        zIndex: 10,
-                    }}
-                    onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = "#4285f4";
-                        e.currentTarget.style.color = "white";
-                    }}
-                    onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = "#f0f4ff";
-                        e.currentTarget.style.color = "#4285f4";
-                    }}
-                    title="Open full graph"
-                >
-                    ↗
-                </button>
                 <svg
                     ref={svgRef}
-                    width="280"
-                    height="120"
-                    style={{ overflow: "visible" }}
+                    style={{
+                        width: "100%",
+                        height: "120px",
+                        overflow: "visible",
+                    }}
                 />
                 <div ref={tooltipRef} />
             </div>
-
-            {/* Legend */}
             <div
                 style={{
                     display: "flex",
                     justifyContent: "center",
-                    gap: "16px",
+                    gap: "12px",
                     fontSize: "9px",
-                    color: "#636e72",
+                    fontWeight: 500,
                 }}
             >
-                <div
-                    style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "4px",
-                    }}
-                >
-                    <div
-                        style={{
-                            width: "8px",
-                            height: "8px",
-                            backgroundColor: "#4285f4",
-                            borderRadius: "2px",
-                        }}
-                    />
-                    Work
-                </div>
-                <div
-                    style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "4px",
-                    }}
-                >
-                    <div
-                        style={{
-                            width: "8px",
-                            height: "8px",
-                            backgroundColor: "#ff6b47",
-                            borderRadius: "2px",
-                        }}
-                    />
-                    Social
-                </div>
-                {hasOther && (
-                    <div
-                        style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "4px",
-                        }}
-                    >
-                        <div
-                            style={{
-                                width: "8px",
-                                height: "8px",
-                                backgroundColor: "#6c757d",
-                                borderRadius: "2px",
-                            }}
-                        />
-                        Other
-                    </div>
-                )}
+                <span style={{ color: "#4285f4" }}>Work</span>
+                <span style={{ color: "#ff6b47" }}>Social</span>
+                {hasOther && <span style={{ color: "#6c757d" }}>Other</span>}
             </div>
         </div>
     );

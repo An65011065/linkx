@@ -1,11 +1,62 @@
 // StatsPanel.tsx - Stats display (visits, time, domains)
 import React from "react";
-import { useStatsData } from "../../shared/services/useExtensionData";
+import { useExtensionData } from "../../data/useExtensionData";
+
+// Safe domain extraction
+const extractDomain = (url: string): string => {
+    try {
+        return new URL(url).hostname.replace(/^www\./, "");
+    } catch {
+        return url.split("/")[2]?.replace(/^www\./, "") || url;
+    }
+};
 
 const StatsPanel: React.FC = () => {
-    const { stats, totalActiveTime, loading, error } = useStatsData();
+    const { currentSession, isLoading, error } = useExtensionData();
 
-    if (loading) {
+    // Calculate stats from currentSession
+    const calculateStats = () => {
+        if (!currentSession)
+            return {
+                totalTime: 0,
+                workTime: 0,
+                socialTime: 0,
+                otherTime: 0,
+                uniqueDomains: 0,
+                totalUrls: 0,
+            };
+
+        const allVisits = currentSession.tabSessions.flatMap(
+            (tab) => tab.urlVisits,
+        );
+        const uniqueDomains = new Set(
+            allVisits.map((visit) => extractDomain(visit.url)),
+        ).size;
+        const totalUrls = allVisits.length;
+
+        const timesByCategory = allVisits.reduce(
+            (acc, visit) => {
+                if (!visit.isActive) return acc;
+                const duration = (visit.duration || 0) / 3600; // Convert to hours
+                const category = visit.category?.toLowerCase() || "other";
+
+                if (category.includes("work")) acc.workTime += duration;
+                else if (category.includes("social"))
+                    acc.socialTime += duration;
+                else acc.otherTime += duration;
+
+                acc.totalTime += duration;
+                return acc;
+            },
+            { totalTime: 0, workTime: 0, socialTime: 0, otherTime: 0 },
+        );
+
+        return { ...timesByCategory, uniqueDomains, totalUrls };
+    };
+
+    const stats = calculateStats();
+
+    if (isLoading) {
         return (
             <div
                 style={{
@@ -83,7 +134,7 @@ const StatsPanel: React.FC = () => {
                     marginBottom: "4px",
                 }}
             >
-                {totalActiveTime.toFixed(1)}h
+                {stats.totalTime.toFixed(1)}h
             </div>
             <div
                 style={{

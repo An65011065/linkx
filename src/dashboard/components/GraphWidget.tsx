@@ -1,5 +1,5 @@
 import React from "react";
-import { useExtensionData } from "../../shared/services/useExtensionData";
+import { useExtensionData } from "../../data/useExtensionData";
 
 const GraphWidget: React.FC = () => {
     const { loading, error } = useExtensionData();

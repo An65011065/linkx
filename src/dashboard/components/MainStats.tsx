@@ -1,9 +1,10 @@
 import React, { useEffect, useRef } from "react";
-import { useStatsData } from "../../shared/services/useExtensionData";
+import { useExtensionData, getQuickStats } from "../../data/useExtensionData";
 import type {
     RoughViz,
     RoughVizRectangleOptions,
 } from "../../shared/types/common.types";
+import type { BrowsingSession } from "../../shared/types/browsing.types";
 
 declare global {
     interface Window {
@@ -202,7 +203,7 @@ const GradientCard: React.FC<GradientCardProps> = ({
 };
 
 const MainStats: React.FC = () => {
-    const { stats, totalActiveTime, loading, error } = useStatsData();
+    const { stats, totalActiveTime, loading, error } = useExtensionData();
 
     useEffect(() => {
         // Simple loading like your working example
