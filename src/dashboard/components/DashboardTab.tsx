@@ -1,9 +1,9 @@
 import React from "react";
 import MainStats from "./MainStats";
 import Activity from "./Activity";
-import Channel from "./Channel";
 import DigitalDestinations from "./DigitalDestinations";
-import GraphWidget from "./GraphWidget";
+import Channel from "./Channel";
+import WebsiteBlocker from "./WebsiteBlocker";
 
 const DashboardTab: React.FC = () => {
     return (
@@ -40,6 +40,7 @@ const DashboardTab: React.FC = () => {
                     font-weight: 300;
                     font-style: normal;
                 }
+                @import url('https://fonts.googleapis.com/icon?family=Material+Icons');
             `}</style>
             <div
                 style={{
@@ -51,43 +52,35 @@ const DashboardTab: React.FC = () => {
             >
                 <div
                     style={{
-                        fontFamily: "Gaegu-Bold, Arial, sans-serif",
-                        fontSize: "22px",
+                        fontFamily: "Nunito-Bold, Arial, sans-serif",
+                        fontSize: "32px",
                         fontWeight: "700",
-                        color: "#666",
+                        color: "#000",
                         letterSpacing: "0px",
                     }}
                 >
-                    LINKx
+                    linkX
                 </div>
                 <h1
                     style={{
-                        fontFamily: "Gaegu-Bold, Arial, sans-serif",
+                        fontFamily: "Nunito-Bold, Arial, sans-serif",
                         fontSize: "56px",
                         fontWeight: "1200",
                         margin: "0",
                         marginTop: "-8px",
                         color: "#000",
-                        letterSpacing: "-4px",
+                        letterSpacing: "0px",
                     }}
                 >
-                    DASHBOARD
+                    Dashboard
                 </h1>
-                <MainStats />
-                <div
-                    style={{
-                        display: "flex",
-                        gap: "200px",
-                        alignItems: "flex-start",
-                    }}
-                >
+                <div className="grid grid-cols-1 gap-6">
+                    <MainStats />
+                    <WebsiteBlocker />
                     <Activity />
-                    <div>
-                        <GraphWidget />
-                        <DigitalDestinations />
-                    </div>
+                    <DigitalDestinations />
+                    <Channel />
                 </div>
-                <Channel />
             </div>
         </div>
     );

@@ -9,7 +9,8 @@
         "activeTab",
         "webNavigation",
         "idle",
-        "windows"
+        "windows",
+        "declarativeNetRequest"
     ],
     "host_permissions": ["*://*/*"],
     "action": {
@@ -17,6 +18,15 @@
     },
     "background": {
         "service_worker": "src/data/background.js"
+    },
+    "declarativeNetRequest": {
+        "rule_resources": [
+            {
+                "id": "ruleset_1",
+                "enabled": true,
+                "path": "rules.json"
+            }
+        ]
     },
     "web_accessible_resources": [
         {
