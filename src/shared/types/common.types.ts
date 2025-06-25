@@ -39,3 +39,10 @@ export interface MetricSummary {
     peak: number;
     trend: "up" | "down" | "stable";
 }
+
+export interface BlockedSite {
+    domain: string;
+    ruleId: number;
+    startTime: number;
+    endTime: number;
+}
