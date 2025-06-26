@@ -2,16 +2,22 @@
 
 import React from "react";
 import { format } from "date-fns";
+import { Play, Pause, SkipBack, X } from "lucide-react";
+import EvolutionSearch from "./EvolutionSearch";
+import type { NetworkNode } from "../types/network.types";
 
 interface EvolutionPlayerProps {
     isPlaying: boolean;
     speed: number;
     currentTimestamp: number;
+    nodes: NetworkNode[];
+    selectedNode: string | null;
     onPlay: () => void;
     onPause: () => void;
     onReset: () => void;
     onSpeedChange: (speed: number) => void;
     onClose: () => void;
+    onNodeSelect: (nodeId: string | null) => void;
 }
 
 const speedOptions = [
@@ -27,11 +33,14 @@ export const EvolutionPlayer: React.FC<EvolutionPlayerProps> = ({
     isPlaying,
     speed,
     currentTimestamp,
+    nodes,
+    selectedNode,
     onPlay,
     onPause,
     onReset,
     onSpeedChange,
     onClose,
+    onNodeSelect,
 }) => {
     const date = new Date(currentTimestamp);
     const timeStr = format(date, "h:mm a");
@@ -40,7 +49,6 @@ export const EvolutionPlayer: React.FC<EvolutionPlayerProps> = ({
     return (
         <>
             <div
-                className="evolution-player"
                 style={{
                     position: "absolute",
                     top: "20px",
@@ -72,7 +80,11 @@ export const EvolutionPlayer: React.FC<EvolutionPlayerProps> = ({
                         transition: "all 0.2s ease",
                     }}
                 >
-                    {isPlaying ? "⏸" : "▶"}
+                    {isPlaying ? (
+                        <Pause size={16} fill="currentColor" />
+                    ) : (
+                        <Play size={16} fill="currentColor" />
+                    )}
                 </button>
 
                 <button
@@ -88,10 +100,9 @@ export const EvolutionPlayer: React.FC<EvolutionPlayerProps> = ({
                         border: "none",
                         borderRadius: "8px",
                         cursor: "pointer",
-                        transition: "all 0.2s ease",
                     }}
                 >
-                    ⏮
+                    <SkipBack size={16} fill="currentColor" />
                 </button>
 
                 <select
@@ -113,6 +124,12 @@ export const EvolutionPlayer: React.FC<EvolutionPlayerProps> = ({
                     ))}
                 </select>
 
+                <EvolutionSearch
+                    nodes={nodes}
+                    onNodeSelect={onNodeSelect}
+                    selectedNode={selectedNode}
+                />
+
                 <button
                     onClick={onClose}
                     style={{
@@ -129,14 +146,14 @@ export const EvolutionPlayer: React.FC<EvolutionPlayerProps> = ({
                         transition: "all 0.2s ease",
                     }}
                 >
-                    ✕
+                    <X size={16} />
                 </button>
             </div>
 
             {/* Time Display */}
             <div
                 style={{
-                    position: "absolute",
+                    position: "fixed",
                     bottom: "40px",
                     right: "40px",
                     display: "flex",

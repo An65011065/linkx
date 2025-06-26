@@ -9,39 +9,23 @@ interface SearchComponentProps {
     onSearch: (searchTerm: string) => void;
 }
 
-const SearchComponent: React.FC<SearchComponentProps> = ({ onSearch }) => {
-    const [isExpanded, setIsExpanded] = useState(false);
+const SearchComponent: React.FC<SearchComponentProps> = ({
+    nodes,
+    onSearch,
+}) => {
     const [searchTerm, setSearchTerm] = useState("");
     const inputRef = useRef<HTMLInputElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
-
-    // Handle click outside to collapse
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (
-                containerRef.current &&
-                !containerRef.current.contains(event.target as Node)
-            ) {
-                if (!searchTerm) {
-                    setTimeout(() => {
-                        setIsExpanded(false);
-                    }, 150); // 150ms delay before collapse
-                }
-            }
-        };
-
-        document.addEventListener("mousedown", handleClickOutside);
-        return () =>
-            document.removeEventListener("mousedown", handleClickOutside);
-    }, [searchTerm]);
 
     // Handle ESC key
     useEffect(() => {
         const handleEsc = (event: KeyboardEvent) => {
             if (event.key === "Escape") {
                 setSearchTerm("");
-                setIsExpanded(false);
                 onSearch("");
+                if (inputRef.current) {
+                    inputRef.current.blur();
+                }
             }
         };
 
@@ -49,16 +33,19 @@ const SearchComponent: React.FC<SearchComponentProps> = ({ onSearch }) => {
         return () => document.removeEventListener("keydown", handleEsc);
     }, [onSearch]);
 
-    // Focus input when expanded
-    useEffect(() => {
-        if (isExpanded && inputRef.current) {
-            inputRef.current.focus();
-        }
-    }, [isExpanded]);
-
     const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const value = event.target.value;
         setSearchTerm(value);
+
+        // Filter nodes based on search term
+        const filteredNodes = nodes.filter(
+            (node) =>
+                node.url.toLowerCase().includes(value.toLowerCase()) ||
+                (node.youtubeMetadata?.title || "")
+                    .toLowerCase()
+                    .includes(value.toLowerCase()),
+        );
+
         onSearch(value);
     };
 
@@ -71,40 +58,27 @@ const SearchComponent: React.FC<SearchComponentProps> = ({ onSearch }) => {
                 left: "50%",
                 transform: "translateX(-50%)",
                 zIndex: 1000,
+                width: "400px",
             }}
         >
-            {!isExpanded ? (
-                <button
-                    onClick={() => setIsExpanded(true)}
-                    className="search-button"
-                >
-                    <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 16 16"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                    >
-                        <path
-                            d="M7 13A6 6 0 1 0 7 1a6 6 0 0 0 0 12zm8.5 2.5L11 11"
-                            stroke="white"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                        />
-                    </svg>
-                </button>
-            ) : (
-                <div className="search-input-container">
-                    <input
-                        ref={inputRef}
-                        type="text"
-                        value={searchTerm}
-                        onChange={handleSearchChange}
-                        placeholder="Search URLs..."
-                        className="search-input"
-                    />
-                </div>
-            )}
+            <div className="search-input-container">
+                <input
+                    ref={inputRef}
+                    type="text"
+                    value={searchTerm}
+                    onChange={handleSearchChange}
+                    placeholder="Search URLs"
+                    className="search-input"
+                    style={{
+                        width: "100%",
+                        padding: "12px 16px",
+                        fontSize: "14px",
+                        border: "1px solid rgba(0, 0, 0, 0.1)",
+                        borderRadius: "8px",
+                        backgroundColor: "rgba(255, 255, 255, 0.9)",
+                    }}
+                />
+            </div>
         </div>
     );
 };

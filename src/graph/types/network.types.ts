@@ -62,4 +62,11 @@ export interface SimNetworkNode extends NetworkNode {
 export interface SimNetworkLink extends Omit<NetworkLink, "source" | "target"> {
     source: SimNetworkNode;
     target: SimNetworkNode;
+    weight: number;
+    tabId?: number;
+    frequency?: number;
+    transitions: {
+        timestamp: number;
+        sourceType: "chain" | "hyperlink";
+    }[];
 }
