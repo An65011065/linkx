@@ -54,7 +54,8 @@ const MainTab: React.FC = () => {
             border: "2px solid #ddd",
             borderRadius: "16px",
             boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
-            overflow: activeTab === "network" ? "hidden" : ("scroll" as const),
+            overflowY: activeTab === "network" ? "hidden" : ("scroll" as const),
+            overflowX: "hidden",
             transition: "all 0.8s cubic-bezier(0.4, 0, 0.2, 1)",
             position: "relative" as const,
         };

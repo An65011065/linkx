@@ -5,6 +5,7 @@ import {
     fetchYouTubeMetadata,
     isYouTubeUrl,
 } from "../graph/utils/youtubeMetadata";
+import AIService from "./services/AIService";
 
 interface Insight {
     id: string;
@@ -151,7 +152,7 @@ const Insights: React.FC = () => {
         }
     }, [visibleInsights, insights]);
 
-    const handleSendMessage = () => {
+    const handleSendMessage = async () => {
         if (message.trim()) {
             const newUserMessage: Insight = {
                 id: `user-${Date.now()}`,
@@ -161,6 +162,47 @@ const Insights: React.FC = () => {
 
             setInsights((prev) => [...prev, newUserMessage]);
             setMessage("");
+
+            try {
+                // Show loading state
+                const loadingMessage: Insight = {
+                    id: `ai-loading-${Date.now()}`,
+                    text: "Thinking...",
+                    type: "insight",
+                };
+                setInsights((prev) => [...prev, loadingMessage]);
+
+                // Get AI response
+                const aiService = AIService.getInstance();
+                const response = await aiService.generateResponse(
+                    message.trim(),
+                );
+
+                // Remove loading message and add AI response
+                setInsights((prev) => {
+                    const filtered = prev.filter(
+                        (msg) => msg.id !== loadingMessage.id,
+                    );
+                    return [
+                        ...filtered,
+                        {
+                            id: `ai-${Date.now()}`,
+                            text: response,
+                            type: "insight",
+                        },
+                    ];
+                });
+            } catch (error) {
+                console.error("Error getting AI response:", error);
+                setInsights((prev) => [
+                    ...prev,
+                    {
+                        id: `error-${Date.now()}`,
+                        text: "Sorry, I couldn't process your message at the moment.",
+                        type: "insight",
+                    },
+                ]);
+            }
         }
     };
 
@@ -347,6 +389,7 @@ const Insights: React.FC = () => {
                         fontFamily:
                             "Nunito-Regular, Helvetica Neue, Helvetica, sans-serif",
                         fontSize: "16px",
+                        overflowX: "hidden",
                     }}
                 >
                     {allMessages.map((insight) => {
