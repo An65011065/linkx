@@ -8,22 +8,29 @@
         "dev:extension": "vite build --watch --mode development",
         "build": "tsc -b && vite build",
         "build:extension": "vite build",
-        "preview": "vite preview"
+        "preview": "vite preview",
+        "test:ct": "playwright test -c playwright-ct.config.ts"
     },
     "dependencies": {
         "d3": "^7.9.0",
         "date-fns": "^4.1.0",
+        "dotenv": "^16.6.0",
+        "firebase": "^11.9.1",
         "framer-motion": "^12.18.1",
         "lucide-react": "^0.515.0",
+        "openai": "^5.8.1",
         "react": "^19.1.0",
         "react-dom": "^19.1.0"
     },
     "devDependencies": {
         "@crxjs/vite-plugin": "^2.0.0",
         "@eslint/js": "^9.25.0",
+        "@playwright/experimental-ct-react": "^1.53.1",
+        "@playwright/test": "^1.53.1",
         "@tailwindcss/postcss": "^4.1.10",
         "@types/chrome": "^0.0.326",
         "@types/d3": "^7.4.3",
+        "@types/node": "^24.0.4",
         "@types/react": "^19.1.8",
         "@types/react-dom": "^19.1.6",
         "@vitejs/plugin-react": "^4.5.2",

@@ -44,7 +44,9 @@
                 "src/assets/fonts/Gaegu-Regular.ttf",
                 "src/assets/fonts/gaegu-v8-latin-regular.ttf",
                 "src/assets/fonts/indie-flower-v11-latin-regular.ttf",
-                "packages/roughviz.es.js"
+                "src/assets/leaves.png",
+                "packages/roughviz.es.js",
+                "src/main/main.html"
             ],
             "matches": ["<all_urls>"]
         }
