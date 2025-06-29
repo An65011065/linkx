@@ -16,135 +16,204 @@ interface Insight {
     chartData?: { label: string; value: number }[];
 }
 
-const Insights: React.FC = () => {
+interface InsightsProps {
+    onInputFocusChange: (focused: boolean) => void;
+}
+
+const Insights: React.FC<InsightsProps> = ({ onInputFocusChange }) => {
     const [visibleInsights, setVisibleInsights] = useState<number>(0);
     const [insights, setInsights] = useState<Insight[]>([]);
     const [message, setMessage] = useState("");
     const chatContainerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
+        setInsights([
+            {
+                id: "1",
+                text: "Loading your browsing stats...",
+                type: "insight",
+            },
+            {
+                id: "2",
+                text: "Analyzing your most visited sites...",
+                type: "insight",
+            },
+            {
+                id: "3",
+                text: "Checking your YouTube activity...",
+                type: "nudge",
+            },
+            {
+                id: "4",
+                text: "Looking at your late night browsing...",
+                type: "nudge",
+            },
+        ]);
+
         const loadInsights = async () => {
-            const dataService = DataService.getInstance();
-            const session = await dataService.getCurrentSession();
-            const allVisits = session.tabSessions.flatMap((ts) => ts.urlVisits);
+            try {
+                const dataService = DataService.getInstance();
+                const session = await dataService.getCurrentSession();
+                const allVisits = session.tabSessions.flatMap(
+                    (ts) => ts.urlVisits,
+                );
+                const totalTabs = session.tabSessions.length;
+                const totalActiveMinutes = Math.round(
+                    session.stats.totalTime / (1000 * 60),
+                );
 
-            // Calculate total tabs and active time
-            const totalTabs = session.tabSessions.length;
-            const totalActiveMinutes = Math.round(
-                session.stats.totalTime / (1000 * 60),
-            );
+                setInsights((prev) => [
+                    {
+                        id: "1",
+                        text: `You opened ${totalTabs} tabs today, and spent ${totalActiveMinutes} minutes on your browser.`,
+                        type: "insight",
+                    },
+                    ...prev.slice(1),
+                ]);
 
-            // Calculate top domains by time
-            const domainTimes = new Map<string, number>();
-            allVisits.forEach((visit) => {
-                const current = domainTimes.get(visit.domain) || 0;
-                domainTimes.set(visit.domain, current + visit.activeTime);
-            });
+                const domainTimes = new Map<string, number>();
+                allVisits.forEach((visit) => {
+                    const current = domainTimes.get(visit.domain) || 0;
+                    domainTimes.set(visit.domain, current + visit.activeTime);
+                });
 
-            const topDomains = Array.from(domainTimes.entries())
-                .sort(([, a], [, b]) => b - a)
-                .slice(0, 5) // Get top 5 instead of 3
-                .map(([domain, time]) => ({
-                    label: domain,
-                    value: Math.round(time / (1000 * 60)), // Convert to minutes
-                }));
+                const topDomains = Array.from(domainTimes.entries())
+                    .sort(([, a], [, b]) => b - a)
+                    .slice(0, 5)
+                    .map(([domain, time]) => ({
+                        label: domain,
+                        value: Math.round(time / (1000 * 60)),
+                    }));
 
-            // Calculate YouTube channel times
-            const youtubeVisits = allVisits.filter((visit) =>
-                isYouTubeUrl(visit.url),
-            );
-            const channelTimes = new Map<string, number>();
-            for (const visit of youtubeVisits) {
-                const metadata = await fetchYouTubeMetadata(visit.url);
-                if (metadata) {
-                    const current = channelTimes.get(metadata.author_name) || 0;
-                    channelTimes.set(
-                        metadata.author_name,
-                        current + visit.activeTime,
+                setInsights((prev) => [
+                    prev[0],
+                    {
+                        id: "2",
+                        text:
+                            topDomains.length > 0
+                                ? `${topDomains[0].label} took most of your time today.`
+                                : "No significant site usage detected.",
+                        type: "insight",
+                        hasChart: topDomains.length > 0,
+                        chartData:
+                            topDomains.length > 0 ? topDomains : undefined,
+                    },
+                    ...prev.slice(2),
+                ]);
+
+                const after10PMTime = allVisits.reduce((total, visit) => {
+                    const visitDate = new Date(visit.startTime);
+                    return visitDate.getHours() >= 22
+                        ? total + visit.activeTime
+                        : total;
+                }, 0);
+                const after10PMMinutes = Math.round(
+                    after10PMTime / (1000 * 60),
+                );
+
+                setInsights((prev) => [
+                    ...prev.slice(0, 3),
+                    {
+                        id: "4",
+                        text:
+                            after10PMMinutes > 0
+                                ? `You spent ${after10PMMinutes} minutes after 10 PM. Consider setting a daily limit?`
+                                : "No late night browsing detected today.",
+                        type: "nudge",
+                        cta: after10PMMinutes > 0 ? "Set limit" : undefined,
+                    },
+                ]);
+
+                const youtubeVisits = allVisits.filter((visit) =>
+                    isYouTubeUrl(visit.url),
+                );
+                if (youtubeVisits.length > 0) {
+                    const channelTimes = new Map<string, number>();
+                    await Promise.allSettled(
+                        youtubeVisits.map(async (visit) => {
+                            try {
+                                const metadata = await fetchYouTubeMetadata(
+                                    visit.url,
+                                );
+                                if (metadata) {
+                                    const current =
+                                        channelTimes.get(
+                                            metadata.author_name,
+                                        ) || 0;
+                                    channelTimes.set(
+                                        metadata.author_name,
+                                        current + visit.activeTime,
+                                    );
+                                }
+                            } catch (error) {
+                                console.warn(
+                                    "Failed to fetch YouTube metadata for:",
+                                    visit.url,
+                                );
+                            }
+                        }),
                     );
+
+                    const topChannel = Array.from(channelTimes.entries()).sort(
+                        ([, a], [, b]) => b - a,
+                    )[0];
+                    setInsights((prev) => [
+                        ...prev.slice(0, 2),
+                        {
+                            id: "3",
+                            text: topChannel
+                                ? `You watched ${Math.round(
+                                      topChannel[1] / (1000 * 60),
+                                  )} minutes of ${
+                                      topChannel[0]
+                                  }, consider setting a limit?`
+                                : "YouTube activity detected but couldn't analyze channels.",
+                            type: "nudge",
+                            cta: topChannel ? "Set limit" : undefined,
+                        },
+                        prev[3],
+                    ]);
+                } else {
+                    setInsights((prev) => [
+                        ...prev.slice(0, 2),
+                        {
+                            id: "3",
+                            text: "No YouTube activity detected today.",
+                            type: "nudge",
+                        },
+                        prev[3],
+                    ]);
                 }
+            } catch (error) {
+                console.error("Error loading insights:", error);
             }
-            const topChannel = Array.from(channelTimes.entries()).sort(
-                ([, a], [, b]) => b - a,
-            )[0];
-
-            // Calculate time after 10 PM
-            const after10PMTime = allVisits.reduce((total, visit) => {
-                const visitDate = new Date(visit.startTime);
-                if (visitDate.getHours() >= 22) {
-                    // 10 PM or later
-                    return total + visit.activeTime;
-                }
-                return total;
-            }, 0);
-            const after10PMMinutes = Math.round(after10PMTime / (1000 * 60));
-
-            setInsights([
-                {
-                    id: "1",
-                    text: `You opened ${totalTabs} tabs today, and spent ${totalActiveMinutes} minutes on your browser.`,
-                    type: "insight",
-                },
-                {
-                    id: "2",
-                    text: `${topDomains[0].label} took most of your time today.`,
-                    type: "insight",
-                    hasChart: true,
-                    chartData: topDomains,
-                },
-                {
-                    id: "3",
-                    text: topChannel
-                        ? `You watched ${Math.round(
-                              topChannel[1] / (1000 * 60),
-                          )} minutes of ${
-                              topChannel[0]
-                          }, consider setting a limit?`
-                        : "No YouTube activity detected today.",
-                    type: "nudge",
-                    cta: "Set limit",
-                },
-                {
-                    id: "4",
-                    text:
-                        after10PMMinutes > 0
-                            ? `You spent ${after10PMMinutes} minutes after 10 PM. Consider setting a daily limit?`
-                            : "No late night browsing detected today.",
-                    type: "nudge",
-                    cta: "Set limit",
-                },
-            ]);
         };
 
         loadInsights();
     }, []);
 
     useEffect(() => {
-        // Start animation after component mounts and when new messages are added
-        const timer = setTimeout(() => {
+        if (visibleInsights === 0 && insights.length > 0) {
+            setVisibleInsights(1);
             const showNextInsight = () => {
                 setVisibleInsights((prev) => {
                     if (prev < insights.length) {
-                        setTimeout(showNextInsight, 800); // 800ms delay between each bubble
+                        setTimeout(showNextInsight, 800);
                         return prev + 1;
                     }
                     return prev;
                 });
             };
-            showNextInsight();
-        }, 300); // Initial delay before first bubble
+            setTimeout(showNextInsight, 800);
+        }
+    }, [insights.length, visibleInsights]);
 
-        return () => clearTimeout(timer);
-    }, [insights.length]);
-
-    // When new user messages are added, show them immediately
     useEffect(() => {
-        if (insights.length > visibleInsights) {
+        if (insights.length > visibleInsights && visibleInsights > 0) {
             setVisibleInsights(insights.length);
         }
     }, [insights.length]);
 
-    // Auto-scroll to bottom when new messages are added
     useEffect(() => {
         if (chatContainerRef.current) {
             chatContainerRef.current.scrollTop =
@@ -159,26 +228,22 @@ const Insights: React.FC = () => {
                 text: message.trim(),
                 type: "user",
             };
-
             setInsights((prev) => [...prev, newUserMessage]);
             setMessage("");
 
             try {
-                // Show loading state
                 const loadingMessage: Insight = {
                     id: `ai-loading-${Date.now()}`,
-                    text: "Thinking...",
+                    text: "",
                     type: "insight",
                 };
                 setInsights((prev) => [...prev, loadingMessage]);
 
-                // Get AI response
                 const aiService = AIService.getInstance();
                 const response = await aiService.generateResponse(
                     message.trim(),
                 );
 
-                // Remove loading message and add AI response
                 setInsights((prev) => {
                     const filtered = prev.filter(
                         (msg) => msg.id !== loadingMessage.id,
@@ -215,20 +280,19 @@ const Insights: React.FC = () => {
 
     const renderMicroChart = (data?: { label: string; value: number }[]) => {
         if (!data) return null;
-
         return (
             <div
                 style={{
-                    width: "calc(100% - 24px)", // Subtract padding to stay within bubble
+                    width: "calc(100% - 24px)",
                     backgroundColor: "rgba(0, 0, 0, 0.05)",
                     borderRadius: "12px",
                     marginTop: "8px",
                     display: "flex",
                     alignItems: "center",
-                    justifyContent: "space-evenly", // Changed to space-evenly for better distribution
+                    justifyContent: "space-evenly",
                     padding: "12px",
-                    flexWrap: "wrap", // Allow wrapping if needed
-                    gap: "8px", // Reduced gap
+                    flexWrap: "wrap",
+                    gap: "8px",
                 }}
             >
                 {data.map((item, i) => (
@@ -238,7 +302,7 @@ const Insights: React.FC = () => {
                             display: "flex",
                             flexDirection: "column",
                             alignItems: "center",
-                            minWidth: "20px", // Set minimum width
+                            minWidth: "20px",
                             animation: `iconFadeIn 0.4s ease-out ${
                                 i * 0.1
                             }s both`,
@@ -250,7 +314,7 @@ const Insights: React.FC = () => {
                                 fontWeight: "600",
                                 color: "rgba(0, 0, 0, 0.7)",
                                 marginBottom: "4px",
-                                whiteSpace: "nowrap", // Prevent text wrapping
+                                whiteSpace: "nowrap",
                             }}
                         >
                             {item.value}m
@@ -275,23 +339,23 @@ const Insights: React.FC = () => {
         <button
             style={{
                 marginTop: "8px",
-                padding: "4px 10px", // Reduced padding for smaller height
+                padding: "4px 10px",
                 backgroundColor: "rgba(0, 0, 0, 0.1)",
                 border: "1px solid rgba(0, 0, 0, 0.15)",
-                borderRadius: "12px", // Smaller border radius
+                borderRadius: "12px",
                 color: "rgba(0, 0, 0, 0.7)",
-                fontSize: "11px", // Slightly smaller font
+                fontSize: "11px",
                 fontWeight: "500",
                 cursor: "pointer",
                 transition: "all 0.2s ease",
                 animation: "ctaFadeIn 0.3s ease-out 0.2s both",
             }}
-            onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "rgba(0, 0, 0, 0.15)";
-            }}
-            onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "rgba(0, 0, 0, 0.1)";
-            }}
+            onMouseEnter={(e) =>
+                (e.currentTarget.style.backgroundColor = "rgba(0, 0, 0, 0.15)")
+            }
+            onMouseLeave={(e) =>
+                (e.currentTarget.style.backgroundColor = "rgba(0, 0, 0, 0.1)")
+            }
         >
             {cta}
         </button>
@@ -302,64 +366,20 @@ const Insights: React.FC = () => {
     return (
         <>
             <style>{`
-                @font-face {
-                    font-family: 'Nunito-Regular';
-                    src: url('${chrome.runtime.getURL(
-                        "src/assets/fonts/Nunito-Regular.ttf",
-                    )}') format('truetype');
-                    font-weight: 400;
-                    font-style: normal;
-                }
-                @font-face {
-                    font-family: 'Nunito-Bold';
-                    src: url('${chrome.runtime.getURL(
-                        "src/assets/fonts/Nunito-Bold.ttf",
-                    )}') format('truetype');
-                    font-weight: 700;
-                    font-style: normal;
-                }
-
-                @keyframes bubbleSlideIn {
-                    0% {
-                        opacity: 0;
-                        transform: translateY(20px) scale(0.8);
-                    }
-                    50% {
-                        transform: translateY(-2px) scale(1.02);
-                    }
-                    100% {
-                        opacity: 1;
-                        transform: translateY(0) scale(1);
-                    }
-                }
-
-                @keyframes iconFadeIn {
-                    0% {
-                        opacity: 0;
-                        transform: scale(0.5);
-                    }
-                    100% {
-                        opacity: 1;
-                        transform: scale(1);
-                    }
-                }
-
-                @keyframes ctaFadeIn {
-                    0% {
-                        opacity: 0;
-                        transform: scale(0.8);
-                    }
-                    100% {
-                        opacity: 1;
-                        transform: scale(1);
-                    }
-                }
-
-                .bubble-enter {
-                    animation: bubbleSlideIn 0.5s ease-out both;
-                }
+                @font-face { font-family: 'Nunito-Regular'; src: url('${chrome.runtime.getURL(
+                    "src/assets/fonts/Nunito-Regular.ttf",
+                )}') format('truetype'); font-weight: 400; font-style: normal; }
+                @font-face { font-family: 'Nunito-Bold'; src: url('${chrome.runtime.getURL(
+                    "src/assets/fonts/Nunito-Bold.ttf",
+                )}') format('truetype'); font-weight: 700; font-style: normal; }
+                @keyframes bubbleSlideIn { 0% { opacity: 0; transform: translateY(20px) scale(0.8); } 50% { transform: translateY(-2px) scale(1.02); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
+                @keyframes iconFadeIn { 0% { opacity: 0; transform: scale(0.5); } 100% { opacity: 1; transform: scale(1); } }
+                @keyframes ctaFadeIn { 0% { opacity: 0; transform: scale(0.8); } 100% { opacity: 1; transform: scale(1); } }
+                @keyframes dotPulse { 0% { background-color: rgba(150, 150, 150, 0.4); } 33.333% { background-color: rgba(150, 150, 150, 1); } 66.667% { background-color: rgba(150, 150, 150, 0.4); } 100% { background-color: rgba(150, 150, 150, 0.4); } }
+                @keyframes dotPulseTwo { 0% { background-color: rgba(150, 150, 150, 0.4); } 33.333% { background-color: rgba(150, 150, 150, 0.4); } 66.667% { background-color: rgba(150, 150, 150, 1); } 100% { background-color: rgba(150, 150, 150, 0.4); } }
+                @keyframes dotPulseThree { 0% { background-color: rgba(150, 150, 150, 0.4); } 33.333% { background-color: rgba(150, 150, 150, 0.4); } 66.667% { background-color: rgba(150, 150, 150, 0.4); } 100% { background-color: rgba(150, 150, 150, 1); } }
+                .bubble-enter { animation: bubbleSlideIn 0.5s ease-out both; }
             `}</style>
-
             <div
                 style={{
                     width: "100%",
@@ -367,34 +387,31 @@ const Insights: React.FC = () => {
                     display: "flex",
                     flexDirection: "column",
                     alignItems: "center",
-                    backgroundColor: "#ffff",
+                    backgroundColor: "transparent",
                     padding: "40px 20px 20px 20px",
                     overflowX: "hidden",
                 }}
             >
-                {/* Chat View Box */}
                 <div
                     ref={chatContainerRef}
                     style={{
                         width: "80%",
                         maxWidth: "600px",
-                        height: "calc(100% - 120px)", // Leave space for input box
-                        backgroundColor: "#ffffff",
-                        // border: "2px solid #ddd",
+                        height: "calc(100% - 120px)",
                         borderRadius: "16px",
-                        // boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
                         overflowY: "auto",
+                        overflowX: "hidden",
+                        display: "flex",
+                        flexDirection: "column",
                         padding: "20px",
                         marginBottom: "20px",
                         fontFamily:
                             "Nunito-Regular, Helvetica Neue, Helvetica, sans-serif",
                         fontSize: "16px",
-                        overflowX: "hidden",
                     }}
                 >
                     {allMessages.map((insight) => {
                         const isUser = insight.type === "user";
-
                         return (
                             <div
                                 key={insight.id}
@@ -402,8 +419,9 @@ const Insights: React.FC = () => {
                                 style={{
                                     width: "fit-content",
                                     maxWidth: "280px",
-                                    minWidth: "10px", // Minimum width for very short messages
+                                    minWidth: "10px",
                                     wordWrap: "break-word",
+                                    wordBreak: "break-word",
                                     marginBottom: "12px",
                                     lineHeight: "24px",
                                     position: "relative",
@@ -413,60 +431,70 @@ const Insights: React.FC = () => {
                                         ? "flex-end"
                                         : "flex-start",
                                     backgroundColor: isUser
-                                        ? "#0B93F6"
-                                        : "#E5E5EA",
-                                    color: isUser ? "white" : "black",
+                                        ? "rgba(11, 147, 246, 0.1)"
+                                        : "rgba(229, 229, 234, 0.1)",
+                                    backdropFilter: "blur(8px)",
+                                    WebkitBackdropFilter: "blur(8px)",
+                                    border: isUser
+                                        ? "1px solid rgba(11, 147, 246, 0.2)"
+                                        : "1px solid rgba(255, 255, 255, 0.4)",
+                                    boxShadow: "0 4px 6px rgba(0, 0, 0, 0.02)",
+                                    color: isUser ? "#0a4174" : "#2D3436",
                                     textAlign: "left",
                                     display: "block",
                                     marginLeft: isUser ? "auto" : "0",
                                     marginRight: isUser ? "0" : "auto",
                                 }}
                             >
-                                {/* Chat bubble tails */}
-                                <div
-                                    style={{
-                                        content: "",
-                                        position: "absolute",
-                                        bottom: "0",
-                                        height: "25px",
-                                        width: "20px",
-                                        backgroundColor: isUser
-                                            ? "#0B93F6"
-                                            : "#E5E5EA",
-                                        borderBottomLeftRadius: isUser
-                                            ? "16px 14px"
-                                            : "0",
-                                        borderBottomRightRadius: isUser
-                                            ? "0"
-                                            : "16px 14px",
-                                        left: isUser ? "auto" : "-7px",
-                                        right: isUser ? "-7px" : "auto",
-                                    }}
-                                />
-                                <div
-                                    style={{
-                                        content: "",
-                                        position: "absolute",
-                                        bottom: "0",
-                                        height: "25px",
-                                        width: "26px",
-                                        backgroundColor: "white",
-                                        borderBottomLeftRadius: isUser
-                                            ? "10px"
-                                            : "0",
-                                        borderBottomRightRadius: isUser
-                                            ? "0"
-                                            : "10px",
-                                        left: isUser ? "auto" : "-26px",
-                                        right: isUser ? "-26px" : "auto",
-                                    }}
-                                />
-
-                                {/* Content */}
                                 <div
                                     style={{ position: "relative", zIndex: 1 }}
                                 >
-                                    {insight.text}
+                                    {insight.id.includes("ai-loading") ? (
+                                        <div
+                                            style={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: "4px",
+                                                padding: "2px 0",
+                                            }}
+                                        >
+                                            <div
+                                                style={{
+                                                    width: "8px",
+                                                    height: "8px",
+                                                    borderRadius: "50%",
+                                                    backgroundColor:
+                                                        "rgba(150, 150, 150, 0.4)",
+                                                    animation:
+                                                        "dotPulse 1s ease-in-out infinite",
+                                                }}
+                                            />
+                                            <div
+                                                style={{
+                                                    width: "8px",
+                                                    height: "8px",
+                                                    borderRadius: "50%",
+                                                    backgroundColor:
+                                                        "rgba(150, 150, 150, 0.4)",
+                                                    animation:
+                                                        "dotPulseTwo 1s ease-in-out infinite",
+                                                }}
+                                            />
+                                            <div
+                                                style={{
+                                                    width: "8px",
+                                                    height: "8px",
+                                                    borderRadius: "50%",
+                                                    backgroundColor:
+                                                        "rgba(150, 150, 150, 0.4)",
+                                                    animation:
+                                                        "dotPulseThree 1s ease-in-out infinite",
+                                                }}
+                                            />
+                                        </div>
+                                    ) : (
+                                        insight.text
+                                    )}
                                     {insight.hasChart &&
                                         renderMicroChart(insight.chartData)}
                                     {insight.cta && renderCTA(insight.cta)}
@@ -475,27 +503,28 @@ const Insights: React.FC = () => {
                         );
                     })}
                 </div>
-
-                {/* Message Input Box */}
                 <div
                     style={{
-                        width: "60%", // Smaller than chat view box
+                        width: "60%",
                         maxWidth: "400px",
                         display: "flex",
                         alignItems: "flex-end",
                         gap: "12px",
                         padding: "12px 16px",
-                        backgroundColor: "#ffffff",
+                        backgroundColor: "rgba(255, 255, 255, 0.9)",
                         border: "1px solid #ddd",
                         borderRadius: "24px",
                         boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)",
                         transition: "all 0.2s ease",
+                        backdropFilter: "blur(10px)",
                     }}
                 >
                     <textarea
                         value={message}
                         onChange={(e) => setMessage(e.target.value)}
                         onKeyPress={handleKeyPress}
+                        onFocus={() => onInputFocusChange(true)}
+                        onBlur={() => onInputFocusChange(false)}
                         placeholder="Why was I off-track today?"
                         style={{
                             flex: 1,
@@ -521,7 +550,6 @@ const Insights: React.FC = () => {
                             )}px`;
                         }}
                     />
-
                     <button
                         onClick={handleSendMessage}
                         disabled={!message.trim()}
@@ -540,16 +568,14 @@ const Insights: React.FC = () => {
                             color: message.trim() ? "white" : "#999",
                         }}
                         onMouseEnter={(e) => {
-                            if (message.trim()) {
+                            if (message.trim())
                                 e.currentTarget.style.backgroundColor =
                                     "#3367d6";
-                            }
                         }}
                         onMouseLeave={(e) => {
-                            if (message.trim()) {
+                            if (message.trim())
                                 e.currentTarget.style.backgroundColor =
                                     "#4285f4";
-                            }
                         }}
                     >
                         <Send size={14} />
