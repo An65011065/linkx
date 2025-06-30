@@ -1,4 +1,5 @@
 import DataService from "./dataService";
+import { websiteBlocker } from "./websiteBlocker";
 
 // Navigation source information for linking pages
 export interface SourceInfo {
@@ -50,6 +51,7 @@ class BackgroundTracker {
     private isUserActive: boolean;
     private userIdleThreshold: number;
     private syncInterval?: NodeJS.Timeout;
+    private cleanupInterval?: NodeJS.Timeout;
     private isDestroyed: boolean;
 
     private constructor() {
@@ -61,6 +63,9 @@ class BackgroundTracker {
         this.isDestroyed = false;
         this.initializeListeners();
         this.startPeriodicSync();
+        this.cleanupInterval = setInterval(() => {
+            this.cleanupExpiredBlocks();
+        }, 60000); // 60 seconds
     }
 
     // Get singleton instance of the background tracker
@@ -525,12 +530,24 @@ class BackgroundTracker {
         }
     }
 
+    private async cleanupExpiredBlocks(): Promise<void> {
+        try {
+            await websiteBlocker.cleanupExpiredBlocks();
+        } catch (error) {
+            console.error("Error cleaning up expired blocks:", error);
+        }
+    }
+
     // Clean up resources when tracker is destroyed
     public destroy(): void {
         this.isDestroyed = true;
         if (this.syncInterval) {
             clearInterval(this.syncInterval);
             this.syncInterval = undefined;
+        }
+        if (this.cleanupInterval) {
+            clearInterval(this.cleanupInterval);
+            this.cleanupInterval = undefined;
         }
 
         // Clean up event listeners
