@@ -10,9 +10,11 @@
         "webNavigation",
         "idle",
         "windows",
-        "declarativeNetRequest"
+        "declarativeNetRequest",
+        "scripting",
+        "downloads"
     ],
-    "host_permissions": ["*://*/*"],
+    "host_permissions": ["*://*/*", "<all_urls>"],
     "action": {
         "default_popup": "src/popup/popup.html"
     },
