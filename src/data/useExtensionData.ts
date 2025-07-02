@@ -212,10 +212,6 @@ export const getTopDomains = (
 // Get recent activity summary
 export const getActivitySummary = (recentActivity: TabSession[]) => {
     const totalTabs = recentActivity.length;
-    const totalUrls = recentActivity.reduce(
-        (sum, tab) => sum + tab.urlVisits.length,
-        0,
-    );
     const totalActiveTime = recentActivity.reduce(
         (sum, tab) => sum + tab.totalActiveTime,
         0,
@@ -233,7 +229,10 @@ export const getActivitySummary = (recentActivity: TabSession[]) => {
 
     return {
         totalTabs,
-        totalUrls,
+        totalUrls: recentActivity.reduce(
+            (sum, tab) => sum + tab.urlVisits.length,
+            0,
+        ),
         totalActiveTime,
         formattedActiveTime: formatDuration(totalActiveTime),
         categoryTimes: {
@@ -342,7 +341,7 @@ export const getQuickStats = (session: BrowsingSession | null) => {
 
     const { stats } = session;
     const activeTime = formatDuration(stats.totalTime);
-    const sitesVisited = stats.totalUrls;
+    const sitesVisited = stats.uniqueUrls;
 
     // Determine top category
     let topCategory = "other";
@@ -366,10 +365,17 @@ export const getQuickStats = (session: BrowsingSession | null) => {
 export const getChannelData = (session: BrowsingSession | null) => {
     if (!session) {
         return {
-            gmail: 0,
-            outlook: 0,
-            youtube: 0,
-            chatgpt: 0,
+            gmail: "0s",
+            outlook: "0s",
+            youtube: "0s",
+            chatgpt: "0s",
+            icons: {
+                gmail: "https://ssl.gstatic.com/ui/v1/icons/mail/rfr/gmail.ico",
+                outlook: "https://outlook.office365.com/favicon.ico",
+                youtube:
+                    "https://www.youtube.com/s/desktop/1c21ae68/img/favicon_144.png",
+                chatgpt: "https://chat.openai.com/favicon.ico",
+            },
         };
     }
 
@@ -404,12 +410,33 @@ export const getChannelData = (session: BrowsingSession | null) => {
         }
     });
 
-    // Convert milliseconds to hours
+    // Format time based on duration
+    const formatTime = (ms: number): string => {
+        const seconds = Math.floor(ms / 1000);
+        const minutes = Math.floor(seconds / 60);
+
+        if (seconds < 60) {
+            return `${seconds}s`;
+        } else if (minutes < 60) {
+            return `${minutes}m`;
+        } else {
+            const decimalHours = (minutes / 60).toFixed(1);
+            return `${decimalHours}h`;
+        }
+    };
+
     return {
-        gmail: channelTimes.gmail / (1000 * 60 * 60),
-        outlook: channelTimes.outlook / (1000 * 60 * 60),
-        youtube: channelTimes.youtube / (1000 * 60 * 60),
-        chatgpt: channelTimes.chatgpt / (1000 * 60 * 60),
+        gmail: formatTime(channelTimes.gmail),
+        outlook: formatTime(channelTimes.outlook),
+        youtube: formatTime(channelTimes.youtube),
+        chatgpt: formatTime(channelTimes.chatgpt),
+        icons: {
+            gmail: "https://ssl.gstatic.com/ui/v1/icons/mail/rfr/gmail.ico",
+            outlook: "https://outlook.office365.com/favicon.ico",
+            youtube:
+                "https://www.youtube.com/s/desktop/1c21ae68/img/favicon_144.png",
+            chatgpt: "https://chat.openai.com/favicon.ico",
+        },
     };
 };
 
@@ -510,4 +537,22 @@ export const getHourlyActivityData = (session: BrowsingSession | null) => {
     }
 
     return hourlyData;
+};
+
+// Download session data in specified format
+export const downloadSessionData = async (format: "json" | "csv" = "json") => {
+    const dataService = DataService.getInstance();
+    const data = await dataService.formatSessionForDownload(format);
+    const blob = new Blob([data], {
+        type: format === "json" ? "application/json" : "text/csv",
+    });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const timestamp = new Date().toISOString().split("T")[0];
+    a.href = url;
+    a.download = `linkx-session-data-${timestamp}.${format}`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
 };

@@ -12,20 +12,23 @@ export interface TabSession {
     displayNumber?: number; // Display number for UI purposes
 }
 
+export interface SessionStats {
+    totalUrls: number;
+    uniqueUrls: number;
+    uniqueDomains: number;
+    workTime: number;
+    socialTime: number;
+    otherTime: number;
+    totalTime: number;
+}
+
 // Daily browsing session containing all tab sessions for one day
 export interface BrowsingSession {
     date: string; // 'YYYY-MM-DD'
     startTime: number; // First activity timestamp
     endTime: number; // Most recent activity timestamp
     tabSessions: TabSession[]; // All tab sessions for this day
-    stats: {
-        totalUrls: number; // Total number of URL visits
-        uniqueDomains: number; // Number of unique domains visited
-        workTime: number; // Total active time on work sites
-        socialTime: number; // Total active time on social sites
-        otherTime: number; // Total active time on other sites
-        totalTime: number; // Sum of all active time
-    };
+    stats: SessionStats;
 }
 
 class DataService {
@@ -51,6 +54,15 @@ class DataService {
             const session = result[key] as BrowsingSession;
 
             if (session) {
+                // Ensure uniqueUrls exists in stats for backward compatibility
+                if (session.stats && !("uniqueUrls" in session.stats)) {
+                    const allVisits = session.tabSessions.flatMap(
+                        (ts) => ts.urlVisits,
+                    );
+                    const uniqueUrls = new Set(allVisits.map((v) => v.url));
+                    session.stats.uniqueUrls = uniqueUrls.size;
+                    await this.saveSession(session);
+                }
                 return session;
             }
         } catch (error) {
@@ -65,12 +77,13 @@ class DataService {
             tabSessions: [],
             stats: {
                 totalUrls: 0,
+                uniqueUrls: 0,
                 uniqueDomains: 0,
                 workTime: 0,
                 socialTime: 0,
                 otherTime: 0,
                 totalTime: 0,
-            },
+            } as SessionStats,
         };
 
         await this.saveSession(newSession);
@@ -188,19 +201,17 @@ class DataService {
     // Calculate and update session statistics including duration and navigation patterns
     private updateSessionStats(session: BrowsingSession): void {
         const allVisits = session.tabSessions.flatMap((ts) => ts.urlVisits);
+        const uniqueUrls = new Set(allVisits.map((v) => v.url));
         const uniqueDomains = new Set(allVisits.map((v) => v.domain));
-
-        const workTime = this.calculateCategoryTime(allVisits, "work");
-        const socialTime = this.calculateCategoryTime(allVisits, "social");
-        const otherTime = this.calculateCategoryTime(allVisits, "other");
 
         session.stats = {
             totalUrls: allVisits.length,
+            uniqueUrls: uniqueUrls.size,
             uniqueDomains: uniqueDomains.size,
-            workTime,
-            socialTime,
-            otherTime,
-            totalTime: workTime + socialTime + otherTime,
+            workTime: this.calculateCategoryTime(allVisits, "work"),
+            socialTime: this.calculateCategoryTime(allVisits, "social"),
+            otherTime: this.calculateCategoryTime(allVisits, "other"),
+            totalTime: allVisits.reduce((sum, v) => sum + v.activeTime, 0),
         };
 
         // Update session time bounds
@@ -593,6 +604,168 @@ class DataService {
                 .sort((a, b) => b.count - a.count)
                 .slice(0, 5), // Top 5 destinations per source
         }));
+    }
+
+    // Format session data for download
+    async formatSessionForDownload(
+        format: "json" | "csv" = "json",
+    ): Promise<string> {
+        const session = await this.getCurrentSession();
+
+        if (format === "json") {
+            return JSON.stringify(session, null, 2);
+        }
+
+        interface FlattenedVisit {
+            date: string;
+            tabId: number;
+            windowId: number;
+            url: string;
+            domain: string;
+            title: string;
+            startTime: string;
+            endTime: string;
+            duration: number;
+            activeTime: number;
+            category: "work" | "social" | "other";
+            creationMode: "chain" | "hyperlink";
+            sourceUrl: string;
+            sourceTabId: string;
+        }
+
+        // For CSV, flatten the data structure
+        const rows: FlattenedVisit[] = [];
+        session.tabSessions.forEach((tabSession) => {
+            tabSession.urlVisits.forEach((visit) => {
+                rows.push({
+                    date: session.date,
+                    tabId: visit.tabId,
+                    windowId: visit.windowId,
+                    url: visit.url,
+                    domain: visit.domain,
+                    title: visit.title || "",
+                    startTime: new Date(visit.startTime).toISOString(),
+                    endTime: visit.endTime
+                        ? new Date(visit.endTime).toISOString()
+                        : "",
+                    duration: visit.duration,
+                    activeTime: visit.activeTime,
+                    category: visit.category,
+                    creationMode: visit.creationMode,
+                    sourceUrl: visit.sourceInfo?.url || "",
+                    sourceTabId: visit.sourceInfo?.tabId?.toString() || "",
+                });
+            });
+        });
+
+        // Convert to CSV
+        const headers = Object.keys(rows[0] || {});
+        const csvRows = [
+            headers.join(","),
+            ...rows.map((row) =>
+                headers
+                    .map((header) =>
+                        JSON.stringify(
+                            row[header as keyof FlattenedVisit] || "",
+                        ),
+                    )
+                    .join(","),
+            ),
+        ];
+
+        return csvRows.join("\n");
+    }
+
+    // Format time from milliseconds to hours and minutes
+    formatTime(milliseconds: number): string {
+        const hours = Math.floor(milliseconds / (1000 * 60 * 60));
+        const minutes = Math.floor(
+            (milliseconds % (1000 * 60 * 60)) / (1000 * 60),
+        );
+        return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+    }
+
+    // Calculate digital wellness score for a session
+    calculateDigitalWellnessScore(session: {
+        stats: SessionStats;
+        tabSessions: { urlVisits: UrlVisit[] }[];
+    }): number {
+        let score = 50;
+
+        // Calculate productivity ratio
+        const totalTime = session.stats.totalTime;
+        const productiveTime = session.stats.workTime + session.stats.otherTime;
+        const productivityRatio =
+            totalTime > 0 ? productiveTime / totalTime : 0;
+        score += Math.round(productivityRatio * 30);
+
+        // Calculate longest focus streak
+        const longestStreak = this.calculateLongestStreak(session);
+        if (longestStreak.time > 30 * 60 * 1000) {
+            // 30 minutes
+            score += 15;
+        } else if (longestStreak.time > 15 * 60 * 1000) {
+            // 15 minutes
+            score += 8;
+        }
+
+        // Adjust for number of unique URLs
+        if (session.stats.uniqueUrls > 500) {
+            score -= 10;
+        } else if (session.stats.uniqueUrls > 300) {
+            score -= 5;
+        }
+
+        score += 5;
+        return Math.max(0, Math.min(100, score));
+    }
+
+    // Calculate longest focus streak on a single domain
+    private calculateLongestStreak(session: {
+        tabSessions: { urlVisits: UrlVisit[] }[];
+    }): { domain: string; time: number } {
+        const allVisits = session.tabSessions
+            .flatMap((tab) => tab.urlVisits)
+            .filter((visit) => visit.activeTime > 0)
+            .sort((a, b) => a.startTime - b.startTime);
+
+        if (allVisits.length === 0) {
+            return { domain: "", time: 0 };
+        }
+
+        const MAX_GAP_BETWEEN_SESSIONS = 10 * 60 * 1000; // 10 minutes
+
+        let longestStreak = { domain: "", time: 0 };
+        let currentStreak = { domain: "", time: 0 };
+        let lastVisitEnd = 0;
+
+        allVisits.forEach((visit) => {
+            const gapFromLastVisit = visit.startTime - lastVisitEnd;
+            const visitEnd = visit.startTime + visit.activeTime;
+
+            if (
+                visit.domain === currentStreak.domain &&
+                gapFromLastVisit <= MAX_GAP_BETWEEN_SESSIONS
+            ) {
+                currentStreak.time += visit.activeTime;
+            } else {
+                if (currentStreak.time > longestStreak.time) {
+                    longestStreak = { ...currentStreak };
+                }
+                currentStreak = {
+                    domain: visit.domain,
+                    time: visit.activeTime,
+                };
+            }
+
+            lastVisitEnd = visitEnd;
+        });
+
+        if (currentStreak.time > longestStreak.time) {
+            longestStreak = { ...currentStreak };
+        }
+
+        return longestStreak;
     }
 }
 
