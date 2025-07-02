@@ -79,11 +79,12 @@ const WeeklyInsights: React.FC = () => {
         return Math.max(baseHeight, (value / maxValue) * maxHeight);
     };
 
+    const CHART_BOTTOM_OFFSET = 24; // space for day label and gap
     const getAverageLinePosition = (avgValue: number) => {
-        if (currentData.length === 0 || avgValue === 0) return 0;
+        if (currentData.length === 0 || avgValue === 0) return CHART_BOTTOM_OFFSET;
         const maxHeight = 160; // Maximum height for bars
-        // Use exact proportion for the line
-        return (avgValue / maxValue) * maxHeight;
+        // Adjust position so the line aligns with the bars above the day label
+        return CHART_BOTTOM_OFFSET + (avgValue / maxValue) * maxHeight;
     };
 
     const getBarColor = () => {
