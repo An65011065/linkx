@@ -1,20 +1,52 @@
 import React from "react";
-import MainStats from "./MainStats";
 import Activity from "./Activity";
-import DigitalDestinations from "./DigitalDestinations";
 import Channel from "./Channel";
 import WebsiteBlocker from "./WebsiteBlocker";
+import StoriesComponent from "./stories";
+import WeeklyInsights from "./WeeklyInsights";
 
 const DashboardTab: React.FC = () => {
     return (
         <div
             style={{
-                height: "100vh",
+                height: "110vh",
                 fontFamily: "Arial, sans-serif",
-                backgroundColor: "#f9fafb",
+                backgroundColor: "#000000",
                 overflowY: "hidden",
+                position: "relative", // Added for absolute positioning of Channel
             }}
         >
+            {/* Blue gradient - top right */}
+            <div
+                style={{
+                    position: "absolute",
+                    top: 0,
+                    right: 0,
+                    width: "600px",
+                    height: "600px",
+                    zIndex: 10,
+                    pointerEvents: "none",
+                    background:
+                        "radial-gradient(circle, rgba(66, 133, 244, 0.4) 0%, rgba(255, 107, 71, 0.2) 50%, transparent 80%)",
+                    filter: "blur(40px)",
+                }}
+            />
+            {/* Orange gradient - bottom left */}
+            <div
+                style={{
+                    position: "absolute",
+                    bottom: 0,
+                    left: 0,
+                    width: "400px",
+                    height: "400px",
+                    zIndex: 10,
+                    pointerEvents: "none",
+                    background:
+                        "radial-gradient(circle, rgba(255, 107, 71, 0.3) 0%, transparent 70%)",
+                    filter: "blur(30px)",
+                }}
+            />
+
             <style>{`
                 @font-face {
                     font-family: 'Gaegu-Bold';
@@ -40,46 +72,68 @@ const DashboardTab: React.FC = () => {
                     font-weight: 300;
                     font-style: normal;
                 }
+                @font-face {
+                    font-family: 'Nunito-Bold';
+                    src: url('${chrome.runtime.getURL(
+                        "src/assets/fonts/Nunito-Bold.ttf",
+                    )}
+                    font-weight: 700;
+                    font-style: normal;
+                }
+                @font-face {
+                    font-family: 'Nunito-Regular';
+                    src: url('${chrome.runtime.getURL(
+                        "src/assets/fonts/Nunito-Regular.ttf",
+                    )}') format('truetype');
+                    font-weight: 400;
+                    font-style: normal;
+                }
                 @import url('https://fonts.googleapis.com/icon?family=Material+Icons');
             `}</style>
+
+            {/* Channel component positioned at top-right */}
+            <div
+                style={{ position: "absolute", top: 35, right: 1, zIndex: 20 }}
+            >
+                <Channel />
+            </div>
+
             <div
                 style={{
                     paddingTop: "32px",
-                    paddingLeft: "52px",
+                    paddingLeft: "32px",
+                    paddingRight: "32px",
                     height: "100%",
-                    overflowY: "auto",
+                    overflowY: "hidden",
+                    position: "relative",
+                    zIndex: 20,
                 }}
             >
+                {/* Main Content Grid */}
                 <div
                     style={{
-                        fontFamily: "Nunito-Bold, Arial, sans-serif",
-                        fontSize: "32px",
-                        fontWeight: "700",
-                        color: "#000",
-                        letterSpacing: "0px",
+                        display: "grid",
+                        gridTemplateColumns: "600px 1fr",
+                        alignItems: "start",
                     }}
                 >
-                    linkX
+                    {/* Left Column - Stats Cards */}
+                    <div>
+                        <StoriesComponent />
+                    </div>
                 </div>
-                <h1
+
+                {/* Other Components */}
+                <div
                     style={{
-                        fontFamily: "Nunito-Bold, Arial, sans-serif",
-                        fontSize: "56px",
-                        fontWeight: "1200",
-                        margin: "0",
-                        marginTop: "-8px",
-                        color: "#000",
-                        letterSpacing: "0px",
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: "30px",
+                        marginTop: "5px",
+                        alignItems: "start",
                     }}
                 >
-                    Dashboard
-                </h1>
-                <div className="grid grid-cols-1 gap-6">
-                    <MainStats />
-                    <WebsiteBlocker />
-                    <Activity />
-                    <DigitalDestinations />
-                    <Channel />
+                    <WeeklyInsights />
                 </div>
             </div>
         </div>
