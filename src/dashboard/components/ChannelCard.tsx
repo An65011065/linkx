@@ -1,11 +1,10 @@
 import React from "react";
 
 interface ChannelCardProps {
-    icon: string; // URL to icon or emoji
+    icon: string;
     domain: string;
-    urlCount: number; // number of URLs visited
-    timeSpent: string; // formatted time like "2.5h" or "45m"
-    iconColor: string; // background color for the icon
+    urlCount: number;
+    timeSpent: string;
 }
 
 const ChannelCard: React.FC<ChannelCardProps> = ({
@@ -13,109 +12,71 @@ const ChannelCard: React.FC<ChannelCardProps> = ({
     domain,
     urlCount,
     timeSpent,
-    iconColor,
-}) => {
-    return (
-        <>
-            <style>{`
-                @font-face {
-                    font-family: 'Nunito-Regular';
-                    src: url('${chrome.runtime.getURL(
-                        "src/assets/fonts/Nunito-Regular.ttf",
-                    )}') format('truetype');
-                    font-weight: 400;
-                    font-style: normal;
-                }
-                @font-face {
-                    font-family: 'Nunito-Bold';
-                    src: url('${chrome.runtime.getURL(
-                        "src/assets/fonts/Nunito-Bold.ttf",
-                    )}') format('truetype');
-                    font-weight: 700;
-                    font-style: normal;
-                }
-            `}</style>
-            <div
-                style={{
-                    backgroundColor: "white",
-                    borderRadius: "16px",
-                    padding: "24px 16px",
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    textAlign: "center",
-                    flex: "1",
-                    minWidth: "120px",
-                    maxWidth: "160px",
-                    boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
-                    border: "1px solid #f0f0f0",
-                    position: "relative",
-                    paddingTop: "48px",
-                    margin: "24px 8px 0",
-                }}
-            >
-                {/* Icon */}
-                <div
-                    style={{
-                        width: "48px",
-                        height: "48px",
-                        borderRadius: "50%",
-                        backgroundColor: iconColor,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: "24px",
-                        position: "absolute",
-                        top: "-24px",
-                        left: "50%",
-                        transform: "translateX(-50%)",
-                        border: "4px solid white",
-                        boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-                    }}
-                >
-                    {icon}
-                </div>
-
-                {/* Domain Name */}
-                <div
-                    style={{
-                        fontFamily: "Nunito-Bold, Arial, sans-serif",
-                        fontSize: "16px",
-                        fontWeight: "700",
-                        color: "#000",
-                        marginBottom: "4px",
-                        textTransform: "capitalize",
-                    }}
-                >
-                    {domain}
-                </div>
-
-                {/* URL Count */}
-                <div
-                    style={{
-                        fontFamily: "Nunito-Regular, Arial, sans-serif",
-                        fontSize: "12px",
-                        color: "#666",
-                        marginBottom: "16px",
-                    }}
-                >
-                    {urlCount} URLs visited
-                </div>
-
-                {/* Time Spent */}
-                <div
-                    style={{
-                        fontFamily: "Nunito-Bold, Arial, sans-serif",
-                        fontSize: "22px",
-                        fontWeight: "700",
-                        color: "#000",
-                    }}
-                >
-                    {timeSpent}
-                </div>
-            </div>
-        </>
-    );
-};
+}) => (
+    <div
+        style={{
+            backgroundColor: "rgba(255, 255, 255, 0.1)",
+            backdropFilter: "blur(10px)",
+            borderRadius: "12px",
+            padding: "32px 12px 16px",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            textAlign: "center",
+            flex: "1",
+            minWidth: "100px",
+            maxWidth: "140px",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+            border: "1px solid rgba(255, 255, 255, 0.1)",
+            position: "relative",
+            margin: "16px 6px 0",
+        }}
+    >
+        <img
+            src={icon}
+            alt={`${domain} icon`}
+            style={{
+                width: "28px",
+                height: "28px",
+                position: "absolute",
+                top: "-14px",
+                left: "50%",
+                transform: "translateX(-50%)",
+            }}
+        />
+        <div
+            style={{
+                fontFamily: "Nunito-Bold, Arial, sans-serif",
+                fontSize: "14px",
+                fontWeight: "700",
+                marginBottom: "2px",
+                textTransform: "capitalize",
+                color: "rgba(255, 255, 255, 0.9)",
+            }}
+        >
+            {domain}
+        </div>
+        <div
+            style={{
+                fontFamily: "Nunito-Regular, Arial, sans-serif",
+                fontSize: "11px",
+                color: "rgba(255, 255, 255, 0.5)",
+                marginBottom: "12px",
+            }}
+        >
+            {urlCount} URLs visited
+        </div>
+        <div
+            style={{
+                fontFamily: "Nunito-Bold, Arial, sans-serif",
+                fontSize: "18px",
+                fontWeight: "700",
+                color: "rgba(255, 255, 255, 0.9)",
+            }}
+        >
+            {timeSpent}
+        </div>
+    </div>
+);
 
 export default ChannelCard;
