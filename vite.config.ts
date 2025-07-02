@@ -20,6 +20,9 @@ export default defineConfig(({ mode }) => ({
             process.env.OPENAI_API_KEY,
         ),
     },
+    css: {
+        postcss: "./postcss.config.js",
+    },
     build: {
         watch: mode === "development" ? {} : undefined,
         rollupOptions: {
