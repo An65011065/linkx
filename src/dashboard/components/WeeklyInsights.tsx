@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import DataService from "../../data/dataService";
 
 const WeeklyInsights: React.FC = () => {
@@ -12,6 +12,8 @@ const WeeklyInsights: React.FC = () => {
         screenTime: Array(7).fill(0),
         days: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
     });
+    const [chartHeight, setChartHeight] = useState(0);
+    const chartContainerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         const loadWeeklyData = async () => {
@@ -59,6 +61,24 @@ const WeeklyInsights: React.FC = () => {
         loadWeeklyData();
     }, []);
 
+    // Calculate available chart height dynamically
+    useEffect(() => {
+        const updateChartHeight = () => {
+            if (chartContainerRef.current) {
+                const containerRect =
+                    chartContainerRef.current.getBoundingClientRect();
+                // Reserve space for labels (value labels + day labels) and some padding
+                const reservedSpace = 60; // ~16px for value labels + ~16px for day labels + padding
+                const availableHeight = containerRect.height - reservedSpace;
+                setChartHeight(Math.max(availableHeight, 80)); // Minimum 80px for bars
+            }
+        };
+
+        updateChartHeight();
+        window.addEventListener("resize", updateChartHeight);
+        return () => window.removeEventListener("resize", updateChartHeight);
+    }, []);
+
     const currentData = viewMode === "scores" ? data.scores : data.screenTime;
     const maxValue = Math.max(...currentData);
     const nonZeroValues = currentData.filter((val) => val > 0);
@@ -73,17 +93,19 @@ const WeeklyInsights: React.FC = () => {
 
     const getBarHeight = (value: number) => {
         if (currentData.length === 0 || value === 0) return 0;
-        const maxHeight = 160; // Maximum height for bars
+        const maxHeight = chartHeight * 0.8; // Use 80% of available chart height
         const baseHeight = 8;
         // Use the same scale as the average line but maintain minimum bar height
         return Math.max(baseHeight, (value / maxValue) * maxHeight);
     };
 
     const getAverageLinePosition = (avgValue: number) => {
-        if (currentData.length === 0 || avgValue === 0) return 0;
-        const maxHeight = 160; // Maximum height for bars
+        const CHART_BOTTOM_OFFSET = 24;
+        if (currentData.length === 0 || avgValue === 0)
+            return CHART_BOTTOM_OFFSET;
+        const maxHeight = chartHeight * 0.8; // Use 80% of available chart height
         // Use exact proportion for the line
-        return (avgValue / maxValue) * maxHeight;
+        return CHART_BOTTOM_OFFSET + (avgValue / maxValue) * maxHeight;
     };
 
     const getBarColor = () => {
@@ -102,11 +124,16 @@ const WeeklyInsights: React.FC = () => {
                 borderRadius: "16px",
                 border: "1px solid rgba(255, 255, 255, 0.1)",
                 backdropFilter: "blur(10px)",
-                padding: "20px",
-                width: "400px",
+                padding: "12px",
+                paddingLeft: "14px",
+                paddingRight: "14px",
+                height: "100%",
+                width: "100%",
                 position: "relative",
                 overflow: "hidden",
                 marginLeft: "0", // Ensure left alignment
+                display: "flex",
+                flexDirection: "column",
             }}
         >
             {/* Background gradients matching StoryCard */}
@@ -137,7 +164,15 @@ const WeeklyInsights: React.FC = () => {
                 }}
             />
 
-            <div style={{ position: "relative", zIndex: 10 }}>
+            <div
+                style={{
+                    position: "relative",
+                    zIndex: 10,
+                    display: "flex",
+                    flexDirection: "column",
+                    height: "100%",
+                }}
+            >
                 {/* Header with Toggle */}
                 <div
                     style={{
@@ -145,18 +180,19 @@ const WeeklyInsights: React.FC = () => {
                         justifyContent: "space-between",
                         alignItems: "center",
                         marginBottom: "24px",
+                        flexShrink: 0,
                     }}
                 >
                     <h2
                         style={{
-                            fontSize: "18px",
-                            fontWeight: "400",
+                            fontSize: "16px",
+                            fontWeight: "600",
                             color: "rgba(255, 255, 255, 0.9)",
                             margin: "0",
                             fontFamily: "system-ui, -apple-system, sans-serif",
                         }}
                     >
-                        This Week
+                        Weekly Scores
                     </h2>
 
                     {/* Toggle with reduced size */}
@@ -173,8 +209,8 @@ const WeeklyInsights: React.FC = () => {
                         <button
                             onClick={() => setViewMode("scores")}
                             style={{
-                                padding: "4px 10px",
-                                fontSize: "11px",
+                                padding: "4px 6px",
+                                fontSize: "10px",
                                 fontWeight: "500",
                                 border: "none",
                                 borderRadius: "6px",
@@ -197,8 +233,8 @@ const WeeklyInsights: React.FC = () => {
                         <button
                             onClick={() => setViewMode("screenTime")}
                             style={{
-                                padding: "4px 10px",
-                                fontSize: "11px",
+                                padding: "4px 6px",
+                                fontSize: "10px",
                                 fontWeight: "500",
                                 border: "none",
                                 borderRadius: "6px",
@@ -223,8 +259,13 @@ const WeeklyInsights: React.FC = () => {
 
                 {/* Chart Container */}
                 <div
+                    ref={chartContainerRef}
                     style={{
-                        position: "relative",
+                        flex: 1,
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "flex-end",
+                        minHeight: "120px", // Minimum height for usability
                     }}
                 >
                     {/* Chart */}
@@ -233,7 +274,7 @@ const WeeklyInsights: React.FC = () => {
                             display: "flex",
                             alignItems: "end",
                             justifyContent: "space-between",
-                            height: "220px",
+                            height: "auto",
                             marginBottom: "0px",
                             gap: "8px",
                             position: "relative",
