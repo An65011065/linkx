@@ -119,34 +119,22 @@ class WebsiteBlocker {
                 const today =
                     startDate || new Date().toISOString().split("T")[0];
 
-                // Parse times
-                const startMinutes = this.parseTimeToMinutes(hoursOrStartTime);
-                const endMinutes = this.parseTimeToMinutes(endTime);
-
-                // Create dates for start and end times
+                // Create dates with the correct timezone
                 const startDateTime = new Date(
                     `${today}T${hoursOrStartTime}:00`,
                 );
                 let endDateTime = new Date(`${today}T${endTime}:00`);
 
                 // If end time is before start time, assume next day
+                const startMinutes = this.parseTimeToMinutes(hoursOrStartTime);
+                const endMinutes = this.parseTimeToMinutes(endTime);
                 if (endMinutes <= startMinutes) {
                     endDateTime.setDate(endDateTime.getDate() + 1);
                 }
 
-                // Convert to UTC with timezone consideration
-                const startInUserTz = new Date(
-                    startDateTime.toLocaleString("en-US", {
-                        timeZone: timezone,
-                    }),
-                );
-                const startInUTC = new Date(
-                    startDateTime.toLocaleString("en-US", { timeZone: "UTC" }),
-                );
-                const tzOffset = startInUTC.getTime() - startInUserTz.getTime();
-
-                blockStartTime = startDateTime.getTime() + tzOffset;
-                blockEndTime = endDateTime.getTime() + tzOffset;
+                // Convert to UTC timestamps directly
+                blockStartTime = startDateTime.getTime();
+                blockEndTime = endDateTime.getTime();
 
                 // If the start time is in the past, start immediately
                 if (blockStartTime < Date.now()) {

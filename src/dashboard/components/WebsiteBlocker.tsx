@@ -3,6 +3,52 @@ import { websiteBlocker } from "../../data/websiteBlocker";
 import type { BlockedSite } from "../../shared/types/common.types";
 import UnblockMiniGame from "./UnblockMiniGame";
 
+// Common leisure/social media domains
+const LEISURE_DOMAINS = [
+    "facebook.com",
+    "instagram.com",
+    "twitter.com",
+    "tiktok.com",
+    "reddit.com",
+    "youtube.com",
+    "netflix.com",
+    "twitch.tv",
+    "pinterest.com",
+    "snapchat.com",
+];
+
+// Common work/productivity domains
+const WORK_DOMAINS = [
+    "github.com",
+    "gitlab.com",
+    "atlassian.com",
+    "jira.com",
+    "confluence.com",
+    "slack.com",
+    "notion.so",
+    "trello.com",
+    "asana.com",
+    "linear.app",
+    "figma.com",
+    "miro.com",
+    "docs.google.com",
+    "drive.google.com",
+    "calendar.google.com",
+    "meet.google.com",
+    "mail.google.com", // Gmail
+    "outlook.com", // Microsoft Outlook
+    "outlook.office.com", // Microsoft 365
+    "outlook.live.com", // Microsoft Live
+    "yahoo.com", // Yahoo Mail
+    "mail.yahoo.com", // Yahoo Mail alternate
+    "proton.me", // Proton Mail
+    "zoho.com", // Zoho Mail
+    "fastmail.com", // FastMail
+    "mail.com", // Mail.com
+    "aol.com", // AOL Mail
+    "icloud.com", // Apple iCloud Mail
+];
+
 const WebsiteBlocker: React.FC = () => {
     const [domain, setDomain] = useState("");
     const [startTime, setStartTime] = useState("");
@@ -16,14 +62,11 @@ const WebsiteBlocker: React.FC = () => {
     useEffect(() => {
         loadBlockedSites();
         const interval = setInterval(loadBlockedSites, 60000);
-
         // Set default values
         const now = new Date();
         const later = new Date(now.getTime() + 60 * 60 * 1000);
-
         setStartTime(now.toTimeString().slice(0, 5));
         setEndTime(later.toTimeString().slice(0, 5));
-
         return () => clearInterval(interval);
     }, []);
 
@@ -36,12 +79,33 @@ const WebsiteBlocker: React.FC = () => {
         }
     };
 
+    const handleBlockLeisure = async () => {
+        try {
+            for (const domain of LEISURE_DOMAINS) {
+                await websiteBlocker.blockWebsite(domain, 1); // Block for 1 hour
+            }
+            await loadBlockedSites();
+        } catch (error) {
+            console.error("Error blocking leisure sites:", error);
+        }
+    };
+
+    const handleBlockWork = async () => {
+        try {
+            for (const domain of WORK_DOMAINS) {
+                await websiteBlocker.blockWebsite(domain, 1); // Block for 1 hour
+            }
+            await loadBlockedSites();
+        } catch (error) {
+            console.error("Error blocking work sites:", error);
+        }
+    };
+
     const handleBlock = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!domain.trim() || !startTime || !endTime) return;
 
         setIsLocked(true); // Start animation
-
         try {
             const cleanDomain = domain
                 .replace(/^(https?:\/\/)?(www\.)?/, "")
@@ -62,7 +126,6 @@ const WebsiteBlocker: React.FC = () => {
             }
 
             const today = new Date().toISOString().split("T")[0];
-
             await websiteBlocker.blockWebsite(
                 cleanDomain,
                 startTime,
@@ -72,7 +135,6 @@ const WebsiteBlocker: React.FC = () => {
             );
             await loadBlockedSites();
             setDomain("");
-
             // Reset lock state after successful block
             setTimeout(() => {
                 setIsLocked(false);
@@ -104,10 +166,19 @@ const WebsiteBlocker: React.FC = () => {
 
     const handleMiniGameSuccess = async () => {
         try {
-            await websiteBlocker.unlockWebsite(selectedDomain);
+            if (selectedDomain === "*") {
+                // Delete all blocked sites
+                const sites = await websiteBlocker.getBlockedSites();
+                for (const site of sites) {
+                    await websiteBlocker.unlockWebsite(site.domain);
+                }
+            } else {
+                // Unlock single domain
+                await websiteBlocker.unlockWebsite(selectedDomain);
+            }
             await loadBlockedSites();
         } catch (err) {
-            console.error("Unlock failed:", err);
+            console.error("Operation failed:", err);
         } finally {
             setShowMiniGame(false);
             setSelectedDomain("");
@@ -134,14 +205,12 @@ const WebsiteBlocker: React.FC = () => {
                 timeZone: site.timezone,
             },
         );
-
         const endFormatted = new Date(site.endTime).toLocaleString("en-US", {
             hour: "numeric",
             minute: "2-digit",
             hour12: true,
             timeZone: site.timezone,
         });
-
         return `${startFormatted} - ${endFormatted}`;
     };
 
@@ -151,168 +220,262 @@ const WebsiteBlocker: React.FC = () => {
 
     const getBlockStatus = (site: BlockedSite): string => {
         const now = Date.now();
-
-        if (site.scheduledStartTime && site.scheduledStartTime > now) {
-            return "Scheduled";
-        } else if (site.endTime <= now) {
+        if (site.endTime <= now) {
             return "Expired";
-        } else {
+        } else if (site.startTime <= now) {
             return "Active";
+        } else if (site.scheduledStartTime) {
+            return "Scheduled";
+        } else {
+            return "Active"; // Fallback for legacy blocks
         }
     };
 
     return (
         <>
             <style>{`
-                @font-face {
-                    font-family: 'Nunito-Regular';
-                    src: url('${chrome.runtime.getURL(
-                        "src/assets/fonts/Nunito-Regular.ttf",
-                    )}') format('truetype');
-                    font-weight: 400;
-                    font-style: normal;
-                }
-                @font-face {
-                    font-family: 'Nunito-Bold';
-                    src: url('${chrome.runtime.getURL(
-                        "src/assets/fonts/Nunito-Bold.ttf",
-                    )}') format('truetype');
-                    font-weight: 700;
-                    font-style: normal;
-                }
-
                 @keyframes lockRotate {
                     0% { transform: rotate(0deg); }
                     100% { transform: rotate(10deg); }
                 }
-
                 .lock-button {
                     transition: all 0.3s ease;
                 }
-
                 .lock-button:hover {
                     transform: scale(1.1);
                 }
-
                 .lock-button.locked {
                     animation: lockRotate 0.3s ease;
                 }
-
                 .lock-icon {
                     transition: all 0.3s ease;
                 }
-
                 .lock-icon.locked {
                     transform: scale(0.9);
                 }
-
                 input[type="time"]::-webkit-calendar-picker-indicator {
                     background: none;
                     display: none;
                 }
+                /* Hide scrollbar for Chrome, Safari and Opera */
+                ::-webkit-scrollbar {
+                    display: none;
+                }
+                /* Hide scrollbar for IE, Edge and Firefox */
+                * {
+                    -ms-overflow-style: none;  /* IE and Edge */
+                    scrollbar-width: none;  /* Firefox */
+                }
             `}</style>
             <div
                 style={{
-                    margin: "0 24px",
-                    width: "calc(50% - 48px)",
-                    minWidth: "400px",
+                    background: "rgba(255, 255, 255, 0.05)",
+                    borderRadius: "16px",
+                    border: "1px solid rgba(255, 255, 255, 0.1)",
+                    backdropFilter: "blur(10px)",
+                    padding: "20px",
+                    height: "100%",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "16px",
                     position: "relative",
-                    top: "-35px",
                 }}
             >
-                <h2
+                <div
                     style={{
-                        fontFamily: "Nunito-Bold, Arial, sans-serif",
-                        fontSize: "24px",
-                        color: "#2d3436",
-                        marginBottom: "24px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        marginBottom: "4px",
                     }}
                 >
-                    Locking In
-                </h2>
-
-                <form onSubmit={handleBlock} style={{ marginBottom: "16px" }}>
                     <div
                         style={{
-                            padding: "16px",
-                            backgroundColor: "#f8f9fa",
-                            borderRadius: "8px",
-                            borderLeft: "4px solid #d63031",
-                            position: "relative",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "12px",
                         }}
                     >
+                        <h2
+                            style={{
+                                margin: 0,
+                                fontSize: "16px",
+                                color: "#ffffff",
+                                fontWeight: "600",
+                                fontFamily:
+                                    "system-ui, -apple-system, sans-serif",
+                            }}
+                        >
+                            Locking In
+                        </h2>
+                    </div>
+                    <div style={{ display: "flex", gap: "6px" }}>
+                        <button
+                            onClick={handleBlockLeisure}
+                            style={{
+                                background: "rgba(255, 107, 71, 0.2)",
+                                border: "1px solid rgba(255, 107, 71, 0.3)",
+                                borderRadius: "6px",
+                                padding: "4px 8px",
+                                color: "rgba(255, 255, 255, 0.9)",
+                                cursor: "pointer",
+                                transition: "all 0.2s ease",
+                                fontSize: "11px",
+                                fontWeight: "500",
+                                fontFamily:
+                                    "system-ui, -apple-system, sans-serif",
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.background =
+                                    "rgba(255, 107, 71, 0.3)";
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.background =
+                                    "rgba(255, 107, 71, 0.2)";
+                            }}
+                            title="Block leisure sites for 1 hour"
+                        >
+                            Lock Leisure
+                        </button>
+                        <button
+                            onClick={handleBlockWork}
+                            style={{
+                                background: "rgba(66, 133, 244, 0.2)",
+                                border: "1px solid rgba(66, 133, 244, 0.3)",
+                                borderRadius: "6px",
+                                padding: "4px 8px",
+                                color: "rgba(255, 255, 255, 0.9)",
+                                cursor: "pointer",
+                                transition: "all 0.2s ease",
+                                fontSize: "11px",
+                                fontWeight: "500",
+                                fontFamily:
+                                    "system-ui, -apple-system, sans-serif",
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.background =
+                                    "rgba(66, 133, 244, 0.3)";
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.background =
+                                    "transparent";
+                            }}
+                            title="Block work sites for 1  hour"
+                        >
+                            Lock Work
+                        </button>
+                        <button
+                            onClick={() => {
+                                setSelectedDomain("*");
+                                setShowMiniGame(true);
+                            }}
+                            style={{
+                                background: "rgba(255, 68, 68, 0.2)",
+                                border: "1px solid rgba(255, 68, 68, 0.3)",
+                                borderRadius: "6px",
+                                padding: "4px 8px",
+                                color: "rgba(255, 255, 255, 0.9)",
+                                cursor: "pointer",
+                                transition: "all 0.2s ease",
+                                fontSize: "11px",
+                                fontWeight: "500",
+                                fontFamily:
+                                    "system-ui, -apple-system, sans-serif",
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.background =
+                                    "rgba(255, 68, 68, 0.3)";
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.background =
+                                    "rgba(255, 68, 68, 0.2)";
+                            }}
+                            title="Delete all blocked sites"
+                        >
+                            Unlock All
+                        </button>
+                    </div>
+                </div>
+
+                <form onSubmit={handleBlock}>
+                    <div
+                        style={{
+                            padding: "8px 12px",
+                            backgroundColor: "rgba(255, 255, 255, 0.05)",
+                            borderRadius: "8px",
+                            border: "1px solid rgba(255, 255, 255, 0.2)",
+                            position: "relative",
+                            backdropFilter: "blur(10px)",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "8px",
+                        }}
+                    >
+                        <input
+                            type="text"
+                            value={domain}
+                            onChange={(e) => setDomain(e.target.value)}
+                            placeholder="Domain"
+                            style={{
+                                width: "40%",
+                                padding: "0",
+                                border: "none",
+                                fontFamily:
+                                    "system-ui, -apple-system, sans-serif",
+                                fontSize: "14px",
+                                outline: "none",
+                                backgroundColor: "transparent",
+                                color: "#ffffff",
+                            }}
+                        />
                         <div
                             style={{
-                                position: "relative",
+                                position: "absolute",
+                                right: "50px",
                                 display: "flex",
+                                gap: "4px",
                                 alignItems: "center",
-                                gap: "8px",
                             }}
                         >
                             <input
-                                type="text"
-                                value={domain}
-                                onChange={(e) => setDomain(e.target.value)}
-                                placeholder="Enter domain to block..."
+                                type="time"
+                                value={startTime}
+                                onChange={(e) => setStartTime(e.target.value)}
                                 style={{
-                                    width: "100%",
-                                    padding: "12px",
-                                    paddingRight: "180px", // Reduced space for time inputs
-                                    border: "1px solid #ddd",
-                                    borderRadius: "6px",
+                                    width: "85px",
+                                    padding: "0",
+                                    border: "none",
+                                    borderLeft:
+                                        "1px solid rgba(255, 255, 255, 0.2)",
+                                    paddingLeft: "8px",
                                     fontFamily:
-                                        "Nunito-Regular, Arial, sans-serif",
+                                        "system-ui, -apple-system, sans-serif",
                                     fontSize: "14px",
                                     outline: "none",
-                                    boxSizing: "border-box",
+                                    backgroundColor: "transparent",
+                                    color: "#ffffff",
                                 }}
                             />
-                            <div
+                            <input
+                                type="time"
+                                value={endTime}
+                                onChange={(e) => setEndTime(e.target.value)}
                                 style={{
-                                    position: "absolute",
-                                    right: "12px",
-                                    display: "flex",
-                                    gap: "4px", // Reduced gap between time inputs
-                                    alignItems: "center",
+                                    width: "85px",
+                                    padding: "0",
+                                    border: "none",
+                                    borderLeft:
+                                        "1px solid rgba(255, 255, 255, 0.2)",
+                                    paddingLeft: "8px",
+                                    fontFamily:
+                                        "system-ui, -apple-system, sans-serif",
+                                    fontSize: "14px",
+                                    outline: "none",
+                                    backgroundColor: "transparent",
+                                    color: "#ffffff",
                                 }}
-                            >
-                                <input
-                                    type="time"
-                                    value={startTime}
-                                    onChange={(e) =>
-                                        setStartTime(e.target.value)
-                                    }
-                                    style={{
-                                        width: "85px", // Reduced width
-                                        padding: "8px",
-                                        border: "none",
-                                        borderLeft: "1px solid #ddd",
-                                        fontFamily:
-                                            "Nunito-Regular, Arial, sans-serif",
-                                        fontSize: "14px",
-                                        outline: "none",
-                                        backgroundColor: "transparent",
-                                    }}
-                                />
-                                <input
-                                    type="time"
-                                    value={endTime}
-                                    onChange={(e) => setEndTime(e.target.value)}
-                                    style={{
-                                        width: "85px", // Reduced width
-                                        padding: "8px",
-                                        border: "none",
-                                        borderLeft: "1px solid #ddd",
-                                        fontFamily:
-                                            "Nunito-Regular, Arial, sans-serif",
-                                        fontSize: "14px",
-                                        outline: "none",
-                                        backgroundColor: "transparent",
-                                    }}
-                                />
-                            </div>
+                            />
                         </div>
-
                         {/* Floating lock button */}
                         <button
                             type="submit"
@@ -321,33 +484,32 @@ const WebsiteBlocker: React.FC = () => {
                             }`}
                             style={{
                                 position: "absolute",
-                                right: "-20px",
+                                right: "8px",
                                 top: "50%",
                                 transform: "translateY(-50%)",
-                                width: "42px",
+                                width: "36px",
                                 height: "36px",
-                                backgroundColor: "#d63031",
+
                                 color: "white",
                                 border: "none",
-                                borderRadius: "6px",
+                                borderRadius: "8px",
                                 cursor: "pointer",
                                 transition: "all 0.3s ease",
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",
-                                boxShadow: "0 2px 8px rgba(214, 48, 49, 0.2)",
                             }}
                             onMouseEnter={(e) => {
                                 e.currentTarget.style.backgroundColor =
-                                    "#b32e2f";
+                                    "#4da3ff";
                                 e.currentTarget.style.boxShadow =
-                                    "0 4px 12px rgba(214, 48, 49, 0.3)";
+                                    "0 6px 16px transparent";
                             }}
                             onMouseLeave={(e) => {
                                 e.currentTarget.style.backgroundColor =
-                                    "#d63031";
+                                    "transparent";
                                 e.currentTarget.style.boxShadow =
-                                    "0 2px 8px rgba(214, 48, 49, 0.2)";
+                                    "0 4px 12px transparent";
                             }}
                         >
                             <svg
@@ -394,31 +556,36 @@ const WebsiteBlocker: React.FC = () => {
                 </form>
 
                 {/* Blocked sites list */}
-                {blockedSites.length > 0 && (
-                    <>
-                        <h3
-                            style={{
-                                fontFamily: "Nunito-Bold, Arial, sans-serif",
-                                fontSize: "16px",
-                                color: "#2d3436",
-                                marginBottom: "8px",
-                            }}
-                        >
-                            Active Locks ({blockedSites.length})
-                        </h3>
-                        <div
-                            style={{
-                                display: "flex",
-                                flexDirection: "column",
-                                gap: "8px",
-                                maxHeight: "400px",
-                                overflowY: "auto",
-                            }}
-                        >
+                <div
+                    style={{
+                        flex: 1,
+                        overflowY: "auto",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "8px",
+                        marginRight: "-8px",
+                        paddingRight: "8px",
+                        marginBottom: "16px",
+                    }}
+                >
+                    {blockedSites.length > 0 && (
+                        <>
+                            <h3
+                                style={{
+                                    fontFamily:
+                                        "system-ui, -apple-system, sans-serif",
+                                    fontSize: "14px",
+                                    color: "#ffffff",
+                                    marginBottom: "8px",
+                                    fontWeight: "500",
+                                    opacity: 0.7,
+                                }}
+                            >
+                                Active Locks ({blockedSites.length})
+                            </h3>
                             {blockedSites.map((site) => {
                                 const expired = isExpired(site.endTime);
                                 const status = getBlockStatus(site);
-
                                 return (
                                     <div
                                         key={site.domain}
@@ -428,11 +595,11 @@ const WebsiteBlocker: React.FC = () => {
                                             alignItems: "flex-start",
                                             padding: "12px",
                                             backgroundColor: expired
-                                                ? "#fff5f5"
+                                                ? "rgba(255, 118, 117, 0.1)"
                                                 : status === "Scheduled"
-                                                ? "#f0f8ff"
-                                                : "#f8f9fa",
-                                            borderRadius: "8px",
+                                                ? "rgba(116, 185, 255, 0.1)"
+                                                : "rgba(0, 184, 148, 0.1)",
+                                            borderRadius: "12px",
                                             marginLeft: "5px",
                                             borderLeft: `4px solid ${
                                                 expired
@@ -441,18 +608,21 @@ const WebsiteBlocker: React.FC = () => {
                                                     ? "#74b9ff"
                                                     : "#00b894"
                                             }`,
+                                            border: "1px solid rgba(255, 255, 255, 0.1)",
+                                            backdropFilter: "blur(10px)",
                                         }}
                                     >
                                         <div style={{ flex: 1 }}>
                                             <div
                                                 style={{
                                                     fontFamily:
-                                                        "Nunito-Bold, Arial, sans-serif",
-                                                    fontSize: "16px",
+                                                        "system-ui, -apple-system, sans-serif",
+                                                    fontSize: "14px",
                                                     color: expired
                                                         ? "#a0a0a0"
-                                                        : "#2d3436",
+                                                        : "#ffffff",
                                                     marginBottom: "4px",
+                                                    fontWeight: "600",
                                                 }}
                                             >
                                                 {site.domain}
@@ -461,7 +631,7 @@ const WebsiteBlocker: React.FC = () => {
                                                         marginLeft: "8px",
                                                         fontSize: "12px",
                                                         padding: "2px 6px",
-                                                        borderRadius: "4px",
+                                                        borderRadius: "6px",
                                                         backgroundColor: expired
                                                             ? "#ff7675"
                                                             : status ===
@@ -472,21 +642,21 @@ const WebsiteBlocker: React.FC = () => {
                                                         textTransform:
                                                             "uppercase",
                                                         letterSpacing: "0.5px",
+                                                        fontWeight: "500",
                                                     }}
                                                 >
                                                     {status}
                                                 </span>
                                             </div>
-
                                             {site.timezone && (
                                                 <div
                                                     style={{
                                                         fontFamily:
-                                                            "Nunito-Regular, Arial, sans-serif",
+                                                            "system-ui, -apple-system, sans-serif",
                                                         fontSize: "12px",
                                                         color: expired
-                                                            ? "#a0a0a0"
-                                                            : "#9b9b9b",
+                                                            ? "#666666"
+                                                            : "#a0a0a0",
                                                         lineHeight: "1.3",
                                                     }}
                                                 >
@@ -494,7 +664,6 @@ const WebsiteBlocker: React.FC = () => {
                                                 </div>
                                             )}
                                         </div>
-
                                         <button
                                             onClick={() =>
                                                 expired
@@ -505,38 +674,42 @@ const WebsiteBlocker: React.FC = () => {
                                             }
                                             style={{
                                                 padding: "6px 12px",
-                                                backgroundColor: "transparent",
+                                                backgroundColor:
+                                                    "rgba(255, 255, 255, 0.1)",
                                                 color: expired
                                                     ? "#a0a0a0"
-                                                    : "#636e72",
+                                                    : "#ffffff",
                                                 border: `1px solid ${
-                                                    expired ? "#e0e0e0" : "#ddd"
+                                                    expired
+                                                        ? "rgba(255, 255, 255, 0.2)"
+                                                        : "rgba(255, 255, 255, 0.3)"
                                                 }`,
-                                                borderRadius: "6px",
+                                                borderRadius: "8px",
                                                 fontFamily:
-                                                    "Nunito-Regular, Arial, sans-serif",
+                                                    "system-ui, -apple-system, sans-serif",
                                                 fontSize: "12px",
                                                 textTransform: "uppercase",
                                                 letterSpacing: "0.5px",
                                                 cursor: "pointer",
                                                 transition: "all 0.2s",
                                                 marginTop: "4px",
+                                                fontWeight: "500",
                                             }}
                                             onMouseEnter={(e) => {
                                                 if (!expired) {
                                                     e.currentTarget.style.backgroundColor =
-                                                        "#f0f0f0";
-                                                    e.currentTarget.style.color =
-                                                        "#2d3436";
+                                                        "rgba(255, 255, 255, 0.2)";
+                                                    e.currentTarget.style.borderColor =
+                                                        "rgba(255, 255, 255, 0.5)";
                                                 }
                                             }}
                                             onMouseLeave={(e) => {
                                                 e.currentTarget.style.backgroundColor =
-                                                    "transparent";
-                                                e.currentTarget.style.color =
+                                                    "rgba(255, 255, 255, 0.1)";
+                                                e.currentTarget.style.borderColor =
                                                     expired
-                                                        ? "#a0a0a0"
-                                                        : "#636e72";
+                                                        ? "rgba(255, 255, 255, 0.2)"
+                                                        : "rgba(255, 255, 255, 0.3)";
                                             }}
                                         >
                                             {expired ? "Remove" : "Unlock"}
@@ -544,27 +717,28 @@ const WebsiteBlocker: React.FC = () => {
                                     </div>
                                 );
                             })}
+                        </>
+                    )}
+                    {blockedSites.length === 0 && (
+                        <div
+                            style={{
+                                padding: "20px",
+                                textAlign: "center",
+                                color: "#a0a0a0",
+                                fontFamily:
+                                    "system-ui, -apple-system, sans-serif",
+                                fontSize: "14px",
+                                backgroundColor: "rgba(255, 255, 255, 0.05)",
+                                borderRadius: "12px",
+                                border: "1px solid rgba(255, 255, 255, 0.1)",
+                                backdropFilter: "blur(10px)",
+                            }}
+                        >
+                            No websites currently locked
                         </div>
-                    </>
-                )}
-
-                {blockedSites.length === 0 && (
-                    <div
-                        style={{
-                            padding: "20px",
-                            textAlign: "center",
-                            color: "#636e72",
-                            fontFamily: "Nunito-Regular, Arial, sans-serif",
-                            fontSize: "14px",
-                            backgroundColor: "#f8f9fa",
-                            borderRadius: "8px",
-                        }}
-                    >
-                        No websites currently locked
-                    </div>
-                )}
+                    )}
+                </div>
             </div>
-
             {showMiniGame && (
                 <UnblockMiniGame
                     onSuccess={handleMiniGameSuccess}
