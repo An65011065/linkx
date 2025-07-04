@@ -144,14 +144,28 @@ exports.chatWithOpenAI = onCall(
             (request.data && request.data.threadId) || null;
         const systemContext =
             (request.data && request.data.systemContext) || "";
+        const assistantType =
+            (request.data && request.data.assistantType) || "browsing"; // NEW: Add assistant type
 
         if (!userMessage) {
             throw new Error("No message provided");
         }
 
+        // NEW: Set assistant ID based on type
+        const assistantIds = {
+            browsing: "asst_oGJq9HXdbQ5VoLRuE8JdgvRQ",
+            summarise: "asst_y1LZY5JHQX3YZiAXyVs1Iiif",
+        };
+
+        const assistantId = assistantIds[assistantType];
+        if (!assistantId) {
+            throw new Error(`Invalid assistant type: ${assistantType}`);
+        }
+
         try {
             console.log("=== OPENAI REQUEST ===");
             console.log("User message:", userMessage);
+            console.log("Assistant type:", assistantType); // NEW: Log assistant type
             console.log("Browsing data received:", browsingData ? "YES" : "NO");
             console.log("Existing thread:", existingThreadId ? "YES" : "NO");
 
@@ -171,7 +185,12 @@ exports.chatWithOpenAI = onCall(
 
             let messageContent = userMessage;
 
-            if (!existingThreadId && browsingData) {
+            // MODIFIED: Only process browsing data for browsing assistant
+            if (
+                !existingThreadId &&
+                browsingData &&
+                assistantType === "browsing"
+            ) {
                 // First message - decide between text summary or CSV upload
                 let fullContext = "";
 
@@ -225,6 +244,7 @@ exports.chatWithOpenAI = onCall(
 
                 messageContent = fullContext + "User question: " + userMessage;
             }
+            // NEW: For summarise assistant, userMessage should already contain the page text
 
             console.log("Final message content length:", messageContent.length);
 
@@ -246,16 +266,16 @@ exports.chatWithOpenAI = onCall(
             await openai.beta.threads.messages.create(threadId, messageData);
             console.log("Message added to thread");
 
-            // Run assistant - only use code_interpreter if we uploaded a file
+            // MODIFIED: Run assistant with the correct ID
             const runConfig = {
-                assistant_id: "asst_oGJq9HXdbQ5VoLRuE8JdgvRQ",
+                assistant_id: assistantId, // Use dynamic assistant ID
             };
 
             if (fileId) {
                 runConfig.tools = [{ type: "code_interpreter" }];
                 console.log("Running with code_interpreter (file uploaded)");
             } else {
-                console.log("Running with default tools (text summary)");
+                console.log("Running with default tools");
             }
 
             const run = await openai.beta.threads.runs.create(
@@ -264,7 +284,7 @@ exports.chatWithOpenAI = onCall(
             );
             console.log("Assistant run created:", run.id);
 
-            // Poll until completion
+            // Poll until completion (rest of the code stays the same)
             let completed = false;
             let runResult;
             let attempts = 0;
@@ -298,7 +318,7 @@ exports.chatWithOpenAI = onCall(
                         const retryRun = await openai.beta.threads.runs.create(
                             threadId,
                             {
-                                assistant_id: "asst_oGJq9HXdbQ5VoLRuE8JdgvRQ",
+                                assistant_id: assistantId, // MODIFIED: Use dynamic assistant ID
                             },
                         );
 
