@@ -1,22 +1,64 @@
-import React from "react";
-import Activity from "./Activity";
-import Channel from "./Channel";
-import WebsiteBlocker from "./WebsiteBlocker";
+import React, { useState, useEffect } from "react";
 import StoriesComponent from "./stories";
+import GhostTab from "./GhostTab";
+import Shortcuts from "./Shortcuts";
+import WebsiteBlocker from "./WebsiteBlocker";
+import NotesOverview from "./NotesOverview";
 import WeeklyInsights from "./WeeklyInsights";
+import Templates from "./Templates";
+import Timers from "./Timers";
 
 const DashboardTab: React.FC = () => {
+    const [isLoaded, setIsLoaded] = useState(false);
+
+    useEffect(() => {
+        // Give components time to mount and load
+        const timer = setTimeout(() => {
+            setIsLoaded(true);
+        }, 100); // Adjust timing as needed
+
+        return () => clearTimeout(timer);
+    }, []);
+
+    if (!isLoaded) {
+        return (
+            <div
+                style={{
+                    height: "100%",
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    backgroundColor: "#000000",
+                }}
+            >
+                <div
+                    style={{
+                        color: "rgba(255, 255, 255, 0.7)",
+                        fontSize: "16px",
+                        fontFamily: "Arial, sans-serif",
+                    }}
+                >
+                    Loading...
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div
             style={{
-                height: "110vh",
+                height: "100%",
                 fontFamily: "Arial, sans-serif",
                 backgroundColor: "#000000",
                 overflowY: "hidden",
-                position: "relative", // Added for absolute positioning of Channel
+                position: "relative",
+                padding: "20px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "20px",
             }}
         >
-            {/* Blue gradient - top right */}
+            {/* Background gradients */}
             <div
                 style={{
                     position: "absolute",
@@ -31,7 +73,6 @@ const DashboardTab: React.FC = () => {
                     filter: "blur(40px)",
                 }}
             />
-            {/* Orange gradient - bottom left */}
             <div
                 style={{
                     position: "absolute",
@@ -91,49 +132,92 @@ const DashboardTab: React.FC = () => {
                 @import url('https://fonts.googleapis.com/icon?family=Material+Icons');
             `}</style>
 
-            {/* Channel component positioned at top-right */}
-            <div
-                style={{ position: "absolute", top: 35, right: 1, zIndex: 20 }}
-            >
-                <Channel />
-            </div>
-
+            {/* Main content */}
             <div
                 style={{
-                    paddingTop: "32px",
-                    paddingLeft: "32px",
-                    paddingRight: "32px",
                     height: "100%",
-                    overflowY: "hidden",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "6px",
                     position: "relative",
                     zIndex: 20,
                 }}
             >
-                {/* Main Content Grid */}
+                {/* Row 1: Stories (75% width) */}
                 <div
                     style={{
-                        display: "grid",
-                        gridTemplateColumns: "600px 1fr",
-                        alignItems: "start",
+                        height: "55%",
+                        display: "flex",
+                        width: "100%",
+                        gap: "10px",
                     }}
                 >
-                    {/* Left Column - Stats Cards */}
-                    <div>
+                    <div style={{ width: "70%", height: "100%" }}>
                         <StoriesComponent />
+                    </div>
+                    <div
+                        style={{
+                            width: "30%",
+                            height: "100%",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "0.4rem",
+                        }}
+                    >
+                        <div style={{ height: "25%" }}>
+                            <Templates />
+                        </div>
+                        <div style={{ height: "25%" }}>
+                            <Timers />
+                        </div>
+                        <div style={{ height: "46%" }}>
+                            <WeeklyInsights />
+                        </div>
+
+                        {/* <div style={{ height: "16.67%" }}>
+                            <ConsolidateTabs />
+                        </div> */}
                     </div>
                 </div>
 
-                {/* Other Components */}
+                {/* Row 2: Ghost Tabs + Shortcuts and Website Blocker */}
                 <div
                     style={{
+                        height: "45%",
                         display: "flex",
-                        flexWrap: "wrap",
-                        gap: "30px",
-                        marginTop: "5px",
-                        alignItems: "start",
+                        gap: "10px",
+                        width: "100%",
+                        // border: "1px solid red",
                     }}
                 >
-                    <WeeklyInsights />
+                    {/* Column 1: Ghost Tabs + Shortcuts (25% width) */}
+                    <div
+                        style={{
+                            width: "25%",
+                            height: "100%",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "4px",
+                            // border: "1px solid white",
+                        }}
+                    >
+                        <div style={{ height: "60%" }}>
+                            <GhostTab />
+                        </div>
+                        <div style={{ height: "40%" }}>
+                            <Shortcuts />
+                        </div>
+                    </div>
+
+                    {/* Column 2: Website Blocker (37% width) */}
+                    <div style={{ width: "37%", height: "100%" }}>
+                        <WebsiteBlocker />
+                    </div>
+
+                    {/* Column 3: Notes Overview (38% width) */}
+                    <div style={{ width: "38%", height: "100%" }}>
+                        <NotesOverview />
+                    </div>
                 </div>
             </div>
         </div>
