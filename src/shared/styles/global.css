@@ -1,3 +1,34 @@
 @import "./fonts.css";
 
 /* Global styles */
+
+:root {
+    /* Add any CSS variables here */
+}
+
+/* Ensure proper viewport height handling */
+html {
+    height: -webkit-fill-available;
+}
+
+body {
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+}
+
+#root {
+    height: 100vh;
+    height: -webkit-fill-available;
+}
+
+/* Hide scrollbar but keep functionality */
+.hide-scrollbar {
+    -ms-overflow-style: none !important; /* IE and Edge */
+    scrollbar-width: none !important; /* Firefox */
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+    display: none !important; /* Chrome, Safari, Opera */
+}
+
+/* Add any other global styles below */
