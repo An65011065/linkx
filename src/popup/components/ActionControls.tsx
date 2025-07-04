@@ -14,7 +14,7 @@ const ActionControls: React.FC = () => {
         // TODO: Implement dashboard navigation
         if (typeof chrome !== "undefined" && chrome.tabs) {
             chrome.tabs.create({
-                url: chrome.runtime.getURL("src/dashboard/dashboard.html"),
+                url: chrome.runtime.getURL("src/main/main.html"),
             });
         } else {
             // For development

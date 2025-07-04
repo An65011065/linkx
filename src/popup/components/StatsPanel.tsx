@@ -2,59 +2,23 @@
 import React from "react";
 import { useExtensionData } from "../../data/useExtensionData";
 
-// Safe domain extraction
-const extractDomain = (url: string): string => {
-    try {
-        return new URL(url).hostname.replace(/^www\./, "");
-    } catch {
-        return url.split("/")[2]?.replace(/^www\./, "") || url;
-    }
-};
-
 const StatsPanel: React.FC = () => {
     const { currentSession, isLoading, error } = useExtensionData();
 
-    // Calculate stats from currentSession
-    const calculateStats = () => {
-        if (!currentSession)
-            return {
-                totalTime: 0,
-                workTime: 0,
-                socialTime: 0,
-                otherTime: 0,
-                uniqueDomains: 0,
-                totalUrls: 0,
-            };
-
-        const allVisits = currentSession.tabSessions.flatMap(
-            (tab) => tab.urlVisits,
-        );
-        const uniqueDomains = new Set(
-            allVisits.map((visit) => extractDomain(visit.url)),
-        ).size;
-        const totalUrls = allVisits.length;
-
-        const timesByCategory = allVisits.reduce(
-            (acc, visit) => {
-                if (!visit.isActive) return acc;
-                const duration = (visit.duration || 0) / 3600; // Convert to hours
-                const category = visit.category?.toLowerCase() || "other";
-
-                if (category.includes("work")) acc.workTime += duration;
-                else if (category.includes("social"))
-                    acc.socialTime += duration;
-                else acc.otherTime += duration;
-
-                acc.totalTime += duration;
-                return acc;
-            },
-            { totalTime: 0, workTime: 0, socialTime: 0, otherTime: 0 },
-        );
-
-        return { ...timesByCategory, uniqueDomains, totalUrls };
+    // Format time from milliseconds to hours with one decimal
+    const formatTimeToHours = (milliseconds: number) => {
+        return (milliseconds / (1000 * 60 * 60)).toFixed(1);
     };
 
-    const stats = calculateStats();
+    // Get stats from session
+    const stats = currentSession?.stats || {
+        totalTime: 0,
+        workTime: 0,
+        socialTime: 0,
+        otherTime: 0,
+        totalUrls: 0,
+        uniqueDomains: 0,
+    };
 
     if (isLoading) {
         return (
@@ -124,7 +88,7 @@ const StatsPanel: React.FC = () => {
                     marginBottom: "6px",
                 }}
             >
-                Today's browsing:
+                Today's active browsing:
             </div>
             <div
                 style={{
@@ -134,7 +98,7 @@ const StatsPanel: React.FC = () => {
                     marginBottom: "4px",
                 }}
             >
-                {stats.totalTime.toFixed(1)}h
+                {formatTimeToHours(stats.totalTime)}h
             </div>
             <div
                 style={{
@@ -146,14 +110,14 @@ const StatsPanel: React.FC = () => {
                 }}
             >
                 <span style={{ color: "#4285f4" }}>
-                    Work {stats.workTime.toFixed(1)}h
+                    Work {formatTimeToHours(stats.workTime)}h
                 </span>
                 <span style={{ color: "#ff6b47" }}>
-                    Social {stats.socialTime.toFixed(1)}h
+                    Social {formatTimeToHours(stats.socialTime)}h
                 </span>
-                {stats.otherTime > 0.1 && (
+                {stats.otherTime > 100 && (
                     <span style={{ color: "#6c757d" }}>
-                        Other {stats.otherTime.toFixed(1)}h
+                        Other {formatTimeToHours(stats.otherTime)}h
                     </span>
                 )}
             </div>
