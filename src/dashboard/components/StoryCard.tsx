@@ -289,8 +289,117 @@ export const StoryCard: React.FC<StoryCardProps> = ({
         return longestBreak;
     };
 
+    const analyzeSleepPatterns = () => {
+        if (!currentSession)
+            return {
+                lastActivityTime: 0,
+                firstActivityTime: 0,
+                estimatedSleepHours: 0,
+                lateNightActivity: false,
+            };
+
+        const allVisits = currentSession.tabSessions
+            .flatMap((tab) => tab.urlVisits)
+            .filter((visit) => visit.activeTime > 0)
+            .sort((a, b) => a.startTime - b.startTime);
+
+        if (allVisits.length === 0) {
+            return {
+                lastActivityTime: 0,
+                firstActivityTime: 0,
+                estimatedSleepHours: 0,
+                lateNightActivity: false,
+            };
+        }
+
+        // Get last activity of previous day and first activity of today
+        const today = new Date();
+        const todayStart = new Date(
+            today.getFullYear(),
+            today.getMonth(),
+            today.getDate(),
+        );
+
+        // Find last activity time (could be today or yesterday)
+        const lastVisit = allVisits[allVisits.length - 1];
+        const lastActivityTime = lastVisit.startTime + lastVisit.activeTime;
+
+        // Find first activity time of today
+        const todayVisits = allVisits.filter(
+            (visit) => visit.startTime >= todayStart.getTime(),
+        );
+        const firstActivityTime =
+            todayVisits.length > 0
+                ? todayVisits[0].startTime
+                : todayStart.getTime();
+
+        // Calculate estimated sleep duration
+        const lastActivityDate = new Date(lastActivityTime);
+
+        // If last activity was today, estimate sleep based on typical bedtime
+        let estimatedSleepHours = 0;
+        if (lastActivityDate.getDate() === today.getDate()) {
+            // If last activity was after midnight, assume they went to bed then
+            const bedTime = Math.max(lastActivityTime, todayStart.getTime());
+            estimatedSleepHours = Math.max(
+                0,
+                (firstActivityTime - bedTime) / (1000 * 60 * 60),
+            );
+        } else {
+            // Cross-day calculation
+            estimatedSleepHours = Math.max(
+                0,
+                (firstActivityTime - lastActivityTime) / (1000 * 60 * 60),
+            );
+        }
+
+        // Check for late night activity (after midnight)
+        const lateNightActivity = allVisits.some((visit) => {
+            const visitDate = new Date(visit.startTime);
+            const hour = visitDate.getHours();
+            return hour >= 0 && hour < 5; // Activity between 12 AM and 5 AM
+        });
+
+        return {
+            lastActivityTime,
+            firstActivityTime,
+            estimatedSleepHours: Math.min(estimatedSleepHours, 12), // Cap at 12 hours
+            lateNightActivity,
+        };
+    };
+
     const calculateScore = () => {
-        return dataService.calculateDigitalWellnessScore(currentSession);
+        const baseScore =
+            dataService.calculateDigitalWellnessScore(currentSession);
+        const sleepData = analyzeSleepPatterns();
+
+        let sleepBonus = 0;
+        let sleepPenalty = 0;
+
+        // Bonus for adequate sleep (5+ hours)
+        if (sleepData.estimatedSleepHours >= 5) {
+            const extraHours = sleepData.estimatedSleepHours - 5;
+            sleepBonus = Math.min(extraHours * 2, 10); // 2 points per hour, max 10 points
+        }
+
+        // Heavy penalty for late night activity (past midnight)
+        if (sleepData.lateNightActivity) {
+            sleepPenalty = 15; // Heavy penalty for staying up past midnight
+        }
+
+        // Additional penalty for very short sleep (less than 5 hours)
+        if (
+            sleepData.estimatedSleepHours > 0 &&
+            sleepData.estimatedSleepHours < 5
+        ) {
+            const missedHours = 5 - sleepData.estimatedSleepHours;
+            sleepPenalty += missedHours * 3; // 3 points penalty per hour under 5
+        }
+
+        return Math.max(
+            0,
+            Math.min(100, baseScore + sleepBonus - sleepPenalty),
+        );
     };
 
     const renderContent = () => {
@@ -354,7 +463,7 @@ export const StoryCard: React.FC<StoryCardProps> = ({
                                                     ).style.display = "none";
                                                 }}
                                             />
-                                            <div className="text-xs text-blue-500 font-normal text-center">
+                                            <div className="text-xs text-white/80 font-normal text-center">
                                                 {formatTime(item.time)}
                                             </div>
                                         </div>
@@ -420,6 +529,7 @@ export const StoryCard: React.FC<StoryCardProps> = ({
                 return (
                     <div className="h-full grid grid-cols-2 gap-6 p-12 relative">
                         <div className="flex flex-col justify-between">
+                            <div></div>
                             <div className="flex flex-col gap-2">
                                 <div className="text-xs text-gray-300 uppercase tracking-wider">
                                     Longest Break
@@ -563,40 +673,22 @@ export const StoryCard: React.FC<StoryCardProps> = ({
                 const score = calculateScore();
 
                 const getSuggestions = () => {
-                    const suggestions = [];
+                    const goodSuggestions = [];
+                    const mediumSuggestions = [];
+                    const badSuggestions = [];
+                    const sleepData = analyzeSleepPatterns();
 
-                    // Add positive feedback first
+                    // Productivity feedback
                     if (productivityRatio >= 0.7) {
-                        suggestions.push({
+                        goodSuggestions.push({
                             text: "Great productivity balance",
                             status: "green",
                             detail: `${Math.round(
                                 productivityRatio * 100,
                             )}% of time spent productively`,
                         });
-                    }
-
-                    if (longestStreakTime >= 30 * 60 * 1000) {
-                        suggestions.push({
-                            text: "Good focus streaks",
-                            status: "green",
-                            detail: `Achieved ${formatTime(
-                                longestStreakTime,
-                            )} focus streak`,
-                        });
-                    }
-
-                    if (uniqueUrls <= 300) {
-                        suggestions.push({
-                            text: "Good focus on key tasks",
-                            status: "green",
-                            detail: "Maintaining focused browsing patterns",
-                        });
-                    }
-
-                    // Add improvement suggestions
-                    if (productivityRatio < 0.7) {
-                        suggestions.push({
+                    } else {
+                        badSuggestions.push({
                             text: "Increase productive time",
                             status: "red",
                             detail: `Currently at ${Math.round(
@@ -605,34 +697,129 @@ export const StoryCard: React.FC<StoryCardProps> = ({
                         });
                     }
 
-                    if (longestStreakTime < 30 * 60 * 1000) {
-                        suggestions.push({
+                    // Focus streak feedback
+                    if (longestStreakTime >= 30 * 60 * 1000) {
+                        goodSuggestions.push({
+                            text: "Good focus streaks",
+                            status: "green",
+                            detail: `Achieved ${formatTime(
+                                longestStreakTime,
+                            )} focus streak`,
+                        });
+                    } else if (longestStreakTime > 15 * 60 * 1000) {
+                        mediumSuggestions.push({
                             text: "Aim for longer focus streaks",
-                            status:
-                                longestStreakTime > 15 * 60 * 1000
-                                    ? "yellow"
-                                    : "red",
+                            status: "yellow",
+                            detail: "Target: 30+ minute sessions",
+                        });
+                    } else {
+                        badSuggestions.push({
+                            text: "Aim for longer focus streaks",
+                            status: "red",
                             detail: "Target: 30+ minute sessions",
                         });
                     }
 
-                    if (uniqueUrls > 300) {
-                        suggestions.push({
+                    // Context switching feedback
+                    if (uniqueUrls <= 300) {
+                        goodSuggestions.push({
+                            text: "Good focus on key tasks",
+                            status: "green",
+                            detail: "Maintaining focused browsing patterns",
+                        });
+                    } else if (uniqueUrls <= 500) {
+                        mediumSuggestions.push({
                             text: "Reduce context switching",
-                            status: uniqueUrls > 500 ? "red" : "yellow",
+                            status: "yellow",
+                            detail: `Visited ${uniqueUrls} unique URLs`,
+                        });
+                    } else {
+                        badSuggestions.push({
+                            text: "Reduce context switching",
+                            status: "red",
                             detail: `Visited ${uniqueUrls} unique URLs`,
                         });
                     }
 
-                    if (suggestions.length === 0) {
-                        suggestions.push({
-                            text: "Keep up the great work!",
+                    // Sleep duration feedback
+                    if (sleepData.estimatedSleepHours >= 7) {
+                        goodSuggestions.push({
+                            text: "Excellent sleep duration",
                             status: "green",
-                            detail: "All metrics look good",
+                            detail: `Estimated ${sleepData.estimatedSleepHours.toFixed(
+                                1,
+                            )} hours of sleep`,
+                        });
+                    } else if (sleepData.estimatedSleepHours >= 5) {
+                        if (sleepData.estimatedSleepHours >= 6) {
+                            goodSuggestions.push({
+                                text: "Adequate sleep duration",
+                                status: "green",
+                                detail: `Estimated ${sleepData.estimatedSleepHours.toFixed(
+                                    1,
+                                )} hours of sleep`,
+                            });
+                        } else {
+                            mediumSuggestions.push({
+                                text: "Consider more sleep",
+                                status: "yellow",
+                                detail: `${sleepData.estimatedSleepHours.toFixed(
+                                    1,
+                                )} hours estimated - aim for 7-9 hours`,
+                            });
+                        }
+                    } else if (sleepData.estimatedSleepHours > 0) {
+                        badSuggestions.push({
+                            text: "Critical: Increase sleep duration",
+                            status: "red",
+                            detail: `Only ${sleepData.estimatedSleepHours.toFixed(
+                                1,
+                            )} hours estimated - aim for 7-9 hours`,
                         });
                     }
 
-                    return suggestions;
+                    // Late night activity feedback
+                    if (!sleepData.lateNightActivity) {
+                        goodSuggestions.push({
+                            text: "Good bedtime habits",
+                            status: "green",
+                            detail: "No late-night screen activity detected",
+                        });
+                    } else {
+                        const lastActivityTime = new Date(
+                            sleepData.lastActivityTime,
+                        );
+                        const lastActivityFormatted =
+                            lastActivityTime.toLocaleTimeString("en-US", {
+                                hour: "numeric",
+                                minute: "2-digit",
+                                hour12: true,
+                            });
+                        badSuggestions.push({
+                            text: "Avoid late-night screen time",
+                            status: "red",
+                            detail: `You stayed up until ${lastActivityFormatted} - affects sleep quality`,
+                        });
+                    }
+
+                    // Combine all suggestions in order: good, medium, bad
+                    const allSuggestions = [
+                        ...goodSuggestions,
+                        ...mediumSuggestions,
+                        ...badSuggestions,
+                    ];
+
+                    if (allSuggestions.length === 0) {
+                        return [
+                            {
+                                text: "Keep up the great work!",
+                                status: "green",
+                                detail: "All metrics look good",
+                            },
+                        ];
+                    }
+
+                    return allSuggestions;
                 };
 
                 return (
