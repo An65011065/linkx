@@ -1,7 +1,7 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import GraphVisualization from "./components/GraphVisualization";
-import "../shared/styles/global.css";
+import "../shared/styles/index.css";
 
 const GraphPage: React.FC = () => {
     return (

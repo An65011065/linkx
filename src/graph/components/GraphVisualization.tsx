@@ -1,5 +1,3 @@
-// GraphVisualization.tsx - Main graph visualization component
-
 import React, { useEffect, useRef, useCallback, useState } from "react";
 import * as d3 from "d3";
 import { useNetworkData } from "../hooks/useNetworkData";
@@ -8,27 +6,20 @@ import type { SimNetworkNode, SimNetworkLink } from "../types/network.types";
 import { EvolutionPlayer } from "./EvolutionPlayer";
 import SearchComponent from "./SearchComponent";
 import { NetworkMetricsCalculator } from "../services/NetworkMetricsCalculator";
-import { History, Trash2 } from "lucide-react";
+import { History, Trash2, Sun, Moon } from "lucide-react";
 import "../styles/graph.css";
 
-// Function to generate straight line path with proper spacing
 const generateLinkPath = (
     source: SimNetworkNode,
     target: SimNetworkNode,
 ): string => {
     if (!source.x || !source.y || !target.x || !target.y) return "";
-
-    // Calculate the direction vector
     const dx = target.x - source.x;
     const dy = target.y - source.y;
     const length = Math.sqrt(dx * dx + dy * dy);
-
     if (length === 0) return "";
-
-    const nodeRadius = 16; // Half of our fixed icon size
-    const spacing = 8; // Small spacing from nodes
-
-    // Calculate start and end points with spacing
+    const nodeRadius = 16;
+    const spacing = 8;
     const startPoint = {
         x: source.x + (dx * (nodeRadius + spacing)) / length,
         y: source.y + (dy * (nodeRadius + spacing)) / length,
@@ -37,7 +28,6 @@ const generateLinkPath = (
         x: target.x - (dx * (nodeRadius + spacing)) / length,
         y: target.y - (dy * (nodeRadius + spacing)) / length,
     };
-
     return `M${startPoint.x},${startPoint.y} L${endPoint.x},${endPoint.y}`;
 };
 
@@ -52,6 +42,7 @@ const GraphVisualization: React.FC = () => {
     const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(
         null,
     );
+    const metricsCalculatorRef = useRef<NetworkMetricsCalculator | null>(null);
     const networkData = useNetworkData();
     const { nodes, links, loading, error } = networkData;
     const [dimensions, setDimensions] = useState({
@@ -60,79 +51,44 @@ const GraphVisualization: React.FC = () => {
     });
     const [isDragging, setIsDragging] = useState(false);
     const [dragStartPos, setDragStartPos] = useState({ x: 0, y: 0 });
-    const metricsCalculatorRef = useRef<NetworkMetricsCalculator | null>(null);
     const [isEvolutionMode, setIsEvolutionMode] = useState(false);
     const [selectedNode, setSelectedNode] = useState<string | null>(null);
     const [pathNodes, setPathNodes] = useState<Set<string>>(new Set());
     const [pathLinks, setPathLinks] = useState<Set<string>>(new Set());
-    const evolution = useEvolutionState(nodes || [], links || [], selectedNode);
     const [searchResults, setSearchResults] = useState<Set<string>>(new Set());
+    const [pathOrder, setPathOrder] = useState<Map<string, number>>(new Map());
+    const [isDarkMode, setIsDarkMode] = useState(true); // Default to dark mode
+    const evolution = useEvolutionState(nodes || [], links || [], selectedNode);
 
-    // Function to format time
     const formatTime = (timestamp: number) => {
-        const now = Date.now();
-        const timeSpent = now - timestamp;
-
+        const timeSpent = Date.now() - timestamp;
         const hours = Math.floor(timeSpent / (60000 * 60));
         const minutes = Math.floor((timeSpent % (60000 * 60)) / 60000);
         const seconds = Math.floor((timeSpent % 60000) / 1000);
-
-        if (hours > 0) {
-            return `${hours}h ${minutes}m`;
-        } else if (minutes > 0) {
-            return `${minutes}m ${seconds}s`;
-        }
+        if (hours > 0) return `${hours}h ${minutes}m`;
+        else if (minutes > 0) return `${minutes}m ${seconds}s`;
         return `${seconds}s`;
     };
 
-    // Function to format metrics
-    const formatMetric = (value: number): string => {
-        return (value * 100).toFixed(1) + "%";
-    };
+    const formatMetric = (value: number): string =>
+        (value * 100).toFixed(1) + "%";
 
-    // Function to check if URL is a new tab
-    const isNewTabUrl = (url: string): boolean => {
-        return (
-            url.startsWith("chrome://newtab") || url.startsWith("about:newtab")
-        );
-    };
+    const isNewTabUrl = (url: string): boolean =>
+        url.startsWith("chrome://newtab") || url.startsWith("about:newtab");
 
-    // Function to check if a link is a hyperlink navigation
-    const isHyperlinkNavigation = (link: SimNetworkLink) => {
-        return link.transitions.some((t) => t.sourceType === "hyperlink");
-    };
+    const isHyperlinkNavigation = (link: SimNetworkLink) =>
+        link.transitions.some((t) => t.sourceType === "hyperlink");
 
-    // Function to get node label
     const formatUrl = (url: string) => {
         try {
+            if (isNewTabUrl(url)) return "New Tab";
             const urlObj = new URL(url);
-            const domain = urlObj.hostname.replace(/^www\./, "");
-            const path = urlObj.pathname !== "/" ? urlObj.pathname : "";
-            const query = urlObj.search;
-
-            // For new tab URLs, just return "New Tab"
-            if (isNewTabUrl(url)) {
-                return "New Tab";
-            }
-
-            // For URLs with paths/queries, show a condensed version
-            if (path || query) {
-                const pathParts = path.split("/").filter(Boolean);
-                const lastPath = pathParts[pathParts.length - 1] || "";
-                const shortQuery =
-                    query.slice(0, 15) + (query.length > 15 ? "..." : "");
-                return `${domain}${
-                    lastPath ? "/" + lastPath : ""
-                }${shortQuery}`;
-            }
-
-            return domain;
+            return urlObj.hostname.replace(/^www\./, "");
         } catch {
             return url;
         }
     };
 
-    // Function to get icon URL
     const getIconUrl = (url: string) => {
         try {
             const urlObj = new URL(url);
@@ -142,10 +98,8 @@ const GraphVisualization: React.FC = () => {
         }
     };
 
-    // Function to show tooltip
     const showTooltip = (event: MouseEvent, d: SimNetworkNode) => {
         if (!tooltipRef.current) return;
-
         const tooltip = tooltipRef.current;
         const timeSpent = d.lastVisited ? formatTime(d.lastVisited) : "0s";
         const metrics = metricsCalculatorRef.current?.getMetrics(d.id) || {
@@ -154,14 +108,16 @@ const GraphVisualization: React.FC = () => {
             degree: 0,
             closeness: 0,
         };
-
         let titleDisplay = "";
         if (d.youtubeMetadata) {
-            titleDisplay = `${d.youtubeMetadata.title}<br/><span style="color: #fff">by ${d.youtubeMetadata.author_name}</span>`;
+            titleDisplay = `${
+                d.youtubeMetadata.title
+            }<br/><span style="color: ${isDarkMode ? "#fff" : "#333"}">by ${
+                d.youtubeMetadata.author_name
+            }</span>`;
         } else {
             titleDisplay = isNewTabUrl(d.url) ? "New Tab" : d.url;
         }
-
         tooltip.innerHTML = `
             <div class="url">${titleDisplay}</div>
             <div class="time">Time spent: ${timeSpent}</div>
@@ -175,27 +131,26 @@ const GraphVisualization: React.FC = () => {
         `;
         tooltip.style.display = "block";
         tooltip.classList.add("show");
+        // Update tooltip colors based on theme
+        tooltip.style.background = isDarkMode
+            ? "rgba(0, 0, 0, 0.9)"
+            : "rgba(255, 255, 255, 0.9)";
+        tooltip.style.color = isDarkMode ? "#fff" : "#333";
+        tooltip.style.border = isDarkMode
+            ? "1px solid rgba(255, 255, 255, 0.2)"
+            : "1px solid rgba(0, 0, 0, 0.2)";
 
-        // Position tooltip
-        const tooltipRect = tooltip.getBoundingClientRect();
-
-        // Calculate position to ensure tooltip stays within viewport
         let left = event.clientX + 10;
         let top = event.clientY + 10;
-
-        // Adjust if tooltip would go off screen
-        if (left + tooltipRect.width > window.innerWidth) {
+        const tooltipRect = tooltip.getBoundingClientRect();
+        if (left + tooltipRect.width > window.innerWidth)
             left = event.clientX - tooltipRect.width - 10;
-        }
-        if (top + tooltipRect.height > window.innerHeight) {
+        if (top + tooltipRect.height > window.innerHeight)
             top = event.clientY - tooltipRect.height - 10;
-        }
-
         tooltip.style.left = `${left}px`;
         tooltip.style.top = `${top}px`;
     };
 
-    // Function to hide tooltip
     const hideTooltip = () => {
         if (tooltipRef.current) {
             tooltipRef.current.style.display = "none";
@@ -203,7 +158,6 @@ const GraphVisualization: React.FC = () => {
         }
     };
 
-    // Create tooltip div if it doesn't exist
     useEffect(() => {
         if (!tooltipRef.current) {
             const tooltip = document.createElement("div");
@@ -212,7 +166,6 @@ const GraphVisualization: React.FC = () => {
             document.body.appendChild(tooltip);
             tooltipRef.current = tooltip;
         }
-
         return () => {
             if (tooltipRef.current) {
                 document.body.removeChild(tooltipRef.current);
@@ -221,21 +174,16 @@ const GraphVisualization: React.FC = () => {
         };
     }, []);
 
-    // Handle resize with smooth transition
     const updateDimensions = () => {
         if (containerRef.current) {
             const { width, height } =
                 containerRef.current.getBoundingClientRect();
             setDimensions({ width, height });
-
-            // Smoothly transition to new center when window resizes
             if (simulationRef.current) {
-                const centerX = width / 2;
-                const centerY = height / 2;
                 simulationRef.current
                     .force(
                         "center",
-                        d3.forceCenter(centerX, centerY).strength(0.1),
+                        d3.forceCenter(width / 2, height / 2).strength(0.1),
                     )
                     .alpha(0.3)
                     .restart();
@@ -243,56 +191,41 @@ const GraphVisualization: React.FC = () => {
         }
     };
 
-    // Set up resize observer
     useEffect(() => {
         updateDimensions();
         const resizeObserver = new ResizeObserver(updateDimensions);
-        if (containerRef.current) {
-            resizeObserver.observe(containerRef.current);
-        }
+        if (containerRef.current) resizeObserver.observe(containerRef.current);
         return () => resizeObserver.disconnect();
     }, []);
 
-    // Initialize or update the visualization
     useEffect(() => {
         if (!svgRef.current || !nodes || !links) return;
-
         const svg = d3.select(svgRef.current);
         const { width, height } = dimensions;
         const centerX = width / 2;
         const centerY = height / 2;
 
-        // Clear previous content
         svg.selectAll("*").remove();
-
-        // Create main group for zoom/pan
         const mainGroup = svg.append("g").attr("class", "main-group");
 
-        // Set up zoom behavior with proper event filtering
         const zoom = d3
             .zoom<SVGSVGElement, unknown>()
             .scaleExtent([0.1, 10])
-            .filter((event) => {
-                // Only allow zoom/pan if not clicking on a node
-                const target = event.target as Element;
-                return !target.closest(".node-group");
-            })
-            .on("zoom", (event) => {
-                mainGroup.attr("transform", event.transform);
-            });
+            .filter((event) => !event.target.closest(".node-group"))
+            .on("zoom", (event) =>
+                mainGroup.attr("transform", event.transform),
+            );
 
-        // Apply zoom behavior to SVG
-        svg.call(zoom).on("dblclick.zoom", null); // Disable double-click zoom
+        svg.call(zoom).on("dblclick.zoom", null);
         zoomRef.current = zoom;
 
-        // Set initial zoom to be slightly zoomed out (0.7x)
+        // Apply initial zoom transform - left-aligned but vertically centered
         const initialTransform = d3.zoomIdentity
-            .translate(centerX, centerY)
-            .scale(0.7)
-            .translate(-centerX, -centerY);
+            .translate(100, 0) // Start from left edge, no vertical offset
+            .scale(0.7);
         svg.call(zoom.transform, initialTransform);
 
-        // Create arrow marker definitions
+        const arrowColor = isDarkMode ? "#999" : "#666";
         svg.append("defs")
             .selectAll("marker")
             .data(["end"])
@@ -306,49 +239,138 @@ const GraphVisualization: React.FC = () => {
             .attr("orient", "auto")
             .append("path")
             .attr("d", "M0,-3L6,0L0,3")
-            .attr("fill", "#999");
+            .attr("fill", arrowColor);
 
-        // Create nodes with proper typing and initial positions
+        // Horizontal BFS layout
+        const createTreeLayout = (nodes: any[], links: any[]) => {
+            const adjacency = new Map<string, string[]>();
+            const outgoingCount = new Map<string, number>();
+            nodes.forEach((node) => {
+                adjacency.set(node.id, []);
+                outgoingCount.set(node.id, 0);
+            });
+            links.forEach((link) => {
+                const sourceId =
+                    typeof link.source === "string"
+                        ? link.source
+                        : link.source.id;
+                const targetId =
+                    typeof link.target === "string"
+                        ? link.target
+                        : link.target.id;
+                adjacency.get(sourceId)?.push(targetId);
+                outgoingCount.set(
+                    sourceId,
+                    (outgoingCount.get(sourceId) || 0) + 1,
+                );
+            });
+
+            const sortedByOutgoing = [...nodes].sort((a, b) => {
+                const aIsNewTab = isNewTabUrl(a.url);
+                const bIsNewTab = isNewTabUrl(b.url);
+                if (aIsNewTab && !bIsNewTab) return -1;
+                if (!aIsNewTab && bIsNewTab) return 1;
+                return (
+                    (outgoingCount.get(b.id) || 0) -
+                    (outgoingCount.get(a.id) || 0)
+                );
+            });
+            const root = sortedByOutgoing[0];
+
+            const levels = new Map<string, number>();
+            const visited = new Set<string>();
+            const queue: [string, number][] = [[root.id, 0]];
+            levels.set(root.id, 0);
+            visited.add(root.id);
+
+            while (queue.length > 0) {
+                const [currentNodeId, currentLevel] = queue.shift()!;
+                const children = adjacency.get(currentNodeId) || [];
+                children.forEach((childId) => {
+                    if (!visited.has(childId)) {
+                        visited.add(childId);
+                        levels.set(childId, currentLevel + 1);
+                        queue.push([childId, currentLevel + 1]);
+                    }
+                });
+            }
+
+            nodes.forEach((node) => {
+                if (!visited.has(node.id)) {
+                    const outgoing = outgoingCount.get(node.id) || 0;
+                    if (outgoing >= 3) levels.set(node.id, 1);
+                    else if (outgoing >= 1) levels.set(node.id, 2);
+                    else levels.set(node.id, 3);
+                }
+            });
+
+            const levelGroups = new Map<number, string[]>();
+            levels.forEach((level, nodeId) => {
+                if (!levelGroups.has(level)) {
+                    levelGroups.set(level, []);
+                }
+                levelGroups.get(level)!.push(nodeId);
+            });
+
+            const positions = new Map<string, { x: number; y: number }>();
+            const levelWidth = 120; // Horizontal spacing between levels
+            const nodeSpacing = 80; // Vertical spacing between nodes in same level
+            const leftMargin = 50; // Small margin to prevent edge clipping
+
+            levelGroups.forEach((nodeIds, level) => {
+                const x = leftMargin + level * levelWidth; // Start from small margin
+                const nodesInLevel = nodeIds.length;
+                if (nodesInLevel === 1) {
+                    positions.set(nodeIds[0], { x, y: centerY });
+                } else {
+                    const totalHeight = (nodesInLevel - 1) * nodeSpacing;
+                    const startY = centerY - totalHeight / 2;
+                    nodeIds.forEach((nodeId, index) => {
+                        const y = startY + index * nodeSpacing;
+                        positions.set(nodeId, { x, y });
+                    });
+                }
+            });
+
+            return positions;
+        };
+
+        const treePositions = createTreeLayout(nodes, links);
+
         const simNodes: SimNetworkNode[] = nodes.map((node) => {
             const existingNode = simulationRef.current
                 ?.nodes()
                 .find((n) => n.id === node.id);
+            const treePos = treePositions.get(node.id);
             return {
                 ...node,
-                // Preserve existing node positions if they exist
-                x: existingNode?.x ?? Math.random() * width * 0.6 + width * 0.2,
-                y:
-                    existingNode?.y ??
-                    Math.random() * height * 0.6 + height * 0.2,
-                vx: existingNode?.vx ?? 0,
-                vy: existingNode?.vy ?? 0,
-                fx: existingNode?.fx ?? null,
-                fy: existingNode?.fy ?? null,
+                x: existingNode?.x ?? treePos?.x ?? centerX,
+                y: existingNode?.y ?? treePos?.y ?? centerY,
+                vx: 0,
+                vy: 0,
+                fx: null,
+                fy: null,
             };
         });
 
-        // Create links with proper typing
         const simLinks = links
-            .map((link): SimNetworkLink | null => {
-                const sourceNode = simNodes.find((n) => n.id === link.source);
-                const targetNode = simNodes.find((n) => n.id === link.target);
-
-                if (!sourceNode || !targetNode) return null;
-
-                return {
-                    source: sourceNode,
-                    target: targetNode,
+            .filter(
+                (link) =>
+                    simNodes.find((n) => n.id === link.source) &&
+                    simNodes.find((n) => n.id === link.target),
+            )
+            .map(
+                (link): SimNetworkLink => ({
+                    source: simNodes.find((n) => n.id === link.source)!,
+                    target: simNodes.find((n) => n.id === link.target)!,
                     weight: link.weight,
                     tabId: link.tabId || 0,
                     frequency: link.frequency || link.weight,
                     transitions: link.transitions,
-                };
-            })
-            .filter((link): link is SimNetworkLink => link !== null);
+                }),
+            );
 
-        // Create or update the force simulation
         if (!simulationRef.current) {
-            // Create new simulation if it doesn't exist
             simulationRef.current = d3
                 .forceSimulation<SimNetworkNode, SimNetworkLink>(simNodes)
                 .force(
@@ -356,20 +378,15 @@ const GraphVisualization: React.FC = () => {
                     d3
                         .forceLink<SimNetworkNode, SimNetworkLink>(simLinks)
                         .id((d) => d.id)
-                        .distance(120) // Increased distance for better spacing
-                        .strength(0.6),
+                        .distance(120)
+                        .strength(0),
                 )
-                .force(
-                    "charge",
-                    d3.forceManyBody().strength(-800).distanceMax(300), // Increased repulsion
-                )
-                .force("center", d3.forceCenter(centerX, centerY).strength(0.3))
-                .force(
-                    "collision",
-                    d3.forceCollide<SimNetworkNode>().radius(32), // Increased collision radius
-                );
+                .force("charge", d3.forceManyBody().strength(0))
+                .force("center", d3.forceCenter(centerX, centerY).strength(0))
+                .force("collision", d3.forceCollide<SimNetworkNode>().radius(0))
+                .alpha(0)
+                .stop();
         } else {
-            // Update existing simulation
             simulationRef.current
                 .nodes(simNodes)
                 .force(
@@ -378,13 +395,12 @@ const GraphVisualization: React.FC = () => {
                         .forceLink<SimNetworkNode, SimNetworkLink>(simLinks)
                         .id((d) => d.id)
                         .distance(120)
-                        .strength(0.6),
+                        .strength(0),
                 )
-                .alpha(isEvolutionMode ? 0 : 0.3) // Don't heat up the simulation during evolution
-                .restart();
+                .alpha(0)
+                .stop();
         }
 
-        // Create links
         const link = mainGroup
             .append("g")
             .attr("class", "links")
@@ -392,13 +408,9 @@ const GraphVisualization: React.FC = () => {
             .data(simLinks)
             .join("path")
             .attr("fill", "none")
-            .attr("stroke", (d) => {
-                if (isHyperlinkNavigation(d)) {
-                    return "#ffa4a5";
-                } else {
-                    return "#8bb0f4";
-                }
-            })
+            .attr("stroke", (d) =>
+                isHyperlinkNavigation(d) ? "#ffa4a5" : "#4285f4",
+            )
             .attr("stroke-dasharray", (d) =>
                 isHyperlinkNavigation(d) ? "5,5" : "none",
             )
@@ -406,27 +418,21 @@ const GraphVisualization: React.FC = () => {
             .attr("marker-end", "url(#arrow)")
             .attr("d", (d) => generateLinkPath(d.source, d.target))
             .style("opacity", (d) => {
-                // Ensure consistent link ID format with useNetworkData
                 const linkId = `${d.source.id}->${d.target.id}`;
                 const sourceId = d.source.id;
                 const targetId = d.target.id;
-
-                if (isEvolutionMode) {
+                if (isEvolutionMode)
                     return evolution.visibleLinks.has(linkId) ? 1 : 0;
-                } else if (selectedNode) {
-                    return pathLinks.has(linkId) ? 1 : 0.15;
-                } else if (searchResults.size > 0) {
+                else if (selectedNode) return pathLinks.has(linkId) ? 1 : 0.15;
+                else if (searchResults.size > 0)
                     return searchResults.has(sourceId) ||
                         searchResults.has(targetId)
                         ? 1
                         : 0.15;
-                } else {
-                    return 1;
-                }
+                return 1;
             })
-            .style("transition", "opacity 0.3s ease"); // Smooth opacity transitions
+            .style("transition", "opacity 0.3s ease");
 
-        // Create node groups with simple click handling
         const node = mainGroup
             .append("g")
             .attr("class", "nodes")
@@ -436,125 +442,61 @@ const GraphVisualization: React.FC = () => {
             .attr("class", "node-group")
             .style("cursor", "pointer")
             .style("opacity", (d) => {
-                if (isEvolutionMode) {
+                if (isEvolutionMode)
                     return evolution.visibleNodes.has(d.id) ? 1 : 0;
-                } else if (selectedNode) {
-                    return pathNodes.has(d.id) ? 1 : 0.15;
-                } else if (searchResults.size > 0) {
+                else if (selectedNode) return pathNodes.has(d.id) ? 1 : 0.15;
+                else if (searchResults.size > 0)
                     return searchResults.has(d.id) ? 1 : 0.15;
-                } else {
-                    return 1;
-                }
+                return 1;
             })
             .style("transition", "opacity 0.3s ease");
 
-        // Add drag behavior to nodes
         node.call(
             d3
                 .drag<SVGGElement, SimNetworkNode>()
                 .on("start", (event) => {
-                    // Don't interfere with zoom/pan
                     event.sourceEvent.stopPropagation();
-
-                    // Reset drag state
                     setIsDragging(false);
                     setDragStartPos({ x: event.x, y: event.y });
-
-                    // Heat up simulation
-                    if (!event.active && simulationRef.current) {
-                        simulationRef.current.alphaTarget(0.3).restart();
-                    }
-
-                    // Fix node position
-                    const d = event.subject;
-                    d.fx = d.x;
-                    d.fy = d.y;
                 })
                 .on("drag", (event) => {
-                    // Calculate how far we've moved
                     const dragDistance = Math.sqrt(
                         Math.pow(event.x - dragStartPos.x, 2) +
                             Math.pow(event.y - dragStartPos.y, 2),
                     );
-
-                    // Only consider it dragging if we've moved more than 5 pixels
                     if (dragDistance > 5) {
                         setIsDragging(true);
-                        // Change cursor to indicate dragging
                         event.sourceEvent.target.style.cursor = "grabbing";
-
-                        // Update node position
                         const d = event.subject;
-                        d.fx = event.x;
-                        d.fy = event.y;
+                        d.x = event.x;
+                        d.y = event.y;
+                        updateVisualElements();
                     }
                 })
                 .on("end", (event) => {
-                    // Don't interfere with zoom/pan
                     event.sourceEvent.stopPropagation();
-
-                    // Cool down simulation
-                    if (!event.active && simulationRef.current) {
-                        simulationRef.current.alphaTarget(0);
-                    }
-
-                    // Reset cursor
                     event.sourceEvent.target.style.cursor = "pointer";
-
-                    const d = event.subject;
-
-                    // If we actually dragged, prevent the click event
-                    if (isDragging) {
-                        // Keep the node fixed at its new position for a bit
-                        setTimeout(() => {
-                            d.fx = null;
-                            d.fy = null;
-                        }, 100);
-                    } else {
-                        // If we didn't drag, release immediately so click can work
-                        d.fx = null;
-                        d.fy = null;
-                    }
-
-                    // Reset drag state after a brief delay
-                    setTimeout(() => {
-                        setIsDragging(false);
-                    }, 10);
+                    setTimeout(() => setIsDragging(false), 50);
                 }),
         );
 
-        // Add click and hover handlers to nodes
         node.on("click", (event: MouseEvent, d: SimNetworkNode) => {
             event.stopPropagation();
             event.preventDefault();
-
-            // If clicking the same node that's already selected, open in new tab
             if (selectedNode === d.id) {
-                // Don't open new tab URLs
-                if (!isNewTabUrl(d.url)) {
-                    window.open(d.url, "_blank");
-                }
+                if (!isNewTabUrl(d.url)) window.open(d.url, "_blank");
             } else {
-                // First click - show the path
                 tracePathToNode(d.id);
             }
         })
             .on("dblclick", (event: MouseEvent, d: SimNetworkNode) => {
                 event.stopPropagation();
                 event.preventDefault();
-
-                // Don't open new tab URLs
-                if (isNewTabUrl(d.url)) return;
-
-                // Open URL in new tab
-                window.open(d.url, "_blank");
+                if (!isNewTabUrl(d.url)) window.open(d.url, "_blank");
             })
             .on("mouseover", (event: MouseEvent, d: SimNetworkNode) => {
-                // Change cursor and add hover effect
                 const nodeGroup = event.currentTarget as SVGGElement;
                 nodeGroup.style.cursor = "pointer";
-
-                // Add subtle scale effect
                 d3.select(nodeGroup)
                     .transition()
                     .duration(150)
@@ -562,31 +504,25 @@ const GraphVisualization: React.FC = () => {
                         "transform",
                         `translate(${d.x || 0},${d.y || 0}) scale(1.1)`,
                     );
-
                 showTooltip(event, d);
             })
             .on("mouseout", (event: MouseEvent, d: SimNetworkNode) => {
-                // Remove hover effect
-                const nodeGroup = event.currentTarget as SVGGElement;
-                d3.select(nodeGroup)
+                d3.select(event.currentTarget as SVGGElement)
                     .transition()
                     .duration(150)
                     .attr(
                         "transform",
                         `translate(${d.x || 0},${d.y || 0}) scale(1)`,
                     );
-
                 hideTooltip();
             })
             .on("mousemove", (event: MouseEvent) => {
                 if (tooltipRef.current) {
-                    const tooltip = tooltipRef.current;
-                    tooltip.style.left = `${event.clientX + 10}px`;
-                    tooltip.style.top = `${event.clientY - 10}px`;
+                    tooltipRef.current.style.left = `${event.clientX + 10}px`;
+                    tooltipRef.current.style.top = `${event.clientY - 10}px`;
                 }
             });
 
-        // Add a clickable background to each node group
         node.append("rect")
             .attr("x", -20)
             .attr("y", -20)
@@ -594,6 +530,7 @@ const GraphVisualization: React.FC = () => {
             .attr("height", 40)
             .attr("fill", "transparent")
             .style("cursor", "pointer");
+
         node.append("image")
             .attr("xlink:href", (d) => getIconUrl(d.url))
             .attr("x", -16)
@@ -601,18 +538,15 @@ const GraphVisualization: React.FC = () => {
             .attr("width", 32)
             .attr("height", 32)
             .style("filter", (d) => {
-                if (selectedNode === d.id) {
+                if (selectedNode === d.id)
                     return "drop-shadow(0px 0px 8px rgba(66, 133, 244, 0.8))";
-                } else if (d.totalTime > 0) {
+                else if (d.totalTime > 0)
                     return "drop-shadow(0px 0px 3px rgba(255,68,68,0.4))";
-                } else {
-                    return "drop-shadow(0px 2px 4px rgba(0,0,0,0.3))";
-                }
+                return "drop-shadow(0px 2px 4px rgba(0,0,0,0.3))";
             })
-            .style("pointer-events", "none") // Prevent icon from interfering with clicks
-            .style("transition", "filter 0.2s ease"); // Smooth filter transitions
+            .style("pointer-events", "none")
+            .style("transition", "filter 0.2s ease");
 
-        // Add selection ring for selected node
         node.append("circle")
             .attr("r", 20)
             .attr("fill", "none")
@@ -622,53 +556,37 @@ const GraphVisualization: React.FC = () => {
             .style("transition", "opacity 0.3s ease")
             .style("pointer-events", "none");
 
-        // Add labels to nodes with better interaction
+        const textColor = isDarkMode ? "#ffffff" : "#333333";
         node.append("text")
             .attr("dy", 24)
             .attr("text-anchor", "middle")
             .style("font-family", "Nunito-Regular, Arial, sans-serif")
             .style("font-size", "11px")
-            .style("pointer-events", "none") // Prevent text from interfering with clicks
-            .style("user-select", "none") // Prevent text selection
+            .style("fill", textColor)
+            .style("pointer-events", "none")
+            .style("user-select", "none")
             .text((d) => d.displayName || formatUrl(d.url));
 
-        // Function to update visual elements
+        node.append("text")
+            .attr("dy", -28)
+            .attr("text-anchor", "middle")
+            .attr("class", "sequence-number")
+            .style("font-family", "Nunito-Bold, Arial, sans-serif")
+            .style("font-size", "14px")
+            .style("fill", "#4285f4")
+            .style("pointer-events", "none")
+            .style("opacity", (d) => (pathOrder.has(d.id) ? 1 : 0))
+            .text((d) => pathOrder.get(d.id) || "");
+
         function updateVisualElements() {
-            // Update links
             link.attr("d", (d) => generateLinkPath(d.source, d.target));
-
-            // Update nodes
-            node.each(function (d) {
-                const currentTransform = d3.select(this).attr("transform");
-                const hasScale =
-                    currentTransform && currentTransform.includes("scale");
-
-                if (!hasScale) {
-                    d3.select(this).attr(
-                        "transform",
-                        `translate(${d.x || 0},${d.y || 0})`,
-                    );
-                } else {
-                    // Preserve scale but update position
-                    const scaleMatch =
-                        currentTransform.match(/scale\(([^)]+)\)/);
-                    const scale = scaleMatch ? scaleMatch[1] : "1";
-                    d3.select(this).attr(
-                        "transform",
-                        `translate(${d.x || 0},${d.y || 0}) scale(${scale})`,
-                    );
-                }
-            });
+            node.attr("transform", (d) => `translate(${d.x || 0},${d.y || 0})`);
         }
 
-        // Set up simulation tick handler
-        simulationRef.current.on("tick", updateVisualElements);
+        updateVisualElements();
 
-        // Cleanup
         return () => {
-            if (simulationRef.current) {
-                simulationRef.current.stop();
-            }
+            if (simulationRef.current) simulationRef.current.stop();
         };
     }, [
         nodes,
@@ -681,68 +599,82 @@ const GraphVisualization: React.FC = () => {
         pathNodes,
         pathLinks,
         searchResults,
+        pathOrder,
+        isDarkMode,
     ]);
 
-    // Function to trace path to a specific node
     const tracePathToNode = useCallback(
         (targetNodeId: string) => {
             if (!nodes || !links) return;
-
             const pathNodesSet = new Set<string>();
             const pathLinksSet = new Set<string>();
+            const nodeOrder = new Map<string, number>();
+
+            const path: string[] = [];
+            let currentNodeId = targetNodeId;
             const visited = new Set<string>();
 
-            // Recursive function to trace backwards from target node
-            const tracePath = (nodeId: string, depth: number = 0) => {
-                if (visited.has(nodeId) || depth > 10) return; // Prevent infinite loops and limit depth
-
-                visited.add(nodeId);
-                pathNodesSet.add(nodeId);
-
-                // Find all links that point TO this node
+            while (currentNodeId && !visited.has(currentNodeId)) {
+                visited.add(currentNodeId);
+                path.unshift(currentNodeId);
                 const incomingLinks = links.filter(
                     (link) =>
                         (typeof link.target === "string"
                             ? link.target
-                            : link.target.id) === nodeId,
+                            : link.target.id) === currentNodeId,
                 );
+                if (incomingLinks.length === 0) break;
 
+                let earliestLink = incomingLinks[0];
+                let earliestTime = Infinity;
                 incomingLinks.forEach((link) => {
-                    const sourceId =
-                        typeof link.source === "string"
-                            ? link.source
-                            : link.source.id;
-                    const targetId =
-                        typeof link.target === "string"
-                            ? link.target
-                            : link.target.id;
-
-                    pathLinksSet.add(`${sourceId}->${targetId}`);
-                    pathNodesSet.add(sourceId);
-
-                    // Recursively trace the path from the source node
-                    tracePath(sourceId, depth + 1);
+                    const earliestTransition = link.transitions.reduce(
+                        (earliest, t) =>
+                            t.timestamp < earliest ? t.timestamp : earliest,
+                        Infinity,
+                    );
+                    if (earliestTransition < earliestTime) {
+                        earliestTime = earliestTransition;
+                        earliestLink = link;
+                    }
                 });
-            };
 
-            // Start tracing from the target node
-            tracePath(targetNodeId);
+                currentNodeId =
+                    typeof earliestLink.source === "string"
+                        ? earliestLink.source
+                        : earliestLink.source.id;
+
+                if (!visited.has(currentNodeId)) {
+                    pathLinksSet.add(
+                        `${currentNodeId}->${
+                            typeof earliestLink.target === "string"
+                                ? earliestLink.target
+                                : earliestLink.target.id
+                        }`,
+                    );
+                }
+            }
+
+            path.forEach((nodeId, index) => {
+                pathNodesSet.add(nodeId);
+                nodeOrder.set(nodeId, index + 1);
+            });
 
             setPathNodes(pathNodesSet);
             setPathLinks(pathLinksSet);
+            setPathOrder(nodeOrder);
             setSelectedNode(targetNodeId);
         },
         [nodes, links],
     );
 
-    // Function to clear path selection
     const clearPath = useCallback(() => {
         setSelectedNode(null);
         setPathNodes(new Set());
         setPathLinks(new Set());
+        setPathOrder(new Map());
     }, []);
 
-    // Handle escape key to clear path selection
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
             if (event.key === "Escape") {
@@ -754,21 +686,17 @@ const GraphVisualization: React.FC = () => {
                 }
             }
         };
-
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
     }, [isEvolutionMode, evolution, selectedNode, clearPath]);
 
-    // Add handleSearch function
     const handleSearch = useCallback(
         (searchTerm: string) => {
             if (!nodes) return;
-
             if (!searchTerm.trim()) {
                 setSearchResults(new Set());
                 return;
             }
-
             const searchTermLower = searchTerm.toLowerCase();
             const matchingNodes = nodes.filter(
                 (node) =>
@@ -777,19 +705,13 @@ const GraphVisualization: React.FC = () => {
                         .toLowerCase()
                         .includes(searchTermLower),
             );
-
             setSearchResults(new Set(matchingNodes.map((node) => node.id)));
         },
         [nodes],
     );
 
-    if (loading) {
-        return <div>Loading network data...</div>;
-    }
-
-    if (error) {
-        return <div>Error: {error}</div>;
-    }
+    if (loading) return <div>Loading network data...</div>;
+    if (error) return <div>Error: {error}</div>;
 
     return (
         <div
@@ -799,13 +721,14 @@ const GraphVisualization: React.FC = () => {
                 height: "100vh",
                 position: "relative",
                 overflow: "hidden",
+                background: isDarkMode ? "#000000" : "#ffffff",
+                color: isDarkMode ? "#ffffff" : "#333333",
+                transition: "background 0.3s ease, color 0.3s ease",
             }}
         >
             {!isEvolutionMode && (
                 <SearchComponent nodes={nodes || []} onSearch={handleSearch} />
             )}
-
-            {/* Evolution Player */}
             {isEvolutionMode && (
                 <EvolutionPlayer
                     isPlaying={evolution.isPlaying}
@@ -822,17 +745,11 @@ const GraphVisualization: React.FC = () => {
                         evolution.reset();
                         clearPath();
                     }}
-                    onNodeSelect={(nodeId) => {
-                        if (nodeId) {
-                            tracePathToNode(nodeId);
-                        } else {
-                            clearPath();
-                        }
-                    }}
+                    onNodeSelect={(nodeId) =>
+                        nodeId ? tracePathToNode(nodeId) : clearPath()
+                    }
                 />
             )}
-
-            {/* Control Buttons */}
             <div
                 style={{
                     position: "absolute",
@@ -843,6 +760,43 @@ const GraphVisualization: React.FC = () => {
                     zIndex: 1000,
                 }}
             >
+                {/* Theme Toggle */}
+                <button
+                    onClick={() => setIsDarkMode(!isDarkMode)}
+                    style={{
+                        width: "36px",
+                        height: "36px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        background: isDarkMode
+                            ? "rgba(255, 255, 255, 0.1)"
+                            : "rgba(0, 0, 0, 0.1)",
+                        color: isDarkMode ? "#ffffff" : "#333333",
+                        border: "none",
+                        borderRadius: "50%",
+                        cursor: "pointer",
+                        transition: "all 0.2s ease",
+                    }}
+                    title={
+                        isDarkMode
+                            ? "Switch to light mode"
+                            : "Switch to dark mode"
+                    }
+                    onMouseEnter={(e) =>
+                        (e.currentTarget.style.background = isDarkMode
+                            ? "rgba(255, 255, 255, 0.2)"
+                            : "rgba(0, 0, 0, 0.2)")
+                    }
+                    onMouseLeave={(e) =>
+                        (e.currentTarget.style.background = isDarkMode
+                            ? "rgba(255, 255, 255, 0.1)"
+                            : "rgba(0, 0, 0, 0.1)")
+                    }
+                >
+                    {isDarkMode ? <Sun size={16} /> : <Moon size={16} />}
+                </button>
+
                 <button
                     onClick={() => {
                         setIsEvolutionMode(true);
@@ -863,18 +817,17 @@ const GraphVisualization: React.FC = () => {
                         transition: "all 0.2s ease",
                     }}
                     title="Show network evolution"
-                    onMouseEnter={(e) => {
-                        e.currentTarget.style.background =
-                            "rgba(66, 133, 244, 0.2)";
-                    }}
-                    onMouseLeave={(e) => {
-                        e.currentTarget.style.background =
-                            "rgba(66, 133, 244, 0.1)";
-                    }}
+                    onMouseEnter={(e) =>
+                        (e.currentTarget.style.background =
+                            "rgba(66, 133, 244, 0.2)")
+                    }
+                    onMouseLeave={(e) =>
+                        (e.currentTarget.style.background =
+                            "rgba(66, 133, 244, 0.1)")
+                    }
                 >
                     <History size={16} />
                 </button>
-
                 <button
                     onClick={() => {
                         if (
@@ -900,19 +853,18 @@ const GraphVisualization: React.FC = () => {
                         transition: "all 0.2s ease",
                     }}
                     title="Delete all data"
-                    onMouseEnter={(e) => {
-                        e.currentTarget.style.background =
-                            "rgba(255, 68, 68, 0.2)";
-                    }}
-                    onMouseLeave={(e) => {
-                        e.currentTarget.style.background =
-                            "rgba(255, 68, 68, 0.1)";
-                    }}
+                    onMouseEnter={(e) =>
+                        (e.currentTarget.style.background =
+                            "rgba(255, 68, 68, 0.2)")
+                    }
+                    onMouseLeave={(e) =>
+                        (e.currentTarget.style.background =
+                            "rgba(255, 68, 68, 0.1)")
+                    }
                 >
                     <Trash2 size={16} />
                 </button>
             </div>
-
             <svg
                 ref={svgRef}
                 width="100%"
@@ -924,12 +876,7 @@ const GraphVisualization: React.FC = () => {
                     top: 0,
                     left: 0,
                 }}
-                onClick={() => {
-                    // Clear path when clicking on background
-                    if (selectedNode) {
-                        clearPath();
-                    }
-                }}
+                onClick={() => selectedNode && clearPath()}
             />
         </div>
     );
