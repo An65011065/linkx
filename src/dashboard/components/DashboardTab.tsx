@@ -10,6 +10,7 @@ import Timers from "./Timers";
 
 const DashboardTab: React.FC = () => {
     const [isLoaded, setIsLoaded] = useState(false);
+    const [scale, setScale] = useState(1);
 
     useEffect(() => {
         // Give components time to mount and load
@@ -18,6 +19,23 @@ const DashboardTab: React.FC = () => {
         }, 100); // Adjust timing as needed
 
         return () => clearTimeout(timer);
+    }, []);
+
+    useEffect(() => {
+        const baseWidth = 1200;
+        const baseHeight = 800;
+
+        const handleResize = () => {
+            const { innerWidth, innerHeight } = window;
+            const widthRatio = innerWidth / baseWidth;
+            const heightRatio = innerHeight / baseHeight;
+            const newScale = Math.min(widthRatio, heightRatio, 1);
+            setScale(newScale);
+        };
+
+        handleResize();
+        window.addEventListener("resize", handleResize);
+        return () => window.removeEventListener("resize", handleResize);
     }, []);
 
     if (!isLoaded) {
@@ -47,17 +65,28 @@ const DashboardTab: React.FC = () => {
     return (
         <div
             style={{
+                width: "100%",
                 height: "100%",
-                fontFamily: "Arial, sans-serif",
+                overflow: "auto",
                 backgroundColor: "#000000",
-                overflowY: "hidden",
-                position: "relative",
-                padding: "20px",
-                display: "flex",
-                flexDirection: "column",
-                gap: "20px",
             }}
         >
+            <div
+                style={{
+                    transform: `scale(${scale})`,
+                    transformOrigin: "top left",
+                    width: `${100 / scale}%`,
+                    height: `${100 / scale}%`,
+                    fontFamily: "Arial, sans-serif",
+                    backgroundColor: "#000000",
+                    overflow: "hidden",
+                    position: "relative",
+                    padding: "20px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "20px",
+                }}
+            >
             {/* Background gradients */}
             <div
                 style={{
