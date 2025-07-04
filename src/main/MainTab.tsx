@@ -56,10 +56,8 @@ const MainTab: React.FC = () => {
         if (tabId === "network" && activeTab !== "network") {
             setIsNetworkAnimating(true);
             setActiveTab(tabId);
-            // Start graph loading after a short delay
-            setTimeout(() => {
-                setNetworkLoaded(true);
-            }, 300);
+            // Start graph loading immediately for network tab
+            setNetworkLoaded(true);
         } else {
             setActiveTab(tabId);
             setIsNetworkAnimating(false);
@@ -83,7 +81,7 @@ const MainTab: React.FC = () => {
             overflowY:
                 activeTab === "network"
                     ? ("hidden" as const)
-                    : ("scroll" as const),
+                    : ("hidden" as const),
             overflowX: "hidden" as const,
             transition: "all 0.8s cubic-bezier(0.4, 0, 0.2, 1)",
             position: "relative" as const,
@@ -96,25 +94,14 @@ const MainTab: React.FC = () => {
         };
 
         if (activeTab === "network") {
-            if (isNetworkAnimating) {
-                // Start small and animate to full viewport
-                return {
-                    ...baseStyle,
-                    width: "95vw",
-                    height: "100vh",
-                    maxWidth: "none",
-                    transform: "scale(1)",
-                };
-            } else {
-                // Initial small size for network
-                return {
-                    ...baseStyle,
-                    width: "400px",
-                    height: "300px",
-                    maxWidth: "400px",
-                    transform: "scale(1)",
-                };
-            }
+            // Always use full size for network tab to prevent constraint issues
+            return {
+                ...baseStyle,
+                width: "100vw",
+                height: "95vh",
+                maxWidth: "none",
+                transform: "scale(1)",
+            };
         } else {
             // Normal size for other tabs
             return {
@@ -141,7 +128,7 @@ const MainTab: React.FC = () => {
                             width: "100%",
                             height: "100%",
                             opacity: networkLoaded ? 1 : 0,
-                            transition: "opacity 0.5s ease-in-out 0.3s",
+                            transition: "opacity 0.5s ease-in-out",
                         }}
                     >
                         <GraphVisualization />
@@ -229,21 +216,6 @@ const MainTab: React.FC = () => {
                     0% { transform: rotate(0deg); }
                     100% { transform: rotate(360deg); }
                 }
-                .expand-animation {
-                    animation: expandViewport 0.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-                }
-                @keyframes expandViewport {
-                    0% {
-                        width: 400px;
-                        height: 300px;
-                        max-width: 400px;
-                    }
-                    100% {
-                        width: 95vw;
-                        height: 90vh;
-                        max-width: none;
-                    }
-                }
                 .download-button {
                     background: #f8f9fa;
                     border: 2px solid #ddd;
@@ -293,7 +265,6 @@ const MainTab: React.FC = () => {
                     fill: currentColor;
                 }
             `}</style>
-
             <div className="main-tab-container">
                 {/* Animation Background Layer */}
                 <div
@@ -374,7 +345,6 @@ const MainTab: React.FC = () => {
                         </div>
                     </div>
                 </div>
-
                 {/* Content Layer */}
                 <div className="content-layer">
                     {/* Tab Navigation Container */}
@@ -504,7 +474,6 @@ const MainTab: React.FC = () => {
                             )}
                         </div>
                     </div>
-
                     {/* Glass View Window */}
                     <div style={getViewportStyle()}>
                         {/* Loading overlay for network tab */}
