@@ -3,11 +3,13 @@ import DataService from "../../data/dataService";
 import Activity from "./Activity";
 
 interface SessionStats {
+    totalUrls: number;
+    uniqueUrls: number;
+    uniqueDomains: number;
     totalTime: number;
     workTime: number;
     socialTime: number;
     otherTime: number;
-    uniqueUrls: number;
     domainStats?: {
         [domain: string]: {
             category: "work" | "social" | "other";
@@ -768,14 +770,6 @@ export const StoryCard: React.FC<StoryCardProps> = ({
                                 )} hours estimated - aim for 7-9 hours`,
                             });
                         }
-                    } else if (sleepData.estimatedSleepHours > 0) {
-                        badSuggestions.push({
-                            text: "Critical: Increase sleep duration",
-                            status: "red",
-                            detail: `Only ${sleepData.estimatedSleepHours.toFixed(
-                                1,
-                            )} hours estimated - aim for 7-9 hours`,
-                        });
                     }
 
                     // Late night activity feedback
@@ -836,7 +830,7 @@ export const StoryCard: React.FC<StoryCardProps> = ({
                                             score,
                                         )} drop-shadow-lg`}
                                     >
-                                        {score}
+                                        {Math.round(score)}
                                     </div>
                                     <div className="text-2xl text-gray-300 font-semibold">
                                         / 100

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Timer, Plus, Circle, X, ArrowRight, Trash2 } from "lucide-react";
 
 interface TimerItem {
@@ -133,6 +133,9 @@ const Timers: React.FC = () => {
     const [timers, setTimers] = useState<TimerItem[]>([]);
     const [showModal, setShowModal] = useState(false);
     const [isDeleteMode, setIsDeleteMode] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const [isExpanded, setIsExpanded] = useState(false);
+    const [containerHeight, setContainerHeight] = useState(0);
 
     useEffect(() => {
         // Load all timers from localStorage
@@ -181,6 +184,35 @@ const Timers: React.FC = () => {
             window.removeEventListener("storage", handleStorageChange);
         };
     }, []);
+
+    // Track container height for responsive scaling
+    useEffect(() => {
+        const updateHeight = () => {
+            if (containerRef.current) {
+                const height = containerRef.current.offsetHeight;
+                setContainerHeight(height);
+            }
+        };
+
+        updateHeight();
+        window.addEventListener("resize", updateHeight);
+        return () => window.removeEventListener("resize", updateHeight);
+    }, []);
+
+    // Handle expansion animation
+    useEffect(() => {
+        if (containerRef.current) {
+            if (isExpanded) {
+                const parentHeight =
+                    containerRef.current.parentElement?.offsetHeight || 0;
+                containerRef.current.style.height = `${parentHeight * 2}px`;
+                containerRef.current.style.zIndex = "100";
+            } else {
+                containerRef.current.style.height = "100%";
+                containerRef.current.style.zIndex = "1";
+            }
+        }
+    }, [isExpanded]);
 
     const handleSaveTimer = (domain: string, minutes: number) => {
         const endTime = Date.now() + minutes * 60 * 1000;
@@ -242,19 +274,56 @@ const Timers: React.FC = () => {
         return `${seconds}s`;
     };
 
+    const handleAddNewClick = () => {
+        setIsExpanded(true);
+        setShowModal(true);
+    };
+
+    const handleModalClose = () => {
+        setShowModal(false);
+        setIsExpanded(false);
+    };
+
+    // Calculate responsive dimensions based on container height
+    const getResponsiveDimensions = () => {
+        // Base dimensions for optimal layout
+        const baseHeight = 100; // Base container height
+        const baseCardHeight = 50;
+        const baseFontSize = 11;
+        const baseIconSize = 16;
+
+        // Calculate scale factor based on container height
+        const scale = Math.max(0.6, Math.min(1, containerHeight / baseHeight));
+
+        return {
+            cardHeight: Math.max(35, baseCardHeight * scale),
+            fontSize: Math.max(9, baseFontSize * scale),
+            iconSize: Math.max(12, baseIconSize * scale),
+            gap: Math.max(4, 8 * scale),
+            padding: Math.max(8, 12 * scale),
+        };
+    };
+
+    const dimensions = getResponsiveDimensions();
+
+    // Calculate how many placeholder slots we need
+    const placeholdersNeeded = Math.max(0, 3 - timers.length);
+
     return (
         <div
+            ref={containerRef}
             style={{
                 background: "rgba(255, 255, 255, 0.05)",
                 borderRadius: "16px",
                 border: "1px solid rgba(255, 255, 255, 0.1)",
                 backdropFilter: "blur(10px)",
-                padding: "12px",
+                padding: `${dimensions.padding}px ${dimensions.padding}px 0px ${dimensions.padding}px`,
                 height: "100%",
                 display: "flex",
                 flexDirection: "column",
-                gap: "12px",
+                gap: `${dimensions.gap}px`,
                 position: "relative",
+                transition: "all 0.3s ease-in-out",
             }}
         >
             {/* Header */}
@@ -263,21 +332,24 @@ const Timers: React.FC = () => {
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
-                    marginBottom: "-4px",
+                    marginBottom: "0px",
                 }}
             >
                 <div
                     style={{
                         display: "flex",
                         alignItems: "center",
-                        gap: "8px",
+                        gap: `${dimensions.gap}px`,
                     }}
                 >
-                    <Timer size={16} color="#ffffff" />
+                    <Timer size={dimensions.iconSize} color="#ffffff" />
                     <div
                         style={{
                             color: "#ffffff",
-                            fontSize: "14px",
+                            fontSize: `${Math.max(
+                                12,
+                                dimensions.fontSize + 3,
+                            )}px`,
                             fontWeight: 600,
                             fontFamily: "system-ui, -apple-system, sans-serif",
                         }}
@@ -301,7 +373,7 @@ const Timers: React.FC = () => {
                     }}
                 >
                     <Trash2
-                        size={14}
+                        size={Math.max(12, dimensions.iconSize - 2)}
                         color={isDeleteMode ? "#e74c3c" : "#ffffff"}
                     />
                 </button>
@@ -309,139 +381,56 @@ const Timers: React.FC = () => {
 
             <div
                 style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(4, 1fr)",
-                    gap: "8px",
+                    overflowX: timers.length > 3 ? "auto" : "hidden",
+                    overflowY: "hidden",
+                    margin: `0 -${dimensions.padding}px`,
+                    padding: `0 ${dimensions.padding}px`,
                 }}
+                className="hide-scrollbar"
             >
-                {/* Add New Timer Button */}
                 <div
-                    onClick={() => setShowModal(true)}
                     style={{
-                        height: "50px",
-                        background: "rgba(255, 255, 255, 0.1)",
-                        borderRadius: "8px",
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: "2px",
-                        cursor: "pointer",
-                        border: "1px solid rgba(255, 255, 255, 0.2)",
-                        transition: "all 0.2s ease",
-                        padding: "4px",
-                    }}
-                    onMouseEnter={(e) => {
-                        e.currentTarget.style.background =
-                            "rgba(255, 255, 255, 0.15)";
-                    }}
-                    onMouseLeave={(e) => {
-                        e.currentTarget.style.background =
-                            "rgba(255, 255, 255, 0.1)";
+                        display: "grid",
+                        gridTemplateColumns: `repeat(${Math.max(
+                            4,
+                            timers.length + 1,
+                        )}, 1fr)`,
+                        gap: `${dimensions.gap}px`,
+                        width: timers.length > 3 ? "fit-content" : "100%",
                     }}
                 >
-                    <Plus size={16} color="#ffffff" />
+                    {/* Add New Timer Button */}
                     <div
+                        onClick={handleAddNewClick}
                         style={{
-                            color: "#ffffff",
-                            fontSize: "11px",
-                            fontFamily: "system-ui, -apple-system, sans-serif",
-                        }}
-                    >
-                        Add Timer
-                    </div>
-                </div>
-
-                {/* Timer Items */}
-                {timers.slice(0, 3).map((timer) => (
-                    <div
-                        key={timer.id}
-                        style={{
-                            position: "relative",
-                        }}
-                    >
-                        {isDeleteMode && (
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteTimer(timer.id);
-                                }}
-                                style={{
-                                    position: "absolute",
-                                    top: "5%",
-                                    right: "5%",
-                                    zIndex: 2,
-                                    cursor: "pointer",
-                                    padding: 0,
-                                    transition: "all 0.2s ease",
-                                }}
-                            >
-                                <X size={12} color="#ffffff" />
-                            </button>
-                        )}
-                        <div
-                            style={{
-                                height: "50px",
-                                background: "rgba(255, 255, 255, 0.1)",
-                                borderRadius: "8px",
-                                display: "flex",
-                                flexDirection: "column",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                gap: "2px",
-                                cursor: isDeleteMode ? "default" : "pointer",
-                                border: "1px solid rgba(255, 255, 255, 0.2)",
-                                transition: "all 0.2s ease",
-                                padding: "4px",
-                            }}
-                        >
-                            <div
-                                style={{
-                                    color: "#ffffff",
-                                    fontSize: "11px",
-                                    fontFamily:
-                                        "system-ui, -apple-system, sans-serif",
-                                    textAlign: "center",
-                                }}
-                            >
-                                {timer.name}
-                            </div>
-                            <div
-                                style={{
-                                    color: "rgba(255, 255, 255, 0.5)",
-                                    fontSize: "10px",
-                                    fontFamily:
-                                        "system-ui, -apple-system, sans-serif",
-                                }}
-                            >
-                                {formatTimeRemaining(timer.endTime)}
-                            </div>
-                        </div>
-                    </div>
-                ))}
-
-                {/* Placeholder Timers */}
-                {[...Array(Math.max(0, 3 - timers.length))].map((_, index) => (
-                    <div
-                        key={index}
-                        style={{
-                            height: "50px",
-                            background: "rgba(255, 255, 255, 0.05)",
+                            height: `${dimensions.cardHeight}px`,
+                            minWidth: "80px",
+                            background: "rgba(255, 255, 255, 0.1)",
                             borderRadius: "8px",
                             display: "flex",
                             flexDirection: "column",
                             alignItems: "center",
                             justifyContent: "center",
                             gap: "2px",
-                            border: "1px solid rgba(255, 255, 255, 0.1)",
+                            cursor: "pointer",
+                            border: "1px solid rgba(255, 255, 255, 0.2)",
+                            transition: "all 0.2s ease",
                             padding: "4px",
                         }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.background =
+                                "rgba(255, 255, 255, 0.15)";
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.background =
+                                "rgba(255, 255, 255, 0.1)";
+                        }}
                     >
-                        <Circle size={16} color="rgba(255, 255, 255, 0.3)" />
+                        <Plus size={dimensions.iconSize} color="#ffffff" />
                         <div
                             style={{
-                                color: "rgba(255, 255, 255, 0.3)",
-                                fontSize: "11px",
+                                color: "#ffffff",
+                                fontSize: `${dimensions.fontSize}px`,
                                 fontFamily:
                                     "system-ui, -apple-system, sans-serif",
                             }}
@@ -449,13 +438,149 @@ const Timers: React.FC = () => {
                             Add Timer
                         </div>
                     </div>
-                ))}
+
+                    {/* Timer Items */}
+                    {timers.map((timer) => (
+                        <div
+                            key={timer.id}
+                            style={{
+                                position: "relative",
+                            }}
+                        >
+                            {isDeleteMode && (
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeleteTimer(timer.id);
+                                    }}
+                                    style={{
+                                        position: "absolute",
+                                        top: "5%",
+                                        right: "5%",
+                                        zIndex: 2,
+                                        border: "none",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        cursor: "pointer",
+                                        padding: 0,
+                                        transition: "all 0.2s ease",
+                                    }}
+                                >
+                                    <X
+                                        size={Math.max(
+                                            10,
+                                            dimensions.iconSize - 4,
+                                        )}
+                                        color="#ffffff"
+                                    />
+                                </button>
+                            )}
+                            <div
+                                style={{
+                                    height: `${dimensions.cardHeight}px`,
+                                    minWidth: "80px",
+                                    background: "rgba(255, 255, 255, 0.1)",
+                                    borderRadius: "8px",
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    gap: "2px",
+                                    cursor: isDeleteMode
+                                        ? "default"
+                                        : "pointer",
+                                    border: "1px solid rgba(255, 255, 255, 0.2)",
+                                    transition: "all 0.2s ease",
+                                    padding: "4px",
+                                    backdropFilter: "blur(10px)",
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (!isDeleteMode) {
+                                        e.currentTarget.style.background =
+                                            "rgba(255, 255, 255, 0.15)";
+                                    }
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (!isDeleteMode) {
+                                        e.currentTarget.style.background =
+                                            "rgba(255, 255, 255, 0.1)";
+                                    }
+                                }}
+                            >
+                                <div
+                                    style={{
+                                        color: "#ffffff",
+                                        fontSize: `${dimensions.fontSize}px`,
+                                        fontFamily:
+                                            "system-ui, -apple-system, sans-serif",
+                                        textAlign: "center",
+                                        wordBreak: "break-word",
+                                        lineHeight: "1.2",
+                                    }}
+                                >
+                                    {timer.name}
+                                </div>
+                                <div
+                                    style={{
+                                        color: "rgba(255, 255, 255, 0.5)",
+                                        fontSize: `${Math.max(
+                                            8,
+                                            dimensions.fontSize - 1,
+                                        )}px`,
+                                        fontFamily:
+                                            "system-ui, -apple-system, sans-serif",
+                                    }}
+                                >
+                                    {formatTimeRemaining(timer.endTime)}
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+
+                    {/* Placeholder Timers */}
+                    {Array.from({ length: placeholdersNeeded }).map(
+                        (_, index) => (
+                            <div
+                                key={`placeholder-${index}`}
+                                style={{
+                                    height: `${dimensions.cardHeight}px`,
+                                    minWidth: "80px",
+                                    background: "rgba(255, 255, 255, 0.05)",
+                                    borderRadius: "8px",
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    gap: "2px",
+                                    border: "1px solid rgba(255, 255, 255, 0.1)",
+                                    padding: "4px",
+                                }}
+                            >
+                                <Circle
+                                    size={dimensions.iconSize}
+                                    color="rgba(255, 255, 255, 0.3)"
+                                />
+                                <div
+                                    style={{
+                                        color: "rgba(255, 255, 255, 0.3)",
+                                        fontSize: `${dimensions.fontSize}px`,
+                                        fontFamily:
+                                            "system-ui, -apple-system, sans-serif",
+                                    }}
+                                >
+                                    Add Timer
+                                </div>
+                            </div>
+                        ),
+                    )}
+                </div>
             </div>
 
             {/* Timer Modal */}
             {showModal && (
                 <TimerModal
-                    onClose={() => setShowModal(false)}
+                    onClose={handleModalClose}
                     onSave={handleSaveTimer}
                 />
             )}

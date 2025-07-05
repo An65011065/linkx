@@ -15,10 +15,10 @@ interface Tab {
 
 const MainTab: React.FC = () => {
     const [activeTab, setActiveTab] = useState<TabType>("insights");
-    const [isNetworkAnimating, setIsNetworkAnimating] = useState(false);
     const [networkLoaded, setNetworkLoaded] = useState(false);
     const [showDownloadMenu, setShowDownloadMenu] = useState(false);
     const [isInputFocused, setIsInputFocused] = useState(false);
+    const [windowWidth, setWindowWidth] = useState(window.innerWidth);
 
     const tabs: Tab[] = [
         { id: "insights", label: "Insights" },
@@ -30,6 +30,16 @@ const MainTab: React.FC = () => {
     const handleInputFocusChange = (focused: boolean) => {
         setIsInputFocused(focused);
     };
+
+    // Handle window resize for responsive behavior
+    useEffect(() => {
+        const handleResize = () => {
+            setWindowWidth(window.innerWidth);
+        };
+
+        window.addEventListener("resize", handleResize);
+        return () => window.removeEventListener("resize", handleResize);
+    }, []);
 
     useEffect(() => {
         // Set the leaves background image dynamically only when on insights tab
@@ -54,13 +64,11 @@ const MainTab: React.FC = () => {
     // Handle network tab activation with animation
     const handleTabClick = (tabId: TabType) => {
         if (tabId === "network" && activeTab !== "network") {
-            setIsNetworkAnimating(true);
             setActiveTab(tabId);
             // Start graph loading immediately for network tab
             setNetworkLoaded(true);
         } else {
             setActiveTab(tabId);
-            setIsNetworkAnimating(false);
             setNetworkLoaded(false);
         }
     };
@@ -68,7 +76,6 @@ const MainTab: React.FC = () => {
     // Reset animation state when leaving network tab
     useEffect(() => {
         if (activeTab !== "network") {
-            setIsNetworkAnimating(false);
             setNetworkLoaded(false);
         }
     }, [activeTab]);
@@ -103,13 +110,19 @@ const MainTab: React.FC = () => {
                 transform: "scale(1)",
             };
         } else {
-            // Normal size for other tabs
+            // Fixed size for other tabs - maintain 1200px until screen width ≤ 1200px
+            const fixedWidth = 1200;
+            const shouldScale = windowWidth <= fixedWidth;
+
             return {
                 ...baseStyle,
-                width: "80%",
-                maxWidth: "1200px",
+                width: shouldScale ? "100vw" : `${fixedWidth}px`,
                 height: "100vh",
-                transform: "scale(1)",
+                maxWidth: shouldScale ? "none" : `${fixedWidth}px`,
+                transform: shouldScale
+                    ? `scale(${windowWidth / fixedWidth})`
+                    : "scale(1)",
+                transformOrigin: "top center",
             };
         }
     };
@@ -350,8 +363,18 @@ const MainTab: React.FC = () => {
                     {/* Tab Navigation Container */}
                     <div
                         style={{
-                            width: "80%",
-                            maxWidth: "1200px",
+                            width: (() => {
+                                const fixedWidth = 1200;
+                                const shouldScale = windowWidth <= fixedWidth;
+                                return shouldScale
+                                    ? "100vw"
+                                    : `${fixedWidth}px`;
+                            })(),
+                            maxWidth: (() => {
+                                const fixedWidth = 1200;
+                                const shouldScale = windowWidth <= fixedWidth;
+                                return shouldScale ? "none" : `${fixedWidth}px`;
+                            })(),
                             display: "flex",
                             justifyContent: "space-between",
                             alignItems: "center",

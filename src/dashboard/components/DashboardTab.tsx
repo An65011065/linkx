@@ -23,13 +23,12 @@ const DashboardTab: React.FC = () => {
 
     useEffect(() => {
         const baseWidth = 1200;
-        const baseHeight = 800;
 
         const handleResize = () => {
-            const { innerWidth, innerHeight } = window;
-            const widthRatio = innerWidth / baseWidth;
-            const heightRatio = innerHeight / baseHeight;
-            const newScale = Math.min(widthRatio, heightRatio, 1);
+            const { innerWidth } = window;
+            // Only scale when screen width is smaller than base width
+            const newScale =
+                innerWidth <= baseWidth ? innerWidth / baseWidth : 1;
             setScale(newScale);
         };
 
@@ -87,37 +86,37 @@ const DashboardTab: React.FC = () => {
                     gap: "20px",
                 }}
             >
-            {/* Background gradients */}
-            <div
-                style={{
-                    position: "absolute",
-                    top: 0,
-                    right: 0,
-                    width: "600px",
-                    height: "600px",
-                    zIndex: 10,
-                    pointerEvents: "none",
-                    background:
-                        "radial-gradient(circle, rgba(66, 133, 244, 0.4) 0%, rgba(255, 107, 71, 0.2) 50%, transparent 80%)",
-                    filter: "blur(40px)",
-                }}
-            />
-            <div
-                style={{
-                    position: "absolute",
-                    bottom: 0,
-                    left: 0,
-                    width: "400px",
-                    height: "400px",
-                    zIndex: 10,
-                    pointerEvents: "none",
-                    background:
-                        "radial-gradient(circle, rgba(255, 107, 71, 0.3) 0%, transparent 70%)",
-                    filter: "blur(30px)",
-                }}
-            />
+                {/* Background gradients */}
+                <div
+                    style={{
+                        position: "absolute",
+                        top: 0,
+                        right: 0,
+                        width: "600px",
+                        height: "600px",
+                        zIndex: 10,
+                        pointerEvents: "none",
+                        background:
+                            "radial-gradient(circle, rgba(66, 133, 244, 0.4) 0%, rgba(255, 107, 71, 0.2) 50%, transparent 80%)",
+                        filter: "blur(40px)",
+                    }}
+                />
+                <div
+                    style={{
+                        position: "absolute",
+                        bottom: 0,
+                        left: 0,
+                        width: "400px",
+                        height: "400px",
+                        zIndex: 10,
+                        pointerEvents: "none",
+                        background:
+                            "radial-gradient(circle, rgba(255, 107, 71, 0.3) 0%, transparent 70%)",
+                        filter: "blur(30px)",
+                    }}
+                />
 
-            <style>{`
+                <style>{`
                 @font-face {
                     font-family: 'Gaegu-Bold';
                     src: url('${chrome.runtime.getURL(
@@ -146,7 +145,7 @@ const DashboardTab: React.FC = () => {
                     font-family: 'Nunito-Bold';
                     src: url('${chrome.runtime.getURL(
                         "src/assets/fonts/Nunito-Bold.ttf",
-                    )}
+                    )}') format('truetype');
                     font-weight: 700;
                     font-style: normal;
                 }
@@ -161,91 +160,92 @@ const DashboardTab: React.FC = () => {
                 @import url('https://fonts.googleapis.com/icon?family=Material+Icons');
             `}</style>
 
-            {/* Main content */}
-            <div
-                style={{
-                    height: "100%",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "6px",
-                    position: "relative",
-                    zIndex: 20,
-                }}
-            >
-                {/* Row 1: Stories (75% width) */}
+                {/* Main content */}
                 <div
                     style={{
-                        height: "55%",
+                        height: "100%",
                         display: "flex",
-                        width: "100%",
-                        gap: "10px",
+                        flexDirection: "column",
+                        gap: "6px",
+                        position: "relative",
+                        zIndex: 20,
                     }}
                 >
-                    <div style={{ width: "70%", height: "100%" }}>
-                        <StoriesComponent />
-                    </div>
+                    {/* Row 1: Stories (75% width) */}
                     <div
                         style={{
-                            width: "30%",
-                            height: "100%",
+                            height: "55%",
                             display: "flex",
-                            flexDirection: "column",
-                            gap: "0.4rem",
+                            width: "100%",
+                            gap: "10px",
                         }}
                     >
-                        <div style={{ height: "25%" }}>
-                            <Templates />
+                        <div style={{ width: "70%", height: "100%" }}>
+                            <StoriesComponent />
                         </div>
-                        <div style={{ height: "25%" }}>
-                            <Timers />
-                        </div>
-                        <div style={{ height: "46%" }}>
-                            <WeeklyInsights />
-                        </div>
+                        <div
+                            style={{
+                                width: "30%",
+                                height: "100%",
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: "0.4rem",
+                            }}
+                        >
+                            <div style={{ height: "25%" }}>
+                                <Templates />
+                            </div>
+                            <div style={{ height: "25%" }}>
+                                <Timers />
+                            </div>
+                            <div style={{ height: "46%" }}>
+                                <WeeklyInsights />
+                            </div>
 
-                        {/* <div style={{ height: "16.67%" }}>
+                            {/* <div style={{ height: "16.67%" }}>
                             <ConsolidateTabs />
                         </div> */}
+                        </div>
                     </div>
-                </div>
 
-                {/* Row 2: Ghost Tabs + Shortcuts and Website Blocker */}
-                <div
-                    style={{
-                        height: "45%",
-                        display: "flex",
-                        gap: "10px",
-                        width: "100%",
-                        // border: "1px solid red",
-                    }}
-                >
-                    {/* Column 1: Ghost Tabs + Shortcuts (25% width) */}
+                    {/* Row 2: Ghost Tabs + Shortcuts and Website Blocker */}
                     <div
                         style={{
-                            width: "25%",
-                            height: "100%",
+                            height: "45%",
                             display: "flex",
-                            flexDirection: "column",
-                            gap: "4px",
-                            // border: "1px solid white",
+                            gap: "10px",
+                            width: "100%",
+                            // border: "1px solid red",
                         }}
                     >
-                        <div style={{ height: "60%" }}>
-                            <GhostTab />
+                        {/* Column 1: Ghost Tabs + Shortcuts (25% width) */}
+                        <div
+                            style={{
+                                width: "25%",
+                                height: "100%",
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: "4px",
+                                // border: "1px solid white",
+                            }}
+                        >
+                            <div style={{ height: "60%" }}>
+                                <GhostTab />
+                            </div>
+                            <div style={{ height: "40%" }}>
+                                <Shortcuts />
+                            </div>
                         </div>
-                        <div style={{ height: "40%" }}>
-                            <Shortcuts />
+
+                        {/* Column 2: Website Blocker (37% width) */}
+                        <div style={{ width: "37%", height: "100%" }}>
+                            <WebsiteBlocker />
                         </div>
-                    </div>
 
-                    {/* Column 2: Website Blocker (37% width) */}
-                    <div style={{ width: "37%", height: "100%" }}>
-                        <WebsiteBlocker />
-                    </div>
-
-                    {/* Column 3: Notes Overview (38% width) */}
-                    <div style={{ width: "38%", height: "100%" }}>
-                        <NotesOverview />
+                        {/* Column 3: Notes Overview (38% width) */}
+                        <div style={{ width: "38%", height: "100%" }}>
+                            <NotesOverview />
+                        </div>
                     </div>
                 </div>
             </div>

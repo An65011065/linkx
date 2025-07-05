@@ -146,7 +146,7 @@ const TemplateModal: React.FC<TemplateModalProps> = ({
                 display: "flex",
                 flexDirection: "column",
                 borderRadius: "16px",
-                padding: "16px",
+                padding: "16px 16px 0px 16px",
             }}
         >
             <div
@@ -519,9 +519,24 @@ const Templates: React.FC = () => {
     const containerRef = useRef<HTMLDivElement>(null);
     const [isExpanded, setIsExpanded] = useState(false);
     const [isDeleteMode, setIsDeleteMode] = useState(false);
+    const [containerHeight, setContainerHeight] = useState(0);
 
     useEffect(() => {
         loadTemplates();
+    }, []);
+
+    // Track container height for responsive scaling
+    useEffect(() => {
+        const updateHeight = () => {
+            if (containerRef.current) {
+                const height = containerRef.current.offsetHeight;
+                setContainerHeight(height);
+            }
+        };
+
+        updateHeight();
+        window.addEventListener("resize", updateHeight);
+        return () => window.removeEventListener("resize", updateHeight);
     }, []);
 
     // Handle expansion animation
@@ -592,6 +607,28 @@ const Templates: React.FC = () => {
         await chrome.storage.local.set({ templates: updatedTemplates });
     };
 
+    // Calculate responsive dimensions based on container height
+    const getResponsiveDimensions = () => {
+        // Base dimensions for optimal layout
+        const baseHeight = 100; // Base container height
+        const baseCardHeight = 50;
+        const baseFontSize = 11;
+        const baseIconSize = 16;
+
+        // Calculate scale factor based on container height
+        const scale = Math.max(0.6, Math.min(1, containerHeight / baseHeight));
+
+        return {
+            cardHeight: Math.max(35, baseCardHeight * scale),
+            fontSize: Math.max(9, baseFontSize * scale),
+            iconSize: Math.max(12, baseIconSize * scale),
+            gap: Math.max(4, 8 * scale),
+            padding: Math.max(8, 12 * scale),
+        };
+    };
+
+    const dimensions = getResponsiveDimensions();
+
     // Calculate how many placeholder slots we need
     const placeholdersNeeded = Math.max(0, 3 - templates.length);
 
@@ -603,11 +640,12 @@ const Templates: React.FC = () => {
                 borderRadius: "16px",
                 border: "1px solid rgba(255, 255, 255, 0.1)",
                 backdropFilter: "blur(10px)",
-                padding: "12px",
+                padding: `${dimensions.padding}px ${dimensions.padding}px 0px ${dimensions.padding}px`,
+                // paddingBottom: "0px",
                 height: "100%",
                 display: "flex",
                 flexDirection: "column",
-                gap: "12px",
+                gap: `${dimensions.gap}px`,
                 position: "relative",
                 transition: "all 0.3s ease-in-out",
             }}
@@ -618,21 +656,24 @@ const Templates: React.FC = () => {
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
-                    marginBottom: "-4px",
+                    marginBottom: "0px",
                 }}
             >
                 <div
                     style={{
                         display: "flex",
                         alignItems: "center",
-                        gap: "8px",
+                        gap: `${dimensions.gap}px`,
                     }}
                 >
-                    <Layout size={16} color="#ffffff" />
+                    <Layout size={dimensions.iconSize} color="#ffffff" />
                     <div
                         style={{
                             color: "#ffffff",
-                            fontSize: "14px",
+                            fontSize: `${Math.max(
+                                12,
+                                dimensions.fontSize + 3,
+                            )}px`,
                             fontWeight: 600,
                             fontFamily: "system-ui, -apple-system, sans-serif",
                         }}
@@ -656,7 +697,7 @@ const Templates: React.FC = () => {
                     }}
                 >
                     <Trash2
-                        size={14}
+                        size={Math.max(12, dimensions.iconSize - 2)}
                         color={isDeleteMode ? "#e74c3c" : "#ffffff"}
                     />
                 </button>
@@ -666,8 +707,8 @@ const Templates: React.FC = () => {
                 style={{
                     overflowX: templates.length > 3 ? "auto" : "hidden",
                     overflowY: "hidden",
-                    margin: "0 -12px",
-                    padding: "0 12px",
+                    margin: `0 -${dimensions.padding}px`,
+                    padding: `0 ${dimensions.padding}px`,
                 }}
                 className="hide-scrollbar"
             >
@@ -678,7 +719,7 @@ const Templates: React.FC = () => {
                             4,
                             templates.length + 1,
                         )}, 1fr)`,
-                        gap: "8px",
+                        gap: `${dimensions.gap}px`,
                         width: templates.length > 3 ? "fit-content" : "100%",
                     }}
                 >
@@ -686,7 +727,7 @@ const Templates: React.FC = () => {
                     <div
                         onClick={handleAddNewClick}
                         style={{
-                            height: "50px",
+                            height: `${dimensions.cardHeight}px`,
                             minWidth: "80px",
                             background: "rgba(255, 255, 255, 0.1)",
                             borderRadius: "8px",
@@ -709,11 +750,11 @@ const Templates: React.FC = () => {
                                 "rgba(255, 255, 255, 0.1)";
                         }}
                     >
-                        <Plus size={16} color="#ffffff" />
+                        <Plus size={dimensions.iconSize} color="#ffffff" />
                         <div
                             style={{
                                 color: "#ffffff",
-                                fontSize: "11px",
+                                fontSize: `${dimensions.fontSize}px`,
                                 fontFamily:
                                     "system-ui, -apple-system, sans-serif",
                             }}
@@ -750,7 +791,13 @@ const Templates: React.FC = () => {
                                         transition: "all 0.2s ease",
                                     }}
                                 >
-                                    <X size={12} color="#ffffff" />
+                                    <X
+                                        size={Math.max(
+                                            10,
+                                            dimensions.iconSize - 4,
+                                        )}
+                                        color="#ffffff"
+                                    />
                                 </button>
                             )}
                             <div
@@ -759,7 +806,7 @@ const Templates: React.FC = () => {
                                     handleOpenTemplate(template)
                                 }
                                 style={{
-                                    height: "50px",
+                                    height: `${dimensions.cardHeight}px`,
                                     minWidth: "80px",
                                     background: template.backgroundColor
                                         ? `${template.backgroundColor}80`
@@ -800,11 +847,12 @@ const Templates: React.FC = () => {
                                 <div
                                     style={{
                                         color: "#ffffff",
-                                        fontSize: "11px",
+                                        fontSize: `${dimensions.fontSize}px`,
                                         fontFamily:
                                             "system-ui, -apple-system, sans-serif",
                                         textAlign: "center",
                                         wordBreak: "break-word",
+                                        lineHeight: "1.2",
                                     }}
                                 >
                                     {template.name}
@@ -812,7 +860,10 @@ const Templates: React.FC = () => {
                                 <div
                                     style={{
                                         color: "rgba(255, 255, 255, 0.5)",
-                                        fontSize: "10px",
+                                        fontSize: `${Math.max(
+                                            8,
+                                            dimensions.fontSize - 1,
+                                        )}px`,
                                         fontFamily:
                                             "system-ui, -apple-system, sans-serif",
                                     }}
@@ -829,7 +880,7 @@ const Templates: React.FC = () => {
                             <div
                                 key={`placeholder-${index}`}
                                 style={{
-                                    height: "50px",
+                                    height: `${dimensions.cardHeight}px`,
                                     minWidth: "80px",
                                     background: "rgba(255, 255, 255, 0.05)",
                                     borderRadius: "8px",
@@ -843,13 +894,13 @@ const Templates: React.FC = () => {
                                 }}
                             >
                                 <Circle
-                                    size={16}
+                                    size={dimensions.iconSize}
                                     color="rgba(255, 255, 255, 0.3)"
                                 />
                                 <div
                                     style={{
                                         color: "rgba(255, 255, 255, 0.3)",
-                                        fontSize: "11px",
+                                        fontSize: `${dimensions.fontSize}px`,
                                         fontFamily:
                                             "system-ui, -apple-system, sans-serif",
                                     }}
