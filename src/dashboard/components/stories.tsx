@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useExtensionData } from "../../data/useExtensionData";
-import { StoryCard } from "./StoryCard";
+// import StoryCard from "../components/StoryCard";
+import { StoryCard } from "./light-mode/StoryCard";
 
 const StoriesComponent: React.FC = () => {
     const [currentIndex, setCurrentIndex] = useState(0);
@@ -181,3 +182,5 @@ const StoriesComponent: React.FC = () => {
 };
 
 export default StoriesComponent;
+
+// newbranch

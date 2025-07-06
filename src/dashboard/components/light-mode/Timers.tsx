@@ -19,7 +19,6 @@ const TimerModal: React.FC<TimerModalProps> = ({ onClose, onSave }) => {
 
     const handleSave = () => {
         if (!domain.trim() || !minutes.trim()) return;
-
         const minutesNum = parseInt(minutes);
         if (isNaN(minutesNum) || minutesNum <= 0) return;
 
@@ -38,92 +37,48 @@ const TimerModal: React.FC<TimerModalProps> = ({ onClose, onSave }) => {
     };
 
     return (
-        <div
-            style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                background: "rgba(0, 0, 0, 0.9)",
-                backdropFilter: "blur(4px)",
-                display: "flex",
-                flexDirection: "column",
-                borderRadius: "16px",
-                padding: "16px",
-            }}
-        >
-            <div
-                style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    marginBottom: "12px",
-                }}
-            >
+        <div className="absolute inset-0 bg-white border border-gray-200 rounded-2xl shadow-2xl flex flex-col p-6">
+            {/* Header */}
+            <div className="flex items-center gap-3 mb-6">
                 <input
                     type="text"
                     placeholder="Website (e.g. youtube.com)"
                     value={domain}
                     onChange={(e) => setDomain(e.target.value)}
-                    style={{
-                        flex: 1,
-                        padding: "8px 12px",
-                        borderRadius: "8px",
-                        border: "1px solid rgba(255, 255, 255, 0.2)",
-                        background: "rgba(255, 255, 255, 0.1)",
-                        color: "#ffffff",
-                        fontSize: "14px",
-                        outline: "none",
-                    }}
+                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-black placeholder-gray-400 focus:outline-none focus:border-gray-400 transition-colors"
                 />
                 <input
                     type="number"
                     placeholder="Minutes"
                     value={minutes}
                     onChange={(e) => setMinutes(e.target.value)}
-                    style={{
-                        width: "100px",
-                        padding: "8px 12px",
-                        borderRadius: "8px",
-                        border: "1px solid rgba(255, 255, 255, 0.2)",
-                        background: "rgba(255, 255, 255, 0.1)",
-                        color: "#ffffff",
-                        fontSize: "14px",
-                        outline: "none",
-                    }}
+                    className="w-24 px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-black placeholder-gray-400 focus:outline-none focus:border-gray-400 transition-colors"
                 />
+
+                {/* Action Buttons */}
                 <button
                     onClick={handleSave}
                     disabled={!domain.trim() || !minutes.trim()}
-                    style={{
-                        background: "none",
-                        border: "none",
-                        color: "#ffffff",
-                        cursor: "pointer",
-                        display: "flex",
-                        opacity: !domain.trim() || !minutes.trim() ? 0.5 : 1,
-                        padding: "6px",
-                    }}
+                    className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                    <ArrowRight size={16} />
+                    <ArrowRight size={16} color="#374151" />
                 </button>
                 <button
                     onClick={onClose}
-                    style={{
-                        background: "none",
-                        border: "none",
-                        color: "#ffffff",
-                        cursor: "pointer",
-                        padding: "6px",
-                        display: "flex",
-                        alignItems: "center",
-                        height: "32px",
-                        width: "32px",
-                    }}
+                    className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
                 >
-                    <X size={16} />
+                    <X size={16} color="#374151" />
                 </button>
+            </div>
+
+            {/* Help Text */}
+            <div className="text-sm text-gray-600 leading-relaxed">
+                <p className="mb-2">
+                    Set a timer for a specific website or domain.
+                </p>
+                <p className="text-xs text-gray-500">
+                    Examples: youtube.com, twitter.com, reddit.com/r/programming
+                </p>
             </div>
         </div>
     );
@@ -148,7 +103,6 @@ const Timers: React.FC = () => {
                     const timerData = JSON.parse(
                         localStorage.getItem(key) || "{}",
                     );
-
                     if (timerData.endTime > Date.now()) {
                         activeTimers.push({
                             id: domain,
@@ -177,6 +131,7 @@ const Timers: React.FC = () => {
                 loadTimers();
             }
         };
+
         window.addEventListener("storage", handleStorageChange);
 
         return () => {
@@ -286,13 +241,11 @@ const Timers: React.FC = () => {
 
     // Calculate responsive dimensions based on container height
     const getResponsiveDimensions = () => {
-        // Base dimensions for optimal layout
-        const baseHeight = 100; // Base container height
+        const baseHeight = 100;
         const baseCardHeight = 50;
         const baseFontSize = 11;
         const baseIconSize = 16;
 
-        // Calculate scale factor based on container height
         const scale = Math.max(0.6, Math.min(1, containerHeight / baseHeight));
 
         return {
@@ -305,53 +258,28 @@ const Timers: React.FC = () => {
     };
 
     const dimensions = getResponsiveDimensions();
-
-    // Calculate how many placeholder slots we need
     const placeholdersNeeded = Math.max(0, 3 - timers.length);
 
     return (
         <div
             ref={containerRef}
+            className="bg-white rounded-2xl border border-gray-200 h-full flex flex-col relative transition-all duration-300 shadow-sm"
             style={{
-                background: "rgba(255, 255, 255, 0.05)",
-                borderRadius: "16px",
-                border: "1px solid rgba(255, 255, 255, 0.1)",
-                backdropFilter: "blur(10px)",
-                padding: `${dimensions.padding}px ${dimensions.padding}px 0px ${dimensions.padding}px`,
-                height: "100%",
-                display: "flex",
-                flexDirection: "column",
+                padding: `${dimensions.padding}px`,
                 gap: `${dimensions.gap}px`,
-                position: "relative",
-                transition: "all 0.3s ease-in-out",
             }}
         >
             {/* Header */}
-            <div
-                style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    marginBottom: "0px",
-                }}
-            >
-                <div
-                    style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: `${dimensions.gap}px`,
-                    }}
-                >
-                    <Timer size={dimensions.iconSize} color="#ffffff" />
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <Timer size={dimensions.iconSize} color="#374151" />
                     <div
+                        className="font-medium text-black"
                         style={{
-                            color: "#ffffff",
                             fontSize: `${Math.max(
                                 12,
                                 dimensions.fontSize + 3,
                             )}px`,
-                            fontWeight: 600,
-                            fontFamily: "system-ui, -apple-system, sans-serif",
                         }}
                     >
                         Timers
@@ -361,36 +289,26 @@ const Timers: React.FC = () => {
                 {/* Delete mode toggle */}
                 <button
                     onClick={() => setIsDeleteMode(!isDeleteMode)}
-                    style={{
-                        background: "none",
-                        border: "none",
-                        padding: "4px",
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        transition: "all 0.2s ease",
-                    }}
+                    className="p-1 rounded-lg hover:bg-gray-100 transition-colors"
                 >
                     <Trash2
                         size={Math.max(12, dimensions.iconSize - 2)}
-                        color={isDeleteMode ? "#e74c3c" : "#ffffff"}
+                        color={isDeleteMode ? "#ef4444" : "#9ca3af"}
                     />
                 </button>
             </div>
 
+            {/* Timers Grid */}
             <div
+                className="overflow-x-auto overflow-y-hidden"
                 style={{
-                    overflowX: timers.length > 3 ? "auto" : "hidden",
-                    overflowY: "hidden",
                     margin: `0 -${dimensions.padding}px`,
                     padding: `0 ${dimensions.padding}px`,
                 }}
-                className="hide-scrollbar"
             >
                 <div
+                    className="grid gap-2"
                     style={{
-                        display: "grid",
                         gridTemplateColumns: `repeat(${Math.max(
                             4,
                             timers.length + 1,
@@ -402,171 +320,125 @@ const Timers: React.FC = () => {
                     {/* Add New Timer Button */}
                     <div
                         onClick={handleAddNewClick}
+                        className="bg-gray-50 rounded-lg border border-gray-200 flex flex-col items-center justify-center gap-1 cursor-pointer hover:bg-gray-100 hover:border-gray-300 transition-all hover:-translate-y-0.5 p-2"
                         style={{
                             height: `${dimensions.cardHeight}px`,
                             minWidth: "80px",
-                            background: "rgba(255, 255, 255, 0.1)",
-                            borderRadius: "8px",
-                            display: "flex",
-                            flexDirection: "column",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            gap: "2px",
-                            cursor: "pointer",
-                            border: "1px solid rgba(255, 255, 255, 0.2)",
-                            transition: "all 0.2s ease",
-                            padding: "4px",
-                        }}
-                        onMouseEnter={(e) => {
-                            e.currentTarget.style.background =
-                                "rgba(255, 255, 255, 0.15)";
-                        }}
-                        onMouseLeave={(e) => {
-                            e.currentTarget.style.background =
-                                "rgba(255, 255, 255, 0.1)";
                         }}
                     >
-                        <Plus size={dimensions.iconSize} color="#ffffff" />
+                        <Plus size={dimensions.iconSize} color="#6b7280" />
                         <div
-                            style={{
-                                color: "#ffffff",
-                                fontSize: `${dimensions.fontSize}px`,
-                                fontFamily:
-                                    "system-ui, -apple-system, sans-serif",
-                            }}
+                            className="text-gray-600 font-medium text-center"
+                            style={{ fontSize: `${dimensions.fontSize}px` }}
                         >
                             Add Timer
                         </div>
                     </div>
 
                     {/* Timer Items */}
-                    {timers.map((timer) => (
-                        <div
-                            key={timer.id}
-                            style={{
-                                position: "relative",
-                            }}
-                        >
-                            {isDeleteMode && (
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleDeleteTimer(timer.id);
-                                    }}
-                                    style={{
-                                        position: "absolute",
-                                        top: "5%",
-                                        right: "5%",
-                                        zIndex: 2,
-                                        border: "none",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        cursor: "pointer",
-                                        padding: 0,
-                                        transition: "all 0.2s ease",
-                                    }}
-                                >
-                                    <X
-                                        size={Math.max(
-                                            10,
-                                            dimensions.iconSize - 4,
-                                        )}
-                                        color="#ffffff"
-                                    />
-                                </button>
-                            )}
-                            <div
-                                style={{
-                                    height: `${dimensions.cardHeight}px`,
-                                    minWidth: "80px",
-                                    background: "rgba(255, 255, 255, 0.1)",
-                                    borderRadius: "8px",
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    gap: "2px",
-                                    cursor: isDeleteMode
-                                        ? "default"
-                                        : "pointer",
-                                    border: "1px solid rgba(255, 255, 255, 0.2)",
-                                    transition: "all 0.2s ease",
-                                    padding: "4px",
-                                    backdropFilter: "blur(10px)",
-                                }}
-                                onMouseEnter={(e) => {
-                                    if (!isDeleteMode) {
-                                        e.currentTarget.style.background =
-                                            "rgba(255, 255, 255, 0.15)";
-                                    }
-                                }}
-                                onMouseLeave={(e) => {
-                                    if (!isDeleteMode) {
-                                        e.currentTarget.style.background =
-                                            "rgba(255, 255, 255, 0.1)";
-                                    }
-                                }}
-                            >
+                    {timers.map((timer) => {
+                        const isExpired = timer.endTime <= Date.now();
+
+                        return (
+                            <div key={timer.id} className="relative">
+                                {isDeleteMode && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleDeleteTimer(timer.id);
+                                        }}
+                                        className="absolute top-1 right-1 z-10 p-1 rounded-full bg-white border border-gray-200 hover:bg-red-50 hover:border-red-200 transition-colors"
+                                    >
+                                        <X
+                                            size={Math.max(
+                                                8,
+                                                dimensions.iconSize - 6,
+                                            )}
+                                            color="#ef4444"
+                                        />
+                                    </button>
+                                )}
                                 <div
+                                    className={`rounded-lg border flex flex-col items-center justify-center gap-1 p-2 transition-all ${
+                                        isExpired
+                                            ? "bg-green-50 border-green-200"
+                                            : "bg-orange-50 border-orange-200 hover:-translate-y-0.5"
+                                    }`}
                                     style={{
-                                        color: "#ffffff",
-                                        fontSize: `${dimensions.fontSize}px`,
-                                        fontFamily:
-                                            "system-ui, -apple-system, sans-serif",
-                                        textAlign: "center",
-                                        wordBreak: "break-word",
-                                        lineHeight: "1.2",
+                                        height: `${dimensions.cardHeight}px`,
+                                        minWidth: "80px",
+                                        cursor: isDeleteMode
+                                            ? "default"
+                                            : "pointer",
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        if (!isDeleteMode && !isExpired) {
+                                            e.currentTarget.style.backgroundColor =
+                                                "#fed7aa40";
+                                            e.currentTarget.style.boxShadow =
+                                                "0 4px 12px rgba(0, 0, 0, 0.1)";
+                                        }
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        if (!isDeleteMode && !isExpired) {
+                                            e.currentTarget.style.backgroundColor =
+                                                "#fff7ed";
+                                            e.currentTarget.style.boxShadow =
+                                                "none";
+                                        }
                                     }}
                                 >
-                                    {timer.name}
-                                </div>
-                                <div
-                                    style={{
-                                        color: "rgba(255, 255, 255, 0.5)",
-                                        fontSize: `${Math.max(
-                                            8,
-                                            dimensions.fontSize - 1,
-                                        )}px`,
-                                        fontFamily:
-                                            "system-ui, -apple-system, sans-serif",
-                                    }}
-                                >
-                                    {formatTimeRemaining(timer.endTime)}
+                                    <div
+                                        className={`font-medium text-center break-words leading-tight ${
+                                            isExpired
+                                                ? "text-green-700"
+                                                : "text-orange-700"
+                                        }`}
+                                        style={{
+                                            fontSize: `${dimensions.fontSize}px`,
+                                        }}
+                                    >
+                                        {timer.name}
+                                    </div>
+                                    <div
+                                        className={`text-center font-medium ${
+                                            isExpired
+                                                ? "text-green-600"
+                                                : "text-orange-600"
+                                        }`}
+                                        style={{
+                                            fontSize: `${Math.max(
+                                                8,
+                                                dimensions.fontSize - 1,
+                                            )}px`,
+                                        }}
+                                    >
+                                        {formatTimeRemaining(timer.endTime)}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
 
                     {/* Placeholder Timers */}
                     {Array.from({ length: placeholdersNeeded }).map(
                         (_, index) => (
                             <div
                                 key={`placeholder-${index}`}
+                                className="bg-gray-25 rounded-lg border border-gray-100 flex flex-col items-center justify-center gap-1 p-2"
                                 style={{
                                     height: `${dimensions.cardHeight}px`,
                                     minWidth: "80px",
-                                    background: "rgba(255, 255, 255, 0.05)",
-                                    borderRadius: "8px",
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    gap: "2px",
-                                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                                    padding: "4px",
                                 }}
                             >
                                 <Circle
                                     size={dimensions.iconSize}
-                                    color="rgba(255, 255, 255, 0.3)"
+                                    color="#d1d5db"
                                 />
                                 <div
+                                    className="text-gray-400 text-center"
                                     style={{
-                                        color: "rgba(255, 255, 255, 0.3)",
                                         fontSize: `${dimensions.fontSize}px`,
-                                        fontFamily:
-                                            "system-ui, -apple-system, sans-serif",
                                     }}
                                 >
                                     Add Timer

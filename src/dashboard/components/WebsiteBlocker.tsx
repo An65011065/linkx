@@ -57,7 +57,6 @@ const WebsiteBlocker: React.FC = () => {
     const [showMiniGame, setShowMiniGame] = useState(false);
     const [selectedDomain, setSelectedDomain] = useState<string>("");
     const [isLocked, setIsLocked] = useState(false);
-    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
     useEffect(() => {
         loadBlockedSites();
@@ -125,14 +124,16 @@ const WebsiteBlocker: React.FC = () => {
                 return;
             }
 
-            const today = new Date().toISOString().split("T")[0];
-            await websiteBlocker.blockWebsite(
-                cleanDomain,
-                startTime,
-                endTime,
-                timezone,
-                today,
-            );
+            // Calculate hours difference
+            let hoursDiff = (endMinutes - startMinutes) / 60;
+
+            // Handle next day scenario (e.g., 23:00 to 01:00)
+            if (hoursDiff <= 0) {
+                hoursDiff += 24;
+            }
+
+            // Block the website for the calculated hours
+            await websiteBlocker.blockWebsite(cleanDomain, hoursDiff);
             await loadBlockedSites();
             setDomain("");
             // Reset lock state after successful block

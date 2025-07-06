@@ -28,6 +28,7 @@ export default defineConfig(({ mode }) => ({
         rollupOptions: {
             input: {
                 background: "src/data/background.ts",
+                contentScript: "src/services/contentScript.js",
                 popup: resolve(__dirname, "src/popup/popup.html"),
                 graph: resolve(__dirname, "src/graph/graph.html"),
                 dashboard: resolve(__dirname, "src/dashboard/dashboard.html"),
