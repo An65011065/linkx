@@ -6,8 +6,8 @@ import StoriesComponent from "./stories";
 // import NotesOverview from "./NotesOverview";
 // import WeeklyInsights from "./WeeklyInsights";
 // import Timers from "./Timers";
-// import Templates from "./Templates";
-import Templates from "./light-mode/Templates";
+import Templates from "./Templates";
+// import Templates from "./light-mode/Templates";
 import Timers from "./light-mode/Timers";
 import WeeklyInsights from "./light-mode/WeeklyInsights";
 import GhostTab from "./light-mode/GhostTab";
@@ -200,7 +200,7 @@ const DashboardTab: React.FC = () => {
                             }}
                         >
                             <div style={{ height: "25%" }}>
-                                <Templates />
+                                <Templates isDarkMode={false} />
                             </div>
                             <div style={{ height: "25%" }}>
                                 <Timers />
