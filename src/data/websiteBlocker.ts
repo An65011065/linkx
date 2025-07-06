@@ -25,62 +25,141 @@ class WebsiteBlocker {
         return ruleId;
     }
 
-    private createBlockRule(
+    private createBlockRules(
         domain: string,
         ruleId: number,
-    ): chrome.declarativeNetRequest.Rule {
-        return {
+    ): chrome.declarativeNetRequest.Rule[] {
+        // Clean the domain - remove protocol and www
+        const cleanDomain = domain
+            .replace(/^https?:\/\//, "")
+            .replace(/^www\./, "")
+            .split("/")[0]; // Remove any path
+
+        // Create comprehensive blocking rules
+        const rules: chrome.declarativeNetRequest.Rule[] = [];
+
+        // All possible resource types to block
+        const resourceTypes = [
+            "main_frame",
+            "sub_frame",
+            "stylesheet",
+            "script",
+            "image",
+            "font",
+            "object",
+            "xmlhttprequest",
+            "ping",
+            "csp_report",
+            "media",
+            "websocket",
+            "webtransport",
+            "webbundle",
+            "other",
+        ] as chrome.declarativeNetRequest.ResourceType[];
+
+        // Method 1: Block main domain with all resource types
+        rules.push({
             id: ruleId,
-            priority: 1,
+            priority: 100,
             action: { type: "block" },
             condition: {
-                urlFilter: `||${domain}/*`,
+                urlFilter: `||${cleanDomain}`,
+                resourceTypes: resourceTypes,
+            },
+        });
+
+        // Method 2: Block www version with all resource types
+        rules.push({
+            id: ruleId + 1,
+            priority: 100,
+            action: { type: "block" },
+            condition: {
+                urlFilter: `||www.${cleanDomain}`,
+                resourceTypes: resourceTypes,
+            },
+        });
+
+        // Method 3: Block using requestDomains (most reliable for main frames)
+        rules.push({
+            id: ruleId + 2,
+            priority: 99,
+            action: { type: "block" },
+            condition: {
+                requestDomains: [cleanDomain, `www.${cleanDomain}`],
                 resourceTypes: ["main_frame", "sub_frame"],
             },
-        };
+        });
+
+        // Method 4: Block using initiatorDomains as backup
+        rules.push({
+            id: ruleId + 3,
+            priority: 98,
+            action: { type: "block" },
+            condition: {
+                initiatorDomains: [cleanDomain, `www.${cleanDomain}`],
+                resourceTypes: ["main_frame", "sub_frame"],
+            },
+        });
+
+        // Method 5: Comprehensive regex for main domain and www
+        rules.push({
+            id: ruleId + 4,
+            priority: 97,
+            action: { type: "block" },
+            condition: {
+                regexFilter: `^https?://(www\\.)?${cleanDomain.replace(
+                    /\./g,
+                    "\\.",
+                )}(/.*)?$`,
+                resourceTypes: ["main_frame", "sub_frame"],
+            },
+        });
+
+        // Method 6: Block all subdomains
+        rules.push({
+            id: ruleId + 5,
+            priority: 96,
+            action: { type: "block" },
+            condition: {
+                regexFilter: `^https?://.*\\.${cleanDomain.replace(
+                    /\./g,
+                    "\\.",
+                )}(/.*)?$`,
+                resourceTypes: ["main_frame", "sub_frame"],
+            },
+        });
+
+        // Method 7: Block HTTP and HTTPS explicitly
+        rules.push({
+            id: ruleId + 6,
+            priority: 95,
+            action: { type: "block" },
+            condition: {
+                regexFilter: `^http://(www\\.)?${cleanDomain.replace(
+                    /\./g,
+                    "\\.",
+                )}(/.*)?$`,
+                resourceTypes: resourceTypes,
+            },
+        });
+
+        rules.push({
+            id: ruleId + 7,
+            priority: 95,
+            action: { type: "block" },
+            condition: {
+                regexFilter: `^https://(www\\.)?${cleanDomain.replace(
+                    /\./g,
+                    "\\.",
+                )}(/.*)?$`,
+                resourceTypes: resourceTypes,
+            },
+        });
+
+        return rules;
     }
 
-    // Helper method to convert timezone-aware times to UTC
-    private convertToUTC(dateTime: string, timezone: string): number {
-        // Create a date object with the timezone
-        const date = new Date(`${dateTime}T00:00:00`);
-
-        // Get timezone offset in minutes
-        const tempDate = new Date(
-            date.toLocaleString("en-US", { timeZone: timezone }),
-        );
-        const utcDate = new Date(
-            date.toLocaleString("en-US", { timeZone: "UTC" }),
-        );
-        const timezoneOffset = utcDate.getTime() - tempDate.getTime();
-
-        return date.getTime() + timezoneOffset;
-    }
-
-    // Helper method to parse time string (HH:MM) into minutes
-    private parseTimeToMinutes(timeString: string): number {
-        const [hours, minutes] = timeString.split(":").map(Number);
-        return hours * 60 + minutes;
-    }
-
-    // Overloaded method for backwards compatibility (hours-based blocking)
-    public async blockWebsite(domain: string, hours: number): Promise<void>;
-    // New method with timezone support
-    public async blockWebsite(
-        domain: string,
-        startTime: string,
-        endTime: string,
-        timezone: string,
-        startDate?: string,
-    ): Promise<void>;
-    // Implementation
-    public async blockWebsite(
-        domain: string,
-        hoursOrStartTime: number | string,
-        endTime?: string,
-        timezone?: string,
-        startDate?: string,
-    ): Promise<void> {
+    public async blockWebsite(domain: string, hours: number): Promise<void> {
         try {
             const data = await chrome.storage.local.get(
                 WebsiteBlocker.BLOCK_RULES_KEY,
@@ -88,87 +167,66 @@ class WebsiteBlocker {
             const blockedSites: BlockedSite[] =
                 data[WebsiteBlocker.BLOCK_RULES_KEY] || [];
 
+            // Clean the domain for consistent checking
+            const cleanDomain = domain
+                .replace(/^https?:\/\//, "")
+                .replace(/^www\./, "")
+                .split("/")[0];
+
+            // Check if already blocked
             const existingBlock = blockedSites.find(
-                (site) => site.domain === domain,
+                (site) => site.domain === cleanDomain,
             );
             if (existingBlock) {
                 throw new Error("This website is already blocked");
             }
 
+            // Get rule IDs (we need 8 IDs for the 8 rules)
             const ruleId = await this.getNextRuleId();
-
-            let blockStartTime: number;
-            let blockEndTime: number;
-            let blockTimezone: string;
-
-            // Handle backwards compatibility (hours-based blocking)
-            if (typeof hoursOrStartTime === "number") {
-                blockStartTime = Date.now();
-                blockEndTime = Date.now() + hoursOrStartTime * 60 * 60 * 1000;
-                blockTimezone =
-                    Intl.DateTimeFormat().resolvedOptions().timeZone;
-            } else {
-                // New timezone-based blocking
-                if (!endTime || !timezone) {
-                    throw new Error(
-                        "Start time, end time, and timezone are required",
-                    );
-                }
-
-                blockTimezone = timezone;
-                const today =
-                    startDate || new Date().toISOString().split("T")[0];
-
-                // Create dates with the correct timezone
-                const startDateTime = new Date(
-                    `${today}T${hoursOrStartTime}:00`,
-                );
-                let endDateTime = new Date(`${today}T${endTime}:00`);
-
-                // If end time is before start time, assume next day
-                const startMinutes = this.parseTimeToMinutes(hoursOrStartTime);
-                const endMinutes = this.parseTimeToMinutes(endTime);
-                if (endMinutes <= startMinutes) {
-                    endDateTime.setDate(endDateTime.getDate() + 1);
-                }
-
-                // Convert to UTC timestamps directly
-                blockStartTime = startDateTime.getTime();
-                blockEndTime = endDateTime.getTime();
-
-                // If the start time is in the past, start immediately
-                if (blockStartTime < Date.now()) {
-                    blockStartTime = Date.now();
-                }
+            for (let i = 0; i < 7; i++) {
+                await this.getNextRuleId(); // Reserve additional IDs
             }
 
-            // Create the rule immediately (for current blocking) or schedule it
-            const shouldStartNow = blockStartTime <= Date.now();
+            const startTime = Date.now();
+            const endTime = startTime + hours * 60 * 60 * 1000;
 
-            if (shouldStartNow) {
-                const rule = this.createBlockRule(domain, ruleId);
-                await chrome.declarativeNetRequest.updateDynamicRules({
-                    addRules: [rule],
-                    removeRuleIds: [],
-                });
-            }
+            // Create and apply the blocking rules immediately
+            const rules = this.createBlockRules(cleanDomain, ruleId);
 
+            console.log(
+                `Creating ${rules.length} blocking rules for ${cleanDomain}:`,
+                rules,
+            );
+
+            await chrome.declarativeNetRequest.updateDynamicRules({
+                addRules: rules,
+                removeRuleIds: [],
+            });
+
+            // Verify rules were added
+            const existingRules =
+                await chrome.declarativeNetRequest.getDynamicRules();
+            console.log(
+                `Total dynamic rules after adding: ${existingRules.length}`,
+            );
+
+            // Store the block info
             const blockInfo: BlockedSite = {
-                domain,
+                domain: cleanDomain,
                 ruleId,
-                startTime: blockStartTime,
-                endTime: blockEndTime,
-                timezone: blockTimezone,
-                scheduledStartTime: shouldStartNow
-                    ? blockStartTime
-                    : blockStartTime,
-                scheduledEndTime: blockEndTime,
+                startTime,
+                endTime,
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
             };
 
             blockedSites.push(blockInfo);
             await chrome.storage.local.set({
                 [WebsiteBlocker.BLOCK_RULES_KEY]: blockedSites,
             });
+
+            console.log(
+                `Successfully blocked ${cleanDomain} for ${hours} hours`,
+            );
         } catch (error) {
             console.error("Error blocking website:", error);
             throw error;
@@ -187,20 +245,37 @@ class WebsiteBlocker {
                 (site) => site.domain === domain,
             );
             if (!siteToUnblock) {
-                throw new Error("This website is not locked");
+                throw new Error("This website is not blocked");
             }
 
+            // Remove all eight blocking rules
+            const ruleIdsToRemove = [
+                siteToUnblock.ruleId,
+                siteToUnblock.ruleId + 1,
+                siteToUnblock.ruleId + 2,
+                siteToUnblock.ruleId + 3,
+                siteToUnblock.ruleId + 4,
+                siteToUnblock.ruleId + 5,
+                siteToUnblock.ruleId + 6,
+                siteToUnblock.ruleId + 7,
+            ];
+
+            console.log(`Removing rule IDs: ${ruleIdsToRemove.join(", ")}`);
+
             await chrome.declarativeNetRequest.updateDynamicRules({
-                removeRuleIds: [siteToUnblock.ruleId],
+                removeRuleIds: ruleIdsToRemove,
                 addRules: [],
             });
 
+            // Remove from storage
             const updatedBlockedSites = blockedSites.filter(
                 (site) => site.domain !== domain,
             );
             await chrome.storage.local.set({
                 [WebsiteBlocker.BLOCK_RULES_KEY]: updatedBlockedSites,
             });
+
+            console.log(`Successfully unblocked ${domain}`);
         } catch (error) {
             console.error("Error unlocking website:", error);
             throw error;
@@ -220,57 +295,65 @@ class WebsiteBlocker {
         const expiredSites = blockedSites.filter((site) => site.endTime <= now);
 
         for (const site of expiredSites) {
-            await this.unlockWebsite(site.domain);
-        }
-    }
-
-    // New method to handle scheduled blocks
-    public async processScheduledBlocks(): Promise<void> {
-        const blockedSites = await this.getBlockedSites();
-        const now = Date.now();
-
-        for (const site of blockedSites) {
-            // Check if we need to start a scheduled block
-            if (
-                site.scheduledStartTime &&
-                site.scheduledStartTime <= now &&
-                site.startTime > now
-            ) {
-                const rule = this.createBlockRule(site.domain, site.ruleId);
-                await chrome.declarativeNetRequest.updateDynamicRules({
-                    addRules: [rule],
-                    removeRuleIds: [],
-                });
-
-                // Update the site to mark it as active
-                site.startTime = now;
-
-                // Update storage
-                const data = await chrome.storage.local.get(
-                    WebsiteBlocker.BLOCK_RULES_KEY,
+            try {
+                await this.unlockWebsite(site.domain);
+                console.log(
+                    `Automatically unblocked expired site: ${site.domain}`,
                 );
-                const allSites: BlockedSite[] =
-                    data[WebsiteBlocker.BLOCK_RULES_KEY] || [];
-                const updatedSites = allSites.map((s) =>
-                    s.domain === site.domain ? site : s,
+            } catch (error) {
+                console.error(
+                    `Failed to unblock expired site ${site.domain}:`,
+                    error,
                 );
-                await chrome.storage.local.set({
-                    [WebsiteBlocker.BLOCK_RULES_KEY]: updatedSites,
-                });
             }
         }
     }
 
-    // Helper method to format time in user's timezone
-    public formatTimeInTimezone(timestamp: number, timezone: string): string {
-        return new Date(timestamp).toLocaleString("en-US", {
-            timeZone: timezone,
-            weekday: "short",
-            month: "short",
-            day: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-        });
+    // Debug method to check current rules
+    public async debugRules(): Promise<void> {
+        const rules = await chrome.declarativeNetRequest.getDynamicRules();
+        console.log("Current dynamic rules:", rules);
+
+        const blockedSites = await this.getBlockedSites();
+        console.log("Blocked sites in storage:", blockedSites);
+    }
+
+    // Helper method to check if a site is currently blocked
+    public async isBlocked(domain: string): Promise<boolean> {
+        const blockedSites = await this.getBlockedSites();
+        const now = Date.now();
+
+        return blockedSites.some(
+            (site) =>
+                site.domain === domain &&
+                site.startTime <= now &&
+                site.endTime > now,
+        );
+    }
+
+    // Helper method to get time remaining for a blocked site
+    public async getTimeRemaining(domain: string): Promise<number> {
+        const blockedSites = await this.getBlockedSites();
+        const site = blockedSites.find((s) => s.domain === domain);
+
+        if (!site) return 0;
+
+        const remaining = site.endTime - Date.now();
+        return Math.max(0, remaining);
+    }
+
+    // Format remaining time as human readable
+    public formatTimeRemaining(milliseconds: number): string {
+        const hours = Math.floor(milliseconds / (1000 * 60 * 60));
+        const minutes = Math.floor(
+            (milliseconds % (1000 * 60 * 60)) / (1000 * 60),
+        );
+
+        if (hours > 0) {
+            return `${hours}h ${minutes}m`;
+        } else {
+            return `${minutes}m`;
+        }
     }
 }
 

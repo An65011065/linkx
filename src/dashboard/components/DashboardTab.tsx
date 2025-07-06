@@ -1,12 +1,19 @@
 import React, { useState, useEffect } from "react";
 import StoriesComponent from "./stories";
-import GhostTab from "./GhostTab";
-import Shortcuts from "./Shortcuts";
-import WebsiteBlocker from "./WebsiteBlocker";
-import NotesOverview from "./NotesOverview";
-import WeeklyInsights from "./WeeklyInsights";
-import Templates from "./Templates";
-import Timers from "./Timers";
+// import GhostTab from "./GhostTab";
+// import Shortcuts from "./Shortcuts";
+// import WebsiteBlocker from "./WebsiteBlocker";
+// import NotesOverview from "./NotesOverview";
+// import WeeklyInsights from "./WeeklyInsights";
+// import Timers from "./Timers";
+// import Templates from "./Templates";
+import Templates from "./light-mode/Templates";
+import Timers from "./light-mode/Timers";
+import WeeklyInsights from "./light-mode/WeeklyInsights";
+import GhostTab from "./light-mode/GhostTab";
+import Shortcuts from "./light-mode/Shortcuts";
+import WebsiteBlocker from "./light-mode/WebsiteBlocker";
+import NotesOverview from "./light-mode/NotesOverview";
 
 const DashboardTab: React.FC = () => {
     const [isLoaded, setIsLoaded] = useState(false);
