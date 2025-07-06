@@ -12,16 +12,17 @@ import {
 interface Template {
     name: string;
     urls: string[];
-    backgroundColor?: string; // Optional background color
+    backgroundColor?: string;
 }
 
 interface TemplateModalProps {
     onClose: () => void;
     onSave: (template: Template & { backgroundColor?: string }) => void;
     mode: "current" | "new";
+    isDarkMode?: boolean;
 }
 
-// Predefined color options
+// Refined color options for Nordic aesthetic
 const colorOptions = [
     { value: "#4285f4", label: "Blue" },
     { value: "#34a853", label: "Green" },
@@ -35,6 +36,7 @@ const TemplateModal: React.FC<TemplateModalProps> = ({
     onClose,
     onSave,
     mode,
+    isDarkMode = false,
 }) => {
     const [name, setName] = useState("");
     const [urls, setUrls] = useState<string[]>([]);
@@ -49,7 +51,6 @@ const TemplateModal: React.FC<TemplateModalProps> = ({
 
     React.useEffect(() => {
         if (mode === "current") {
-            // Get all tabs in the current window
             chrome.tabs.query({ currentWindow: true }, (tabs) => {
                 setCurrentTabs(
                     tabs
@@ -60,7 +61,7 @@ const TemplateModal: React.FC<TemplateModalProps> = ({
                         .map((tab) => ({
                             url: tab.url!,
                             title: tab.title || "Untitled",
-                            checked: true, // Set to true by default
+                            checked: true,
                         })),
                 );
             });
@@ -75,10 +76,8 @@ const TemplateModal: React.FC<TemplateModalProps> = ({
 
         if (templateUrls.length === 0) return;
 
-        // Generate automatic name if none provided
         let templateName = name.trim();
         if (!templateName) {
-            // Get existing template names to find the next available temp number
             chrome.storage.local.get("templates", (result) => {
                 const existingTemplates = result.templates || [];
                 let tempNumber = 1;
@@ -128,92 +127,145 @@ const TemplateModal: React.FC<TemplateModalProps> = ({
         );
     };
 
-    const handleColorSelect = (color: string) => {
+    const handleColorSelect = (color: string | undefined) => {
         setSelectedColor(color);
         setIsColorPickerExpanded(false);
     };
 
+    // Container styles based on mode
+    const containerStyle = isDarkMode
+        ? {
+              position: "absolute" as const,
+              inset: 0,
+              background: "rgba(0, 0, 0, 0.8)",
+              border: "1px solid rgba(255, 255, 255, 0.2)",
+              borderRadius: "16px",
+              backdropFilter: "blur(10px)",
+              display: "flex",
+              flexDirection: "column" as const,
+              padding: "24px",
+          }
+        : {};
+
+    const modalClasses = isDarkMode
+        ? ""
+        : "absolute inset-0 bg-white border border-gray-200 rounded-2xl shadow-2xl flex flex-col p-6";
+
     return (
-        <div
-            style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                background: "rgba(0, 0, 0, 0.9)",
-                backdropFilter: "blur(4px)",
-                display: "flex",
-                flexDirection: "column",
-                borderRadius: "16px",
-                padding: "16px 16px 0px 16px",
-            }}
-        >
+        <div style={isDarkMode ? containerStyle : {}} className={modalClasses}>
+            {/* Header */}
             <div
-                style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    marginBottom: "12px",
-                }}
+                style={
+                    isDarkMode
+                        ? {
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "12px",
+                              marginBottom: "24px",
+                              paddingBottom: "16px",
+                              borderBottom:
+                                  "1px solid rgba(255, 255, 255, 0.1)",
+                          }
+                        : {}
+                }
+                className={
+                    !isDarkMode
+                        ? "flex items-center gap-3 mb-6 pb-4 border-b border-gray-100"
+                        : ""
+                }
             >
-                {/* Template Name Input */}
                 <div
-                    style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                        flex: 1,
-                    }}
+                    style={
+                        isDarkMode
+                            ? {
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "12px",
+                                  flex: 1,
+                              }
+                            : {}
+                    }
+                    className={
+                        !isDarkMode ? "flex items-center gap-3 flex-1" : ""
+                    }
                 >
                     <input
                         type="text"
                         placeholder="Template Name"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
-                        style={{
-                            flex: 1,
-                            padding: "6px 12px",
-                            borderRadius: "8px",
-                            border: "1px solid rgba(255, 255, 255, 0.2)",
-                            background: "rgba(255, 255, 255, 0.1)",
-                            color: "#ffffff",
-                            fontSize: "14px",
-                            outline: "none",
-                            height: "100%",
-                        }}
+                        style={
+                            isDarkMode
+                                ? {
+                                      flex: 1,
+                                      padding: "6px 12px",
+                                      borderRadius: "8px",
+                                      border: "1px solid rgba(255, 255, 255, 0.2)",
+                                      background: "rgba(255, 255, 255, 0.1)",
+                                      color: "#ffffff",
+                                      fontSize: "14px",
+                                      outline: "none",
+                                      height: "100%",
+                                  }
+                                : {}
+                        }
+                        className={
+                            !isDarkMode
+                                ? "flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-black placeholder-gray-400 focus:outline-none focus:border-gray-400 transition-colors"
+                                : ""
+                        }
                     />
 
-                    {/* Rainbow Color Picker */}
+                    {/* Color Picker */}
                     <div style={{ position: "relative" }}>
                         <button
                             onClick={() =>
                                 setIsColorPickerExpanded(!isColorPickerExpanded)
                             }
-                            style={{
-                                width: "2rem",
-                                height: "2rem",
-                                borderRadius: "50%",
-                                background:
-                                    selectedColor ||
-                                    "conic-gradient(from 0deg, rgba(255,0,0,0.3), rgba(255,128,0,0.3), rgba(255,255,0,0.3), rgba(128,255,0,0.3), rgba(0,255,0,0.3), rgba(0,255,255,0.3), rgba(0,128,255,0.3), rgba(0,0,255,0.3), rgba(128,0,255,0.3), rgba(255,0,255,0.3), rgba(255,0,128,0.3))",
-                                border: "1px solid rgba(255, 255, 255, 0.5)",
-                                cursor: "pointer",
-                                padding: 0,
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                transition: "all 0.2s ease",
-                                transform: isColorPickerExpanded
-                                    ? "scale(1.05)"
-                                    : "scale(1)",
-                            }}
+                            style={
+                                isDarkMode
+                                    ? {
+                                          width: "2rem",
+                                          height: "2rem",
+                                          borderRadius: "50%",
+                                          background:
+                                              selectedColor ||
+                                              "conic-gradient(from 0deg, rgba(255,0,0,0.3), rgba(255,128,0,0.3), rgba(255,255,0,0.3), rgba(128,255,0,0.3), rgba(0,255,0,0.3), rgba(0,255,255,0.3), rgba(0,128,255,0.3), rgba(0,0,255,0.3), rgba(128,0,255,0.3), rgba(255,0,255,0.3), rgba(255,0,128,0.3))",
+                                          border: "1px solid rgba(255, 255, 255, 0.5)",
+                                          cursor: "pointer",
+                                          padding: 0,
+                                          display: "flex",
+                                          alignItems: "center",
+                                          justifyContent: "center",
+                                          transition: "all 0.2s ease",
+                                          transform: isColorPickerExpanded
+                                              ? "scale(1.05)"
+                                              : "scale(1)",
+                                      }
+                                    : {
+                                          backgroundColor:
+                                              selectedColor || "#f8f9fa",
+                                      }
+                            }
+                            className={
+                                !isDarkMode
+                                    ? "w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center hover:border-gray-300 transition-colors"
+                                    : ""
+                            }
                         >
                             <Plus
-                                size={14}
-                                color="#ffffff"
+                                size={isDarkMode ? 14 : 12}
+                                color={
+                                    selectedColor
+                                        ? "#ffffff"
+                                        : isDarkMode
+                                        ? "#ffffff"
+                                        : "#6c757d"
+                                }
                                 style={{
-                                    filter: "drop-shadow(0 0 2px rgba(0,0,0,0.8))",
+                                    filter: isDarkMode
+                                        ? "drop-shadow(0 0 2px rgba(0,0,0,0.8))"
+                                        : undefined,
                                     transform: isColorPickerExpanded
                                         ? "rotate(45deg)"
                                         : "rotate(0deg)",
@@ -222,71 +274,69 @@ const TemplateModal: React.FC<TemplateModalProps> = ({
                             />
                         </button>
 
-                        {/* Expanded Color Options */}
                         {isColorPickerExpanded && (
                             <div
-                                style={{
-                                    position: "absolute",
-                                    top: "calc(100% + 8px)",
-                                    right: 0,
-                                    background: "rgba(0, 0, 0, 0.9)",
-                                    border: "1px solid rgba(255, 255, 255, 0.2)",
-                                    borderRadius: "8px",
-                                    padding: "8px",
-                                    display: "flex",
-                                    gap: "4px",
-                                    zIndex: 1000,
-                                    backdropFilter: "blur(8px)",
-                                    animation: "fadeIn 0.2s ease-out",
-                                }}
+                                style={
+                                    isDarkMode
+                                        ? {
+                                              position: "absolute",
+                                              top: "calc(100% + 8px)",
+                                              right: 0,
+                                              background: "rgba(0, 0, 0, 0.9)",
+                                              border: "1px solid rgba(255, 255, 255, 0.2)",
+                                              borderRadius: "8px",
+                                              padding: "8px",
+                                              display: "flex",
+                                              gap: "4px",
+                                              zIndex: 1000,
+                                              backdropFilter: "blur(8px)",
+                                          }
+                                        : {}
+                                }
+                                className={
+                                    !isDarkMode
+                                        ? "absolute top-10 right-0 bg-white border border-gray-200 rounded-lg shadow-lg p-2 z-50"
+                                        : ""
+                                }
                             >
-                                {/* Clear/None option */}
-                                <button
-                                    onClick={() => handleColorSelect(undefined)}
-                                    style={{
-                                        width: "1.5rem",
-                                        height: "1.5rem",
-                                        borderRadius: "50%",
-                                        background: "transparent",
-                                        border: "2px solid rgba(255, 255, 255, 0.5)",
-                                        cursor: "pointer",
-                                        padding: 0,
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        transition: "all 0.2s ease",
-                                    }}
-                                    title="No Color"
-                                >
-                                    <X
-                                        size={10}
-                                        color="rgba(255, 255, 255, 0.5)"
-                                    />
-                                </button>
-
                                 {colorOptions.map((color) => (
                                     <button
                                         key={color.value}
                                         onClick={() =>
                                             handleColorSelect(color.value)
                                         }
-                                        style={{
-                                            width: "1.5rem",
-                                            height: "1.5rem",
-                                            borderRadius: "50%",
-                                            background: color.value,
-                                            border:
-                                                selectedColor === color.value
-                                                    ? "2px solid white"
-                                                    : "2px solid transparent",
-                                            cursor: "pointer",
-                                            padding: 0,
-                                            transition: "all 0.2s ease",
-                                            transform:
-                                                selectedColor === color.value
-                                                    ? "scale(1.1)"
-                                                    : "scale(1)",
-                                        }}
+                                        style={
+                                            isDarkMode
+                                                ? {
+                                                      width: "1.5rem",
+                                                      height: "1.5rem",
+                                                      borderRadius: "50%",
+                                                      background: color.value,
+                                                      border:
+                                                          selectedColor ===
+                                                          color.value
+                                                              ? "2px solid #ffffff"
+                                                              : "1px solid rgba(255, 255, 255, 0.3)",
+                                                      cursor: "pointer",
+                                                      padding: 0,
+                                                      transition:
+                                                          "all 0.2s ease",
+                                                  }
+                                                : {
+                                                      backgroundColor:
+                                                          color.value,
+                                                      border:
+                                                          selectedColor ===
+                                                          color.value
+                                                              ? "2px solid #000000"
+                                                              : "transparent",
+                                                  }
+                                        }
+                                        className={
+                                            !isDarkMode
+                                                ? "w-6 h-6 rounded-full border border-white m-1 hover:scale-110 transition-transform"
+                                                : ""
+                                        }
                                         title={color.label}
                                     />
                                 ))}
@@ -295,7 +345,7 @@ const TemplateModal: React.FC<TemplateModalProps> = ({
                     </div>
                 </div>
 
-                {/* Save and Close buttons */}
+                {/* Action Buttons */}
                 <button
                     onClick={handleSave}
                     disabled={
@@ -303,223 +353,377 @@ const TemplateModal: React.FC<TemplateModalProps> = ({
                             ? !currentTabs.some((tab) => tab.checked)
                             : urls.length === 0
                     }
-                    style={{
-                        background: "none",
-                        border: "none",
-                        color: "#ffffff",
-                        cursor: "pointer",
-                        display: "flex",
-                        opacity: (
-                            mode === "current"
-                                ? !currentTabs.some((tab) => tab.checked)
-                                : urls.length === 0
-                        )
-                            ? 0.5
-                            : 1,
-                        padding: "6px",
-                    }}
+                    style={
+                        isDarkMode
+                            ? {
+                                  padding: "8px",
+                                  borderRadius: "8px",
+                                  background: "rgba(255, 255, 255, 0.1)",
+                                  border: "1px solid rgba(255, 255, 255, 0.2)",
+                                  cursor: "pointer",
+                                  transition: "all 0.2s ease",
+                              }
+                            : {}
+                    }
+                    className={
+                        !isDarkMode
+                            ? "p-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            : ""
+                    }
                 >
-                    <ArrowRight size={16} />
+                    <ArrowRight
+                        size={16}
+                        color={isDarkMode ? "#ffffff" : "#374151"}
+                    />
                 </button>
                 <button
                     onClick={onClose}
-                    style={{
-                        background: "none",
-                        border: "none",
-                        color: "#ffffff",
-                        cursor: "pointer",
-                        padding: "6px",
-                        display: "flex",
-                        alignItems: "center",
-                        height: "32px",
-                        width: "32px",
-                    }}
+                    style={
+                        isDarkMode
+                            ? {
+                                  padding: "8px",
+                                  borderRadius: "8px",
+                                  background: "rgba(255, 255, 255, 0.1)",
+                                  border: "1px solid rgba(255, 255, 255, 0.2)",
+                                  cursor: "pointer",
+                                  transition: "all 0.2s ease",
+                              }
+                            : {}
+                    }
+                    className={
+                        !isDarkMode
+                            ? "p-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+                            : ""
+                    }
                 >
-                    <X size={16} />
+                    <X size={16} color={isDarkMode ? "#ffffff" : "#374151"} />
                 </button>
             </div>
 
+            {/* Content */}
             <div
-                style={{
-                    flex: 1,
-                    overflowY: "auto",
-                    marginRight: "-8px",
-                    paddingRight: "8px",
-                }}
+                style={
+                    isDarkMode ? { flex: 1, overflowY: "auto" as const } : {}
+                }
+                className={!isDarkMode ? "flex-1 overflow-y-auto" : ""}
             >
                 {mode === "current" ? (
-                    currentTabs.map((tab, index) => (
-                        <div key={tab.url}>
-                            <div
-                                onClick={() => toggleTab(index)}
-                                style={{
-                                    padding: "8px 0",
-                                    cursor: "pointer",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "8px",
-                                }}
-                            >
+                    <div
+                        style={
+                            isDarkMode
+                                ? {
+                                      display: "flex",
+                                      flexDirection: "column",
+                                      gap: "4px",
+                                  }
+                                : {}
+                        }
+                        className={!isDarkMode ? "space-y-1" : ""}
+                    >
+                        {currentTabs.map((tab, index) => (
+                            <div key={tab.url}>
                                 <div
-                                    style={{
-                                        width: "16px",
-                                        height: "16px",
-                                        border: "1.5px solid rgba(255, 255, 255, 0.5)",
-                                        borderRadius: "3px",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        flexShrink: 0,
-                                        background: tab.checked
-                                            ? "rgba(255, 255, 255, 0.1)"
-                                            : "transparent",
-                                    }}
+                                    onClick={() => toggleTab(index)}
+                                    style={
+                                        isDarkMode
+                                            ? {
+                                                  display: "flex",
+                                                  alignItems: "center",
+                                                  gap: "12px",
+                                                  padding: "8px",
+                                                  borderRadius: "8px",
+                                                  cursor: "pointer",
+                                                  transition: "all 0.2s ease",
+                                                  background:
+                                                      "rgba(255, 255, 255, 0.05)",
+                                              }
+                                            : {}
+                                    }
+                                    className={
+                                        !isDarkMode
+                                            ? "flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+                                            : ""
+                                    }
                                 >
-                                    {tab.checked && (
-                                        <Check size={12} color="#ffffff" />
-                                    )}
-                                </div>
-                                <div style={{ flex: 1, minWidth: 0 }}>
                                     <div
                                         style={{
-                                            color: "#ffffff",
-                                            fontSize: "11px",
-                                            marginBottom: "1px",
-                                            whiteSpace: "nowrap",
-                                            overflow: "hidden",
-                                            textOverflow: "ellipsis",
+                                            width: "16px",
+                                            height: "16px",
+                                            border: `1px solid ${
+                                                tab.checked
+                                                    ? "#000000"
+                                                    : isDarkMode
+                                                    ? "rgba(255, 255, 255, 0.3)"
+                                                    : "#d1d5db"
+                                            }`,
+                                            borderRadius: "4px",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            flexShrink: 0,
+                                            transition: "colors 0.2s ease",
+                                            backgroundColor: tab.checked
+                                                ? "#000000"
+                                                : "transparent",
                                         }}
                                     >
-                                        {tab.title}
+                                        {tab.checked && (
+                                            <Check size={10} color="#ffffff" />
+                                        )}
+                                    </div>
+                                    <div
+                                        style={
+                                            isDarkMode
+                                                ? { flex: 1, minWidth: 0 }
+                                                : {}
+                                        }
+                                        className={
+                                            !isDarkMode ? "flex-1 min-w-0" : ""
+                                        }
+                                    >
+                                        <div
+                                            style={
+                                                isDarkMode
+                                                    ? {
+                                                          color: "#ffffff",
+                                                          fontSize: "14px",
+                                                          fontWeight: 500,
+                                                          whiteSpace: "nowrap",
+                                                          overflow: "hidden",
+                                                          textOverflow:
+                                                              "ellipsis",
+                                                      }
+                                                    : {}
+                                            }
+                                            className={
+                                                !isDarkMode
+                                                    ? "font-medium text-sm truncate text-black"
+                                                    : ""
+                                            }
+                                        >
+                                            {tab.title}
+                                        </div>
+                                        <div
+                                            style={
+                                                isDarkMode
+                                                    ? {
+                                                          color: "rgba(255, 255, 255, 0.5)",
+                                                          fontSize: "12px",
+                                                          whiteSpace: "nowrap",
+                                                          overflow: "hidden",
+                                                          textOverflow:
+                                                              "ellipsis",
+                                                      }
+                                                    : {}
+                                            }
+                                            className={
+                                                !isDarkMode
+                                                    ? "text-xs truncate text-gray-500"
+                                                    : ""
+                                            }
+                                        >
+                                            {tab.url}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                            {index < currentTabs.length - 1 && (
-                                <div
-                                    style={{
-                                        height: "1px",
-                                        background: "rgba(255, 255, 255, 0.1)",
-                                        margin: "1px 0",
-                                    }}
-                                />
-                            )}
-                        </div>
-                    ))
+                        ))}
+                    </div>
                 ) : (
-                    <>
+                    <div
+                        style={
+                            isDarkMode
+                                ? {
+                                      display: "flex",
+                                      flexDirection: "column",
+                                      gap: "12px",
+                                  }
+                                : {}
+                        }
+                        className={!isDarkMode ? "space-y-3" : ""}
+                    >
                         <div
-                            style={{
-                                display: "flex",
-                                gap: "8px",
-                                marginBottom: "12px",
-                            }}
+                            style={
+                                isDarkMode
+                                    ? { display: "flex", gap: "8px" }
+                                    : {}
+                            }
+                            className={!isDarkMode ? "flex gap-2" : ""}
                         >
                             <input
                                 type="url"
                                 placeholder="Enter URL"
                                 value={newUrl}
                                 onChange={(e) => setNewUrl(e.target.value)}
-                                style={{
-                                    flex: 1,
-                                    padding: "8px 12px",
-                                    borderRadius: "8px",
-                                    border: "1px solid rgba(255, 255, 255, 0.2)",
-                                    background: "rgba(255, 255, 255, 0.1)",
-                                    color: "#ffffff",
-                                    fontSize: "14px",
-                                    outline: "none",
-                                }}
+                                onKeyPress={(e) =>
+                                    e.key === "Enter" && handleAddUrl()
+                                }
+                                style={
+                                    isDarkMode
+                                        ? {
+                                              flex: 1,
+                                              padding: "8px 12px",
+                                              borderRadius: "8px",
+                                              border: "1px solid rgba(255, 255, 255, 0.2)",
+                                              background:
+                                                  "rgba(255, 255, 255, 0.1)",
+                                              color: "#ffffff",
+                                              fontSize: "14px",
+                                              outline: "none",
+                                          }
+                                        : {}
+                                }
+                                className={
+                                    !isDarkMode
+                                        ? "flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-gray-400 transition-colors text-black placeholder-gray-400"
+                                        : ""
+                                }
                             />
                             <button
                                 onClick={handleAddUrl}
-                                style={{
-                                    padding: "8px",
-                                    borderRadius: "8px",
-                                    border: "1px solid rgba(255, 255, 255, 0.2)",
-                                    background: "#4285f4",
-                                    color: "#ffffff",
-                                    cursor: "pointer",
-                                    display: "flex",
-                                    alignItems: "center",
-                                }}
+                                disabled={!newUrl.trim()}
+                                style={
+                                    isDarkMode
+                                        ? {
+                                              padding: "8px 16px",
+                                              borderRadius: "8px",
+                                              background:
+                                                  "rgba(255, 255, 255, 0.1)",
+                                              border: "1px solid rgba(255, 255, 255, 0.2)",
+                                              cursor: newUrl.trim()
+                                                  ? "pointer"
+                                                  : "not-allowed",
+                                              opacity: newUrl.trim() ? 1 : 0.5,
+                                              transition: "all 0.2s ease",
+                                          }
+                                        : {}
+                                }
+                                className={
+                                    !isDarkMode
+                                        ? "px-4 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                        : ""
+                                }
                             >
-                                <Plus size={20} />
+                                <Plus
+                                    size={16}
+                                    color={isDarkMode ? "#ffffff" : "#374151"}
+                                />
                             </button>
                         </div>
-                        {urls.map((url, index) => (
-                            <div key={url}>
+
+                        <div
+                            style={
+                                isDarkMode
+                                    ? {
+                                          display: "flex",
+                                          flexDirection: "column",
+                                          gap: "8px",
+                                      }
+                                    : {}
+                            }
+                            className={!isDarkMode ? "space-y-2" : ""}
+                        >
+                            {urls.map((url, index) => (
                                 <div
-                                    style={{
-                                        padding: "8px 0",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "space-between",
-                                    }}
+                                    key={index}
+                                    style={
+                                        isDarkMode
+                                            ? {
+                                                  display: "flex",
+                                                  alignItems: "center",
+                                                  gap: "12px",
+                                                  padding: "8px",
+                                                  borderRadius: "8px",
+                                                  border: "1px solid rgba(255, 255, 255, 0.2)",
+                                                  background:
+                                                      "rgba(255, 255, 255, 0.05)",
+                                              }
+                                            : {}
+                                    }
+                                    className={
+                                        !isDarkMode
+                                            ? "flex items-center gap-3 p-2 rounded-lg border border-gray-200"
+                                            : ""
+                                    }
                                 >
                                     <div
-                                        style={{
-                                            flex: 1,
-                                            color: "#ffffff",
-                                            fontSize: "14px",
-                                            wordBreak: "break-all",
-                                        }}
+                                        style={
+                                            isDarkMode
+                                                ? { flex: 1, minWidth: 0 }
+                                                : {}
+                                        }
+                                        className={
+                                            !isDarkMode ? "flex-1 min-w-0" : ""
+                                        }
                                     >
-                                        {url}
+                                        <div
+                                            style={
+                                                isDarkMode
+                                                    ? {
+                                                          color: "#ffffff",
+                                                          fontSize: "14px",
+                                                          whiteSpace: "nowrap",
+                                                          overflow: "hidden",
+                                                          textOverflow:
+                                                              "ellipsis",
+                                                      }
+                                                    : {}
+                                            }
+                                            className={
+                                                !isDarkMode
+                                                    ? "text-sm truncate text-black"
+                                                    : ""
+                                            }
+                                        >
+                                            {url}
+                                        </div>
                                     </div>
                                     <button
                                         onClick={() => handleRemoveUrl(url)}
-                                        style={{
-                                            background: "none",
-                                            border: "none",
-                                            color: "rgba(255, 255, 255, 0.5)",
-                                            cursor: "pointer",
-                                            padding: "4px",
-                                            display: "flex",
-                                        }}
+                                        style={
+                                            isDarkMode
+                                                ? {
+                                                      padding: "4px",
+                                                      borderRadius: "4px",
+                                                      background: "transparent",
+                                                      border: "none",
+                                                      cursor: "pointer",
+                                                      transition:
+                                                          "all 0.2s ease",
+                                                  }
+                                                : {}
+                                        }
+                                        className={
+                                            !isDarkMode
+                                                ? "p-1 rounded hover:bg-red-50 transition-colors"
+                                                : ""
+                                        }
                                     >
-                                        <X size={16} />
+                                        <X size={12} color="#ef4444" />
                                     </button>
                                 </div>
-                                {index < urls.length - 1 && (
-                                    <div
-                                        style={{
-                                            height: "1px",
-                                            background:
-                                                "rgba(255, 255, 255, 0.1)",
-                                            margin: "4px 0",
-                                        }}
-                                    />
-                                )}
-                            </div>
-                        ))}
-                    </>
+                            ))}
+                        </div>
+                    </div>
                 )}
             </div>
-
-            <style jsx>{`
-                @keyframes fadeIn {
-                    from {
-                        opacity: 0;
-                        transform: translateY(-8px);
-                    }
-                    to {
-                        opacity: 1;
-                        transform: translateY(0);
-                    }
-                }
-            `}</style>
         </div>
     );
 };
 
-const Templates: React.FC = () => {
+interface TemplatesProps {
+    isDarkMode?: boolean;
+}
+
+const Templates: React.FC<TemplatesProps> = ({ isDarkMode = false }) => {
+    const [templates, setTemplates] = useState<Template[]>([]);
     const [showModal, setShowModal] = useState(false);
     const [modalMode, setModalMode] = useState<"current" | "new">("current");
-    const [templates, setTemplates] = useState<Template[]>([]);
-    const containerRef = useRef<HTMLDivElement>(null);
     const [isExpanded, setIsExpanded] = useState(false);
     const [isDeleteMode, setIsDeleteMode] = useState(false);
-    const [containerHeight, setContainerHeight] = useState(0);
+    const [containerHeight, setContainerHeight] = useState(100);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const [showModeSelector, setShowModeSelector] = useState(false);
 
     useEffect(() => {
         loadTemplates();
@@ -529,8 +733,7 @@ const Templates: React.FC = () => {
     useEffect(() => {
         const updateHeight = () => {
             if (containerRef.current) {
-                const height = containerRef.current.offsetHeight;
-                setContainerHeight(height);
+                setContainerHeight(containerRef.current.offsetHeight);
             }
         };
 
@@ -566,19 +769,16 @@ const Templates: React.FC = () => {
         const newTemplates = [...templates, template];
         setTemplates(newTemplates);
         chrome.storage.local.set({ templates: newTemplates }, () => {
-            loadTemplates(); // Reload templates after saving
+            loadTemplates();
         });
     };
 
     const handleOpenTemplate = (template: Template) => {
-        // Open all URLs in the template
         template.urls.forEach((url) => {
             chrome.tabs.create({ url, active: false });
         });
         console.log("Opening template:", template.name);
     };
-
-    const [showModeSelector, setShowModeSelector] = useState(false);
 
     const handleAddNewClick = () => {
         setIsExpanded(true);
@@ -598,7 +798,6 @@ const Templates: React.FC = () => {
         setIsExpanded(false);
     };
 
-    // Add delete template function
     const handleDeleteTemplate = async (templateName: string) => {
         const updatedTemplates = templates.filter(
             (t) => t.name !== templateName,
@@ -609,13 +808,11 @@ const Templates: React.FC = () => {
 
     // Calculate responsive dimensions based on container height
     const getResponsiveDimensions = () => {
-        // Base dimensions for optimal layout
-        const baseHeight = 100; // Base container height
+        const baseHeight = 100;
         const baseCardHeight = 50;
         const baseFontSize = 11;
         const baseIconSize = 16;
 
-        // Calculate scale factor based on container height
         const scale = Math.max(0.6, Math.min(1, containerHeight / baseHeight));
 
         return {
@@ -628,55 +825,90 @@ const Templates: React.FC = () => {
     };
 
     const dimensions = getResponsiveDimensions();
-
-    // Calculate how many placeholder slots we need
     const placeholdersNeeded = Math.max(0, 3 - templates.length);
+
+    // Container styles based on mode
+    const containerStyle = isDarkMode
+        ? {
+              background: "rgba(255, 255, 255, 0.05)",
+              borderRadius: "16px",
+              border: "1px solid rgba(255, 255, 255, 0.1)",
+              backdropFilter: "blur(10px)",
+              padding: `${dimensions.padding}px`,
+              gap: `${dimensions.gap}px`,
+              height: "100%",
+              display: "flex",
+              flexDirection: "column" as const,
+              position: "relative" as const,
+              transition: "all 0.3s ease",
+          }
+        : {
+              padding: `${dimensions.padding}px`,
+              gap: `${dimensions.gap}px`,
+          };
+
+    const containerClasses = isDarkMode
+        ? ""
+        : "bg-white rounded-2xl border border-gray-200 h-full flex flex-col relative transition-all duration-300 shadow-sm";
 
     return (
         <div
             ref={containerRef}
-            style={{
-                background: "rgba(255, 255, 255, 0.05)",
-                borderRadius: "16px",
-                border: "1px solid rgba(255, 255, 255, 0.1)",
-                backdropFilter: "blur(10px)",
-                padding: `${dimensions.padding}px ${dimensions.padding}px 0px ${dimensions.padding}px`,
-                // paddingBottom: "0px",
-                height: "100%",
-                display: "flex",
-                flexDirection: "column",
-                gap: `${dimensions.gap}px`,
-                position: "relative",
-                transition: "all 0.3s ease-in-out",
-            }}
+            style={containerStyle}
+            className={containerClasses}
         >
             {/* Header */}
             <div
-                style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    marginBottom: "0px",
-                }}
+                style={
+                    isDarkMode
+                        ? {
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                          }
+                        : {}
+                }
+                className={
+                    !isDarkMode ? "flex items-center justify-between" : ""
+                }
             >
                 <div
-                    style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: `${dimensions.gap}px`,
-                    }}
+                    style={
+                        isDarkMode
+                            ? {
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "8px",
+                              }
+                            : {}
+                    }
+                    className={!isDarkMode ? "flex items-center gap-2" : ""}
                 >
-                    <Layout size={dimensions.iconSize} color="#ffffff" />
+                    <Layout
+                        size={dimensions.iconSize}
+                        color={isDarkMode ? "#ffffff" : "#374151"}
+                    />
                     <div
-                        style={{
-                            color: "#ffffff",
-                            fontSize: `${Math.max(
-                                12,
-                                dimensions.fontSize + 3,
-                            )}px`,
-                            fontWeight: 600,
-                            fontFamily: "system-ui, -apple-system, sans-serif",
-                        }}
+                        style={
+                            isDarkMode
+                                ? {
+                                      color: "#ffffff",
+                                      fontSize: `${Math.max(
+                                          12,
+                                          dimensions.fontSize + 3,
+                                      )}px`,
+                                      fontFamily:
+                                          "system-ui, -apple-system, sans-serif",
+                                      fontWeight: 500,
+                                  }
+                                : {
+                                      fontSize: `${Math.max(
+                                          12,
+                                          dimensions.fontSize + 3,
+                                      )}px`,
+                                  }
+                        }
+                        className={!isDarkMode ? "font-medium text-black" : ""}
                     >
                         Templates
                     </div>
@@ -685,32 +917,55 @@ const Templates: React.FC = () => {
                 {/* Delete mode toggle */}
                 <button
                     onClick={() => setIsDeleteMode(!isDeleteMode)}
-                    style={{
-                        background: "none",
-                        border: "none",
-                        padding: "4px",
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        transition: "all 0.2s ease",
-                    }}
+                    style={
+                        isDarkMode
+                            ? {
+                                  padding: "4px",
+                                  borderRadius: "8px",
+                                  background: "transparent",
+                                  border: "none",
+                                  cursor: "pointer",
+                                  transition: "all 0.2s ease",
+                              }
+                            : {}
+                    }
+                    className={
+                        !isDarkMode
+                            ? "p-1 rounded-lg hover:bg-gray-100 transition-colors"
+                            : ""
+                    }
                 >
                     <Trash2
                         size={Math.max(12, dimensions.iconSize - 2)}
-                        color={isDeleteMode ? "#e74c3c" : "#ffffff"}
+                        color={
+                            isDeleteMode
+                                ? "#ef4444"
+                                : isDarkMode
+                                ? "rgba(255, 255, 255, 0.5)"
+                                : "#9ca3af"
+                        }
                     />
                 </button>
             </div>
 
+            {/* Templates Grid */}
             <div
-                style={{
-                    overflowX: templates.length > 3 ? "auto" : "hidden",
-                    overflowY: "hidden",
-                    margin: `0 -${dimensions.padding}px`,
-                    padding: `0 ${dimensions.padding}px`,
-                }}
-                className="hide-scrollbar"
+                style={
+                    isDarkMode
+                        ? {
+                              overflowX: "auto",
+                              overflowY: "hidden",
+                              margin: `0 -${dimensions.padding}px`,
+                              padding: `0 ${dimensions.padding}px`,
+                          }
+                        : {
+                              margin: `0 -${dimensions.padding}px`,
+                              padding: `0 ${dimensions.padding}px`,
+                          }
+                }
+                className={
+                    !isDarkMode ? "overflow-x-auto overflow-y-hidden" : ""
+                }
             >
                 <div
                     style={{
@@ -726,38 +981,62 @@ const Templates: React.FC = () => {
                     {/* Add New Template Button */}
                     <div
                         onClick={handleAddNewClick}
-                        style={{
-                            height: `${dimensions.cardHeight}px`,
-                            minWidth: "80px",
-                            background: "rgba(255, 255, 255, 0.1)",
-                            borderRadius: "8px",
-                            display: "flex",
-                            flexDirection: "column",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            gap: "2px",
-                            cursor: "pointer",
-                            border: "1px solid rgba(255, 255, 255, 0.2)",
-                            transition: "all 0.2s ease",
-                            padding: "4px",
-                        }}
-                        onMouseEnter={(e) => {
-                            e.currentTarget.style.background =
-                                "rgba(255, 255, 255, 0.15)";
-                        }}
-                        onMouseLeave={(e) => {
-                            e.currentTarget.style.background =
-                                "rgba(255, 255, 255, 0.1)";
-                        }}
+                        style={
+                            isDarkMode
+                                ? {
+                                      background: "rgba(255, 255, 255, 0.1)",
+                                      borderRadius: "8px",
+                                      border: "1px solid rgba(255, 255, 255, 0.2)",
+                                      display: "flex",
+                                      flexDirection: "column",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      gap: "4px",
+                                      cursor: "pointer",
+                                      transition: "all 0.2s ease",
+                                      padding: "8px",
+                                      height: `${dimensions.cardHeight}px`,
+                                      minWidth: "80px",
+                                  }
+                                : {
+                                      height: `${dimensions.cardHeight}px`,
+                                      minWidth: "80px",
+                                  }
+                        }
+                        className={
+                            !isDarkMode
+                                ? "bg-gray-50 rounded-lg border border-gray-200 flex flex-col items-center justify-center gap-1 cursor-pointer hover:bg-gray-100 hover:border-gray-300 transition-all hover:-translate-y-0.5 p-2"
+                                : ""
+                        }
                     >
-                        <Plus size={dimensions.iconSize} color="#ffffff" />
+                        <Plus
+                            size={dimensions.iconSize}
+                            color={
+                                isDarkMode
+                                    ? "rgba(255, 255, 255, 0.7)"
+                                    : "#6b7280"
+                            }
+                        />
                         <div
-                            style={{
-                                color: "#ffffff",
-                                fontSize: `${dimensions.fontSize}px`,
-                                fontFamily:
-                                    "system-ui, -apple-system, sans-serif",
-                            }}
+                            style={
+                                isDarkMode
+                                    ? {
+                                          color: "rgba(255, 255, 255, 0.7)",
+                                          fontSize: `${dimensions.fontSize}px`,
+                                          fontFamily:
+                                              "system-ui, -apple-system, sans-serif",
+                                          textAlign: "center",
+                                          fontWeight: 500,
+                                      }
+                                    : {
+                                          fontSize: `${dimensions.fontSize}px`,
+                                      }
+                            }
+                            className={
+                                !isDarkMode
+                                    ? "text-gray-600 font-medium text-center"
+                                    : ""
+                            }
                         >
                             Add New
                         </div>
@@ -765,38 +1044,42 @@ const Templates: React.FC = () => {
 
                     {/* Template Items */}
                     {templates.map((template, index) => (
-                        <div
-                            key={index}
-                            style={{
-                                position: "relative",
-                            }}
-                        >
+                        <div key={index} style={{ position: "relative" }}>
                             {isDeleteMode && (
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         handleDeleteTemplate(template.name);
                                     }}
-                                    style={{
-                                        position: "absolute",
-                                        top: "5%",
-                                        right: "5%",
-                                        zIndex: 2,
-                                        border: "none",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        cursor: "pointer",
-                                        padding: 0,
-                                        transition: "all 0.2s ease",
-                                    }}
+                                    style={
+                                        isDarkMode
+                                            ? {
+                                                  position: "absolute",
+                                                  top: "4px",
+                                                  right: "4px",
+                                                  zIndex: 10,
+                                                  padding: "4px",
+                                                  borderRadius: "50%",
+                                                  background:
+                                                      "rgba(0, 0, 0, 0.8)",
+                                                  border: "1px solid rgba(255, 255, 255, 0.2)",
+                                                  cursor: "pointer",
+                                                  transition: "all 0.2s ease",
+                                              }
+                                            : {}
+                                    }
+                                    className={
+                                        !isDarkMode
+                                            ? "absolute top-1 right-1 z-10 p-1 rounded-full bg-white border border-gray-200 hover:bg-red-50 hover:border-red-200 transition-colors"
+                                            : ""
+                                    }
                                 >
                                     <X
                                         size={Math.max(
-                                            10,
-                                            dimensions.iconSize - 4,
+                                            8,
+                                            dimensions.iconSize - 6,
                                         )}
-                                        color="#ffffff"
+                                        color="#ef4444"
                                     />
                                 </button>
                             )}
@@ -805,68 +1088,132 @@ const Templates: React.FC = () => {
                                     !isDeleteMode &&
                                     handleOpenTemplate(template)
                                 }
-                                style={{
-                                    height: `${dimensions.cardHeight}px`,
-                                    minWidth: "80px",
-                                    background: template.backgroundColor
-                                        ? `${template.backgroundColor}80`
-                                        : "rgba(255, 255, 255, 0.1)",
-                                    borderRadius: "8px",
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    gap: "2px",
-                                    cursor: isDeleteMode
-                                        ? "default"
-                                        : "pointer",
-                                    border: template.backgroundColor
-                                        ? `1px solid ${template.backgroundColor}33`
-                                        : "1px solid rgba(255, 255, 255, 0.2)",
-                                    transition: "all 0.2s ease",
-                                    padding: "4px",
-                                    backdropFilter: "blur(10px)",
-                                }}
+                                style={
+                                    isDarkMode
+                                        ? {
+                                              borderRadius: "8px",
+                                              border: "1px solid rgba(255, 255, 255, 0.2)",
+                                              display: "flex",
+                                              flexDirection: "column",
+                                              alignItems: "center",
+                                              justifyContent: "center",
+                                              gap: "4px",
+                                              cursor: isDeleteMode
+                                                  ? "default"
+                                                  : "pointer",
+                                              transition: "all 0.2s ease",
+                                              padding: "8px",
+                                              height: `${dimensions.cardHeight}px`,
+                                              minWidth: "80px",
+                                              background:
+                                                  template.backgroundColor
+                                                      ? `${template.backgroundColor}80`
+                                                      : "rgba(255, 255, 255, 0.1)",
+                                          }
+                                        : {
+                                              height: `${dimensions.cardHeight}px`,
+                                              minWidth: "80px",
+                                              backgroundColor:
+                                                  template.backgroundColor
+                                                      ? `${template.backgroundColor}20`
+                                                      : "#f9fafb",
+                                              borderColor:
+                                                  template.backgroundColor
+                                                      ? `${template.backgroundColor}60`
+                                                      : "#e5e7eb",
+                                              cursor: isDeleteMode
+                                                  ? "default"
+                                                  : "pointer",
+                                          }
+                                }
+                                className={
+                                    !isDarkMode
+                                        ? "rounded-lg border flex flex-col items-center justify-center gap-1 cursor-pointer transition-all hover:-translate-y-0.5 p-2"
+                                        : ""
+                                }
                                 onMouseEnter={(e) => {
                                     if (!isDeleteMode) {
-                                        e.currentTarget.style.background =
-                                            template.backgroundColor
-                                                ? `${template.backgroundColor}A6`
-                                                : "rgba(255, 255, 255, 0.15)";
+                                        if (isDarkMode) {
+                                            e.currentTarget.style.background =
+                                                template.backgroundColor
+                                                    ? `${template.backgroundColor}A6`
+                                                    : "rgba(255, 255, 255, 0.15)";
+                                        } else {
+                                            e.currentTarget.style.backgroundColor =
+                                                template.backgroundColor
+                                                    ? `${template.backgroundColor}40`
+                                                    : "#f3f4f6";
+                                            e.currentTarget.style.boxShadow =
+                                                "0 4px 12px rgba(0, 0, 0, 0.1)";
+                                        }
                                     }
                                 }}
                                 onMouseLeave={(e) => {
                                     if (!isDeleteMode) {
-                                        e.currentTarget.style.background =
-                                            template.backgroundColor
-                                                ? `${template.backgroundColor}80`
-                                                : "rgba(255, 255, 255, 0.1)";
+                                        if (isDarkMode) {
+                                            e.currentTarget.style.background =
+                                                template.backgroundColor
+                                                    ? `${template.backgroundColor}80`
+                                                    : "rgba(255, 255, 255, 0.1)";
+                                        } else {
+                                            e.currentTarget.style.backgroundColor =
+                                                template.backgroundColor
+                                                    ? `${template.backgroundColor}20`
+                                                    : "#f9fafb";
+                                            e.currentTarget.style.boxShadow =
+                                                "none";
+                                        }
                                     }
                                 }}
                             >
                                 <div
-                                    style={{
-                                        color: "#ffffff",
-                                        fontSize: `${dimensions.fontSize}px`,
-                                        fontFamily:
-                                            "system-ui, -apple-system, sans-serif",
-                                        textAlign: "center",
-                                        wordBreak: "break-word",
-                                        lineHeight: "1.2",
-                                    }}
+                                    style={
+                                        isDarkMode
+                                            ? {
+                                                  color: "#ffffff",
+                                                  fontSize: `${dimensions.fontSize}px`,
+                                                  fontFamily:
+                                                      "system-ui, -apple-system, sans-serif",
+                                                  textAlign: "center",
+                                                  wordBreak: "break-word",
+                                                  lineHeight: "1.2",
+                                              }
+                                            : {
+                                                  fontSize: `${dimensions.fontSize}px`,
+                                              }
+                                    }
+                                    className={
+                                        !isDarkMode
+                                            ? "font-medium text-black text-center break-words leading-tight"
+                                            : ""
+                                    }
                                 >
                                     {template.name}
                                 </div>
                                 <div
-                                    style={{
-                                        color: "rgba(255, 255, 255, 0.5)",
-                                        fontSize: `${Math.max(
-                                            8,
-                                            dimensions.fontSize - 1,
-                                        )}px`,
-                                        fontFamily:
-                                            "system-ui, -apple-system, sans-serif",
-                                    }}
+                                    style={
+                                        isDarkMode
+                                            ? {
+                                                  color: "rgba(255, 255, 255, 0.5)",
+                                                  fontSize: `${Math.max(
+                                                      8,
+                                                      dimensions.fontSize - 1,
+                                                  )}px`,
+                                                  fontFamily:
+                                                      "system-ui, -apple-system, sans-serif",
+                                              }
+                                            : {
+                                                  fontSize: `${Math.max(
+                                                      8,
+                                                      dimensions.fontSize - 1,
+                                                  )}px`,
+                                              }
+                                    }
+                                    className={
+                                        !isDarkMode
+                                            ? "text-gray-500 text-center"
+                                            : ""
+                                    }
                                 >
                                     {template.urls.length} tabs
                                 </div>
@@ -879,31 +1226,60 @@ const Templates: React.FC = () => {
                         (_, index) => (
                             <div
                                 key={`placeholder-${index}`}
-                                style={{
-                                    height: `${dimensions.cardHeight}px`,
-                                    minWidth: "80px",
-                                    background: "rgba(255, 255, 255, 0.05)",
-                                    borderRadius: "8px",
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    gap: "2px",
-                                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                                    padding: "4px",
-                                }}
+                                style={
+                                    isDarkMode
+                                        ? {
+                                              background:
+                                                  "rgba(255, 255, 255, 0.05)",
+                                              borderRadius: "8px",
+                                              border: "1px solid rgba(255, 255, 255, 0.1)",
+                                              display: "flex",
+                                              flexDirection: "column",
+                                              alignItems: "center",
+                                              justifyContent: "center",
+                                              gap: "4px",
+                                              padding: "8px",
+                                              height: `${dimensions.cardHeight}px`,
+                                              minWidth: "80px",
+                                          }
+                                        : {
+                                              height: `${dimensions.cardHeight}px`,
+                                              minWidth: "80px",
+                                          }
+                                }
+                                className={
+                                    !isDarkMode
+                                        ? "bg-gray-25 rounded-lg border border-gray-100 flex flex-col items-center justify-center gap-1 p-2"
+                                        : ""
+                                }
                             >
                                 <Circle
                                     size={dimensions.iconSize}
-                                    color="rgba(255, 255, 255, 0.3)"
+                                    color={
+                                        isDarkMode
+                                            ? "rgba(255, 255, 255, 0.3)"
+                                            : "#d1d5db"
+                                    }
                                 />
                                 <div
-                                    style={{
-                                        color: "rgba(255, 255, 255, 0.3)",
-                                        fontSize: `${dimensions.fontSize}px`,
-                                        fontFamily:
-                                            "system-ui, -apple-system, sans-serif",
-                                    }}
+                                    style={
+                                        isDarkMode
+                                            ? {
+                                                  color: "rgba(255, 255, 255, 0.3)",
+                                                  fontSize: `${dimensions.fontSize}px`,
+                                                  fontFamily:
+                                                      "system-ui, -apple-system, sans-serif",
+                                                  textAlign: "center",
+                                              }
+                                            : {
+                                                  fontSize: `${dimensions.fontSize}px`,
+                                              }
+                                    }
+                                    className={
+                                        !isDarkMode
+                                            ? "text-gray-400 text-center"
+                                            : ""
+                                    }
                                 >
                                     Empty
                                 </div>
@@ -916,145 +1292,220 @@ const Templates: React.FC = () => {
             {/* Mode Selector */}
             {showModeSelector && (
                 <div
-                    style={{
-                        position: "absolute",
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        background: "rgba(0, 0, 0, 0.9)",
-                        backdropFilter: "blur(4px)",
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        borderRadius: "16px",
-                        padding: "16px",
-                        gap: "16px",
-                    }}
+                    style={
+                        isDarkMode
+                            ? {
+                                  position: "absolute",
+                                  inset: 0,
+                                  background: "rgba(0, 0, 0, 0.9)",
+                                  border: "1px solid rgba(255, 255, 255, 0.2)",
+                                  borderRadius: "16px",
+                                  backdropFilter: "blur(10px)",
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  padding: "24px",
+                                  gap: "24px",
+                              }
+                            : {}
+                    }
+                    className={
+                        !isDarkMode
+                            ? "absolute inset-0 bg-white border border-gray-200 rounded-2xl shadow-2xl flex flex-col items-center justify-center p-6 gap-6"
+                            : ""
+                    }
                 >
                     <div
-                        style={{
-                            display: "flex",
-                            gap: "16px",
-                            width: "100%",
-                            maxWidth: "400px",
-                        }}
+                        style={
+                            isDarkMode
+                                ? {
+                                      display: "flex",
+                                      gap: "16px",
+                                      width: "100%",
+                                      maxWidth: "28rem",
+                                  }
+                                : {}
+                        }
+                        className={
+                            !isDarkMode ? "flex gap-4 w-full max-w-md" : ""
+                        }
                     >
                         {/* Open Tabs Option */}
                         <button
                             onClick={() => handleModeSelect("current")}
-                            style={{
-                                flex: 1,
-                                padding: "16px",
-                                borderRadius: "12px",
-                                border: "1px solid rgba(255, 255, 255, 0.2)",
-                                background: "rgba(66, 133, 244, 0.2)",
-                                color: "#ffffff",
-                                cursor: "pointer",
-                                display: "flex",
-                                flexDirection: "column",
-                                alignItems: "center",
-                                gap: "8px",
-                                transition: "all 0.2s ease",
-                            }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.background =
-                                    "rgba(66, 133, 244, 0.3)";
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.background =
-                                    "rgba(66, 133, 244, 0.2)";
-                            }}
+                            style={
+                                isDarkMode
+                                    ? {
+                                          flex: 1,
+                                          padding: "16px",
+                                          border: "1px solid rgba(255, 255, 255, 0.2)",
+                                          borderRadius: "12px",
+                                          background:
+                                              "rgba(255, 255, 255, 0.05)",
+                                          cursor: "pointer",
+                                          transition: "all 0.2s ease",
+                                          display: "flex",
+                                          flexDirection: "column",
+                                          alignItems: "center",
+                                          gap: "12px",
+                                      }
+                                    : {}
+                            }
+                            className={
+                                !isDarkMode
+                                    ? "flex-1 p-4 border border-gray-200 rounded-xl hover:border-gray-300 hover:bg-gray-50 transition-all flex flex-col items-center gap-3"
+                                    : ""
+                            }
                         >
-                            <Layout size={24} />
-                            <div style={{ fontSize: "14px", fontWeight: 600 }}>
+                            <Layout
+                                size={24}
+                                color={isDarkMode ? "#ffffff" : "#374151"}
+                            />
+                            <div
+                                style={
+                                    isDarkMode
+                                        ? {
+                                              color: "#ffffff",
+                                              fontSize: "14px",
+                                              fontWeight: 500,
+                                          }
+                                        : {}
+                                }
+                                className={
+                                    !isDarkMode
+                                        ? "text-sm font-medium text-black"
+                                        : ""
+                                }
+                            >
                                 From Open Tabs
                             </div>
                             <div
-                                style={{
-                                    fontSize: "12px",
-                                    color: "rgba(255, 255, 255, 0.7)",
-                                    textAlign: "center",
-                                }}
+                                style={
+                                    isDarkMode
+                                        ? {
+                                              color: "rgba(255, 255, 255, 0.5)",
+                                              fontSize: "12px",
+                                              textAlign: "center",
+                                          }
+                                        : {}
+                                }
+                                className={
+                                    !isDarkMode
+                                        ? "text-xs text-center text-gray-500"
+                                        : ""
+                                }
                             >
-                                Save your currently open tabs as a template
+                                Create template from currently open tabs
                             </div>
                         </button>
 
-                        {/* Add Manually Option */}
+                        {/* Manual Entry Option */}
                         <button
                             onClick={() => handleModeSelect("new")}
-                            style={{
-                                flex: 1,
-                                padding: "16px",
-                                borderRadius: "12px",
-                                border: "1px solid rgba(255, 255, 255, 0.2)",
-                                background: "rgba(52, 168, 83, 0.2)",
-                                color: "#ffffff",
-                                cursor: "pointer",
-                                display: "flex",
-                                flexDirection: "column",
-                                alignItems: "center",
-                                gap: "8px",
-                                transition: "all 0.2s ease",
-                            }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.background =
-                                    "rgba(52, 168, 83, 0.3)";
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.background =
-                                    "rgba(52, 168, 83, 0.2)";
-                            }}
+                            style={
+                                isDarkMode
+                                    ? {
+                                          flex: 1,
+                                          padding: "16px",
+                                          border: "1px solid rgba(255, 255, 255, 0.2)",
+                                          borderRadius: "12px",
+                                          background:
+                                              "rgba(255, 255, 255, 0.05)",
+                                          cursor: "pointer",
+                                          transition: "all 0.2s ease",
+                                          display: "flex",
+                                          flexDirection: "column",
+                                          alignItems: "center",
+                                          gap: "12px",
+                                      }
+                                    : {}
+                            }
+                            className={
+                                !isDarkMode
+                                    ? "flex-1 p-4 border border-gray-200 rounded-xl hover:border-gray-300 hover:bg-gray-50 transition-all flex flex-col items-center gap-3"
+                                    : ""
+                            }
                         >
-                            <Plus size={24} />
-                            <div style={{ fontSize: "14px", fontWeight: 600 }}>
-                                Add Manually
+                            <Plus
+                                size={24}
+                                color={isDarkMode ? "#ffffff" : "#374151"}
+                            />
+                            <div
+                                style={
+                                    isDarkMode
+                                        ? {
+                                              color: "#ffffff",
+                                              fontSize: "14px",
+                                              fontWeight: 500,
+                                          }
+                                        : {}
+                                }
+                                className={
+                                    !isDarkMode
+                                        ? "text-sm font-medium text-black"
+                                        : ""
+                                }
+                            >
+                                Manual Entry
                             </div>
                             <div
-                                style={{
-                                    fontSize: "12px",
-                                    color: "rgba(255, 255, 255, 0.7)",
-                                    textAlign: "center",
-                                }}
+                                style={
+                                    isDarkMode
+                                        ? {
+                                              color: "rgba(255, 255, 255, 0.5)",
+                                              fontSize: "12px",
+                                              textAlign: "center",
+                                          }
+                                        : {}
+                                }
+                                className={
+                                    !isDarkMode
+                                        ? "text-xs text-center text-gray-500"
+                                        : ""
+                                }
                             >
-                                Manually enter URLs for your template
+                                Add URLs manually to create template
                             </div>
                         </button>
                     </div>
 
-                    {/* Close button */}
                     <button
-                        onClick={handleModalClose}
-                        style={{
-                            position: "absolute",
-                            top: "16px",
-                            right: "16px",
-                            background: "none",
-                            border: "none",
-                            color: "#ffffff",
-                            cursor: "pointer",
-                            padding: "6px",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
+                        onClick={() => {
+                            setShowModeSelector(false);
+                            setIsExpanded(false);
                         }}
+                        style={
+                            isDarkMode
+                                ? {
+                                      padding: "8px 16px",
+                                      borderRadius: "8px",
+                                      border: "1px solid rgba(255, 255, 255, 0.2)",
+                                      background: "rgba(255, 255, 255, 0.1)",
+                                      color: "#ffffff",
+                                      cursor: "pointer",
+                                      transition: "all 0.2s ease",
+                                  }
+                                : {}
+                        }
+                        className={
+                            !isDarkMode
+                                ? "px-4 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+                                : ""
+                        }
                     >
-                        <X size={16} />
+                        Cancel
                     </button>
                 </div>
             )}
 
-            {/* Modal */}
+            {/* Template Modal */}
             {showModal && (
                 <TemplateModal
-                    mode={modalMode}
                     onClose={handleModalClose}
-                    onSave={(template) => {
-                        handleSaveTemplate(template);
-                        setIsExpanded(false);
-                    }}
+                    onSave={handleSaveTemplate}
+                    mode={modalMode}
+                    isDarkMode={isDarkMode}
                 />
             )}
         </div>
