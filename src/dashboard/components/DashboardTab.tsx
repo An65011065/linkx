@@ -1,21 +1,24 @@
 import React, { useState, useEffect } from "react";
 import StoriesComponent from "./stories";
-// import GhostTab from "./GhostTab";
-// import Shortcuts from "./Shortcuts";
+import GhostTab from "./GhostTab";
+import Shortcuts from "./Shortcuts";
 // import WebsiteBlocker from "./WebsiteBlocker";
 // import NotesOverview from "./NotesOverview";
-// import WeeklyInsights from "./WeeklyInsights";
-// import Timers from "./Timers";
+import WeeklyInsights from "./WeeklyInsights";
+import Timers from "./Timers";
 import Templates from "./Templates";
 // import Templates from "./light-mode/Templates";
-import Timers from "./light-mode/Timers";
-import WeeklyInsights from "./light-mode/WeeklyInsights";
-import GhostTab from "./light-mode/GhostTab";
-import Shortcuts from "./light-mode/Shortcuts";
-import WebsiteBlocker from "./light-mode/WebsiteBlocker";
-import NotesOverview from "./light-mode/NotesOverview";
+// import Timers from "./light-mode/Timers";
+// import WeeklyInsights from "./light-mode/WeeklyInsights";
+// import Shortcuts from "./light-mode/Shortcuts";
+import WebsiteBlocker from "./WebsiteBlocker";
+import NotesOverview from "./NotesOverview";
 
-const DashboardTab: React.FC = () => {
+interface DashboardTabProps {
+    isDarkMode?: boolean;
+}
+
+const DashboardTab: React.FC<DashboardTabProps> = ({ isDarkMode = true }) => {
     const [isLoaded, setIsLoaded] = useState(false);
     const [scale, setScale] = useState(1);
 
@@ -52,12 +55,14 @@ const DashboardTab: React.FC = () => {
                     display: "flex",
                     justifyContent: "center",
                     alignItems: "center",
-                    backgroundColor: "#000000",
+                    backgroundColor: isDarkMode ? "#000000" : "#ffffff",
                 }}
             >
                 <div
                     style={{
-                        color: "rgba(255, 255, 255, 0.7)",
+                        color: isDarkMode
+                            ? "rgba(255, 255, 255, 0.7)"
+                            : "rgba(0, 0, 0, 0.7)",
                         fontSize: "16px",
                         fontFamily: "Arial, sans-serif",
                     }}
@@ -74,7 +79,7 @@ const DashboardTab: React.FC = () => {
                 width: "100%",
                 height: "100%",
                 overflow: "auto",
-                backgroundColor: "#000000",
+                backgroundColor: isDarkMode ? "#000000" : "#ffffff",
             }}
         >
             <div
@@ -84,7 +89,7 @@ const DashboardTab: React.FC = () => {
                     width: `${100 / scale}%`,
                     height: `${100 / scale}%`,
                     fontFamily: "Arial, sans-serif",
-                    backgroundColor: "#000000",
+                    backgroundColor: isDarkMode ? "#000000" : "#ffffff",
                     overflow: "hidden",
                     position: "relative",
                     padding: "20px",
@@ -103,8 +108,9 @@ const DashboardTab: React.FC = () => {
                         height: "600px",
                         zIndex: 10,
                         pointerEvents: "none",
-                        background:
-                            "radial-gradient(circle, rgba(66, 133, 244, 0.4) 0%, rgba(255, 107, 71, 0.2) 50%, transparent 80%)",
+                        background: isDarkMode
+                            ? "radial-gradient(circle, rgba(66, 133, 244, 0.4) 0%, rgba(255, 107, 71, 0.2) 50%, transparent 80%)"
+                            : "radial-gradient(circle, rgba(66, 133, 244, 0.1) 0%, rgba(255, 107, 71, 0.05) 50%, transparent 80%)",
                         filter: "blur(40px)",
                     }}
                 />
@@ -117,8 +123,9 @@ const DashboardTab: React.FC = () => {
                         height: "400px",
                         zIndex: 10,
                         pointerEvents: "none",
-                        background:
-                            "radial-gradient(circle, rgba(255, 107, 71, 0.3) 0%, transparent 70%)",
+                        background: isDarkMode
+                            ? "radial-gradient(circle, rgba(255, 107, 71, 0.3) 0%, transparent 70%)"
+                            : "radial-gradient(circle, rgba(255, 107, 71, 0.08) 0%, transparent 70%)",
                         filter: "blur(30px)",
                     }}
                 />
@@ -188,7 +195,7 @@ const DashboardTab: React.FC = () => {
                         }}
                     >
                         <div style={{ width: "70%", height: "100%" }}>
-                            <StoriesComponent />
+                            <StoriesComponent isDarkMode={isDarkMode} />
                         </div>
                         <div
                             style={{
@@ -200,13 +207,13 @@ const DashboardTab: React.FC = () => {
                             }}
                         >
                             <div style={{ height: "25%" }}>
-                                <Templates isDarkMode={false} />
+                                <Templates isDarkMode={isDarkMode} />
                             </div>
                             <div style={{ height: "25%" }}>
-                                <Timers />
+                                <Timers isDarkMode={isDarkMode} />
                             </div>
                             <div style={{ height: "46%" }}>
-                                <WeeklyInsights />
+                                <WeeklyInsights isDarkMode={isDarkMode} />
                             </div>
 
                             {/* <div style={{ height: "16.67%" }}>
@@ -237,21 +244,21 @@ const DashboardTab: React.FC = () => {
                             }}
                         >
                             <div style={{ height: "60%" }}>
-                                <GhostTab />
+                                <GhostTab isDarkMode={isDarkMode} />
                             </div>
                             <div style={{ height: "40%" }}>
-                                <Shortcuts />
+                                <Shortcuts isDarkMode={isDarkMode} />
                             </div>
                         </div>
 
                         {/* Column 2: Website Blocker (37% width) */}
                         <div style={{ width: "37%", height: "100%" }}>
-                            <WebsiteBlocker />
+                            <WebsiteBlocker isDarkMode={isDarkMode} />
                         </div>
 
                         {/* Column 3: Notes Overview (38% width) */}
                         <div style={{ width: "38%", height: "100%" }}>
-                            <NotesOverview />
+                            <NotesOverview isDarkMode={isDarkMode} />
                         </div>
                     </div>
                 </div>

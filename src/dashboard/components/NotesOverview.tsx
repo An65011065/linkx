@@ -5,7 +5,6 @@ import {
     ChevronRight,
     Calendar,
     Plus,
-    X,
     ArrowLeft,
     Save,
     Copy,
@@ -20,7 +19,13 @@ interface Note {
     createdAt: number;
 }
 
-const NotesOverview: React.FC = () => {
+interface NotesOverviewProps {
+    isDarkMode?: boolean;
+}
+
+const NotesOverview: React.FC<NotesOverviewProps> = ({
+    isDarkMode = false,
+}) => {
     const [notes, setNotes] = useState<Note[]>([]);
     const [searchQuery, setSearchQuery] = useState("");
     const [isSearchExpanded, setIsSearchExpanded] = useState(false);
@@ -47,7 +52,6 @@ const NotesOverview: React.FC = () => {
         try {
             const storage = await chrome.storage.local.get(null);
             const noteEntries: Note[] = [];
-
             for (const [key, value] of Object.entries(storage)) {
                 if (key.startsWith("note_") && !key.includes("timestamp")) {
                     const domain = key.replace("note_", "");
@@ -62,7 +66,6 @@ const NotesOverview: React.FC = () => {
                     });
                 }
             }
-
             noteEntries.sort((a, b) => b.createdAt - a.createdAt);
             setNotes(noteEntries);
         } catch (err) {
@@ -74,12 +77,10 @@ const NotesOverview: React.FC = () => {
         try {
             setSaving(true);
             const timestamp = Date.now();
-
             await chrome.storage.local.set({
                 [`note_${domain}`]: content,
                 [`note_timestamp_${domain}`]: timestamp,
             });
-
             await loadNotes();
             if (selectedNote) {
                 setSelectedNote((prev) => ({
@@ -97,17 +98,14 @@ const NotesOverview: React.FC = () => {
 
     const handleAddNote = async () => {
         if (!newNoteDomain.trim() || !newNoteContent.trim()) return;
-
         try {
             const timestamp = Date.now();
             const domain = newNoteDomain.trim();
-
             await chrome.storage.local.set({
                 [`note_${domain}`]: newNoteContent,
                 [`note_timestamp_${domain}`]: timestamp,
                 [`note_created_${domain}`]: timestamp,
             });
-
             setNewNoteDomain("");
             setNewNoteContent("");
             setIsAddingNote(false);
@@ -137,7 +135,6 @@ const NotesOverview: React.FC = () => {
         const newText =
             content + (content ? "\n\n" : "") + `--- ${timestamp} ---\n`;
         setContent(newText);
-
         setTimeout(() => {
             if (textareaRef.current) {
                 textareaRef.current.focus();
@@ -156,7 +153,13 @@ const NotesOverview: React.FC = () => {
     };
 
     const getPreviewText = (content: string) => {
-        return content.length > 100 ? content.slice(0, 100) + "..." : content;
+        if (!content || typeof content !== "string") {
+            return "";
+        }
+        const firstLine = content.split("\n")[0];
+        return firstLine.length > 80
+            ? firstLine.slice(0, 80) + "..."
+            : firstLine;
     };
 
     const openLink = (domain: string) => {
@@ -183,492 +186,306 @@ const NotesOverview: React.FC = () => {
         note: Note,
         onClose: () => void,
         isNew = false,
-    ) => (
-        <div
-            style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                background: "rgba(0, 0, 0, 0.8)",
-                backdropFilter: "blur(4px)",
-                display: "flex",
-                flexDirection: "column",
-                borderRadius: "16px",
-                padding: "20px",
-            }}
-        >
-            {/* Header */}
-            <div
-                style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    marginBottom: "12px",
-                }}
-            >
-                <div
-                    style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "12px",
-                    }}
-                >
-                    <button
-                        onClick={onClose}
-                        style={{
-                            background: "none",
-                            border: "none",
-                            padding: "8px",
-                            cursor: "pointer",
-                            color: "#ffffff",
-                            display: "flex",
-                            alignItems: "center",
-                        }}
-                    >
-                        <ArrowLeft size={20} />
-                    </button>
-                    <div>
-                        <div
-                            style={{
-                                fontSize: "16px",
-                                color: "#ffffff",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "8px",
-                                fontFamily:
-                                    "system-ui, -apple-system, sans-serif",
-                            }}
+    ) => {
+        const editorClasses = `absolute inset-0 ${
+            isDarkMode
+                ? "bg-black bg-opacity-95 border-white border-opacity-20"
+                : "bg-white border-gray-200"
+        } rounded-2xl flex flex-col p-5 border shadow-xl backdrop-blur-sm`;
+
+        return (
+            <div className={editorClasses}>
+                {/* Header */}
+                <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={onClose}
+                            className={`p-2 rounded-lg transition-colors ${
+                                isDarkMode
+                                    ? "bg-white bg-opacity-10 hover:bg-opacity-20 text-white"
+                                    : "hover:bg-gray-100 text-gray-600 hover:text-gray-800"
+                            }`}
                         >
-                            <Tag size={16} />
-                            {note.domain}
-                        </div>
-                        <div
-                            style={{
-                                fontSize: "12px",
-                                color: "rgba(255, 255, 255, 0.6)",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "8px",
-                                fontFamily:
-                                    "system-ui, -apple-system, sans-serif",
-                            }}
-                        >
-                            {isSaving ? (
-                                <>
-                                    <Save size={12} />
-                                    Saving...
-                                </>
-                            ) : (
-                                formatLastModified(note.lastModified)
-                            )}
+                            <ArrowLeft size={20} />
+                        </button>
+                        <div>
+                            <div
+                                className={`text-lg font-medium flex items-center gap-2 ${
+                                    isDarkMode ? "text-white" : "text-black"
+                                }`}
+                            >
+                                <Tag size={16} />
+                                {isNew ? (
+                                    <input
+                                        type="text"
+                                        value={newNoteDomain}
+                                        onChange={(e) =>
+                                            setNewNoteDomain(e.target.value)
+                                        }
+                                        placeholder="Enter domain..."
+                                        className={`bg-transparent border-none outline-none text-lg placeholder-gray-400 ${
+                                            isDarkMode
+                                                ? "text-white"
+                                                : "text-black"
+                                        }`}
+                                    />
+                                ) : (
+                                    note.domain
+                                )}
+                            </div>
+                            <div
+                                className={`text-sm flex items-center gap-2 ${
+                                    isDarkMode
+                                        ? "text-white text-opacity-60"
+                                        : "text-gray-500"
+                                }`}
+                            >
+                                {isSaving ? (
+                                    <>
+                                        <Save size={12} />
+                                        Saving...
+                                    </>
+                                ) : (
+                                    formatLastModified(note.lastModified)
+                                )}
+                            </div>
                         </div>
                     </div>
-                </div>
-
-                {/* Action buttons */}
-                <div style={{ display: "flex", gap: "8px" }}>
-                    <button
-                        onClick={() =>
-                            addTimestamp(
-                                isNew ? newNoteContent : selectedNote!.content,
-                                isNew
-                                    ? setNewNoteContent
-                                    : (content) =>
-                                          handleSaveNote(note.domain, content),
-                            )
-                        }
-                        style={{
-                            background: "none",
-                            border: "none",
-                            padding: "6px",
-                            cursor: "pointer",
-                            color: "#ffffff",
-                        }}
-                        title="Add timestamp"
-                    >
-                        <Calendar size={16} />
-                    </button>
-
-                    <button
-                        onClick={() =>
-                            handleCopyNote(
-                                isNew ? newNoteContent : note.content,
-                            )
-                        }
-                        style={{
-                            background: "none",
-                            border: "none",
-                            padding: "6px",
-                            cursor: "pointer",
-                            color: "#ffffff",
-                        }}
-                        title="Copy note"
-                    >
-                        <Copy size={16} />
-                    </button>
-
-                    {!isNew && (
+                    {/* Action buttons */}
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() =>
+                                addTimestamp(
+                                    isNew ? newNoteContent : note.content,
+                                    isNew
+                                        ? setNewNoteContent
+                                        : (content) =>
+                                              handleSaveNote(
+                                                  note.domain,
+                                                  content,
+                                              ),
+                                )
+                            }
+                            className={`p-2 rounded-lg transition-colors ${
+                                isDarkMode
+                                    ? "bg-white bg-opacity-10 hover:bg-opacity-20 text-white"
+                                    : "hover:bg-gray-100 text-gray-600 hover:text-gray-800"
+                            }`}
+                            title="Add timestamp"
+                        >
+                            <Calendar size={16} />
+                        </button>
+                        <button
+                            onClick={() =>
+                                handleCopyNote(
+                                    isNew ? newNoteContent : note.content,
+                                )
+                            }
+                            className={`p-2 rounded-lg transition-colors ${
+                                isDarkMode
+                                    ? "bg-white bg-opacity-10 hover:bg-opacity-20 text-white"
+                                    : "hover:bg-gray-100 text-gray-600 hover:text-gray-800"
+                            }`}
+                            title="Copy note"
+                        >
+                            <Copy size={16} />
+                        </button>
                         <button
                             onClick={() => openLink(note.domain)}
-                            style={{
-                                background: "none",
-                                border: "none",
-                                padding: "6px",
-                                cursor: "pointer",
-                                color: "#ffffff",
-                            }}
-                            title="Open link"
+                            className={`p-2 rounded-lg transition-colors ${
+                                isDarkMode
+                                    ? "bg-white bg-opacity-10 hover:bg-opacity-20 text-white"
+                                    : "hover:bg-gray-100 text-gray-600 hover:text-gray-800"
+                            }`}
+                            title="Open website"
                         >
                             <ExternalLink size={16} />
                         </button>
-                    )}
+                    </div>
                 </div>
+                {/* Copy Message */}
+                {copyMessage && (
+                    <div
+                        className={`p-2 rounded-lg text-sm mb-3 text-center border ${
+                            isDarkMode
+                                ? "bg-green-500 bg-opacity-20 text-green-400 border-green-400 border-opacity-30"
+                                : "bg-green-50 text-green-700 border-green-200"
+                        }`}
+                    >
+                        {copyMessage}
+                    </div>
+                )}
+                {/* Text Editor */}
+                <textarea
+                    ref={textareaRef}
+                    value={isNew ? newNoteContent : note.content}
+                    onChange={(e) => {
+                        if (isNew) {
+                            setNewNoteContent(e.target.value);
+                        } else {
+                            handleSaveNote(note.domain, e.target.value);
+                        }
+                    }}
+                    placeholder={`Write your note about ${note.domain}...`}
+                    className={`flex-1 p-4 rounded-lg resize-none text-sm leading-relaxed outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                        isDarkMode
+                            ? "bg-white bg-opacity-5 border-white border-opacity-10 text-white placeholder-gray-400"
+                            : "bg-gray-50 border-gray-200 text-black placeholder-gray-400"
+                    } border`}
+                />
+                {isNew && (
+                    <div className="flex justify-end gap-2 mt-4">
+                        <button
+                            onClick={onClose}
+                            className={`px-4 py-2 rounded-lg text-sm transition-colors ${
+                                isDarkMode
+                                    ? "border-white border-opacity-20 bg-transparent text-white hover:bg-white hover:bg-opacity-10"
+                                    : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                            } border`}
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={handleAddNote}
+                            className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors text-sm"
+                        >
+                            Add Note
+                        </button>
+                    </div>
+                )}
             </div>
+        );
+    };
 
-            {/* Copy message */}
-            {copyMessage && (
-                <div
-                    style={{
-                        fontSize: "12px",
-                        color: "#4285f4",
-                        textAlign: "center",
-                        marginBottom: "8px",
-                        fontFamily: "system-ui, -apple-system, sans-serif",
-                    }}
-                >
-                    {copyMessage}
-                </div>
-            )}
-
-            {/* Note content */}
-            <textarea
-                ref={textareaRef}
-                value={isNew ? newNoteContent : note.content}
-                onChange={(e) => {
-                    if (isNew) {
-                        setNewNoteContent(e.target.value);
-                    } else {
-                        handleSaveNote(note.domain, e.target.value);
-                    }
-                }}
-                placeholder={`Write your note about ${note.domain}...`}
-                style={{
-                    flex: 1,
-                    padding: "16px",
-                    background: "rgba(255, 255, 255, 0.1)",
-                    border: "1px solid rgba(255, 255, 255, 0.2)",
-                    borderRadius: "12px",
-                    resize: "none",
-                    fontSize: "14px",
-                    fontFamily: "system-ui, -apple-system, sans-serif",
-                    lineHeight: "1.6",
-                    color: "#ffffff",
-                    outline: "none",
-                }}
-            />
-
-            {isNew && (
-                <div
-                    style={{
-                        display: "flex",
-                        justifyContent: "flex-end",
-                        gap: "8px",
-                        marginTop: "16px",
-                    }}
-                >
-                    <button
-                        onClick={onClose}
-                        style={{
-                            padding: "8px 16px",
-                            borderRadius: "8px",
-                            border: "1px solid rgba(255, 255, 255, 0.2)",
-                            background: "transparent",
-                            color: "#ffffff",
-                            cursor: "pointer",
-                            fontSize: "14px",
-                            fontFamily: "system-ui, -apple-system, sans-serif",
-                        }}
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        onClick={handleAddNote}
-                        style={{
-                            padding: "8px 16px",
-                            borderRadius: "8px",
-                            border: "none",
-                            background: "#4285f4",
-                            color: "#ffffff",
-                            cursor: "pointer",
-                            fontSize: "14px",
-                            fontFamily: "system-ui, -apple-system, sans-serif",
-                        }}
-                    >
-                        Add Note
-                    </button>
-                </div>
-            )}
-        </div>
-    );
+    const containerClasses = `${
+        isDarkMode
+            ? "bg-white bg-opacity-5 border-white border-opacity-10"
+            : "bg-white border-gray-200"
+    } rounded-2xl border shadow-lg p-3 h-full flex flex-col gap-3 relative backdrop-blur-sm`;
 
     return (
-        <div
-            style={{
-                background: "rgba(255, 255, 255, 0.05)",
-                borderRadius: "16px",
-                border: "1px solid rgba(255, 255, 255, 0.1)",
-                backdropFilter: "blur(10px)",
-                padding: "12px",
-                height: "100%",
-                display: "flex",
-                flexDirection: "column",
-                gap: "12px",
-                position: "relative",
-            }}
-        >
+        <div className={containerClasses}>
             {/* Header */}
-            <div
-                style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                }}
-            >
-                <div
-                    style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "12px",
-                    }}
-                >
-                    <FileText size={20} color="#ffffff" />
+            <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                    <FileText
+                        size={16}
+                        className={isDarkMode ? "text-white" : "text-gray-700"}
+                    />
                     <h3
-                        style={{
-                            margin: 0,
-                            fontSize: "16px",
-                            fontWeight: 600,
-                            color: "#ffffff",
-                            fontFamily: "system-ui, -apple-system, sans-serif",
-                        }}
+                        className={`text-sm font-medium ${
+                            isDarkMode ? "text-white" : "text-gray-900"
+                        }`}
                     >
                         Site Notes
                     </h3>
                 </div>
-
-                <div
-                    style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                    }}
-                >
+                <div className="flex items-center gap-2">
                     {/* Search Icon/Bar */}
                     <div
-                        style={{
-                            position: "relative",
-                            display: "flex",
-                            alignItems: "center",
-                            transition: "all 0.3s ease",
-                            width: isSearchExpanded ? "200px" : "32px",
-                        }}
+                        className="relative flex items-center transition-all duration-300"
+                        style={{ width: isSearchExpanded ? "200px" : "32px" }}
                     >
-                        {isSearchExpanded ? (
-                            <div
-                                style={{
-                                    position: "relative",
-                                    width: "100%",
-                                }}
-                            >
-                                <input
-                                    ref={searchInputRef}
-                                    type="text"
-                                    value={searchQuery}
-                                    onChange={(e) =>
-                                        setSearchQuery(e.target.value)
-                                    }
-                                    placeholder="Search notes..."
-                                    style={{
-                                        width: "100%",
-                                        padding: "6px 30px 6px 12px",
-                                        borderRadius: "8px",
-                                        border: "1px solid rgba(255, 255, 255, 0.2)",
-                                        background: "rgba(255, 255, 255, 0.1)",
-                                        color: "#ffffff",
-                                        fontSize: "14px",
-                                        outline: "none",
-                                        fontFamily:
-                                            "system-ui, -apple-system, sans-serif",
-                                        boxSizing: "border-box",
-                                    }}
-                                    onBlur={() => {
-                                        if (!searchQuery) {
-                                            setIsSearchExpanded(false);
-                                        }
-                                    }}
-                                />
-                                <button
-                                    onClick={handleSearchIconClick}
-                                    style={{
-                                        position: "absolute",
-                                        right: "6px",
-                                        top: "50%",
-                                        transform: "translateY(-50%)",
-                                        background: "none",
-                                        border: "none",
-                                        padding: "2px",
-                                        cursor: "pointer",
-                                        color: "rgba(255, 255, 255, 0.5)",
-                                        display: "flex",
-                                        alignItems: "center",
-                                    }}
-                                >
-                                    <X size={16} />
-                                </button>
-                            </div>
-                        ) : (
-                            <button
-                                onClick={handleSearchIconClick}
-                                style={{
-                                    padding: "6px",
-                                    borderRadius: "8px",
-                                    // border: "1px solid rgba(255, 255, 255, 0.2)",
-                                    // background: "rgba(255, 255, 255, 0.1)",
-                                    color: "#ffffff",
-                                    cursor: "pointer",
-                                    transition: "all 0.2s ease",
-                                    display: "flex",
-                                    alignItems: "center",
-                                }}
-                                onMouseEnter={(e) => {
-                                    e.currentTarget.style.background =
-                                        "rgba(255, 255, 255, 0.15)";
-                                }}
-                                onMouseLeave={(e) => {
-                                    e.currentTarget.style.background =
-                                        "transparent";
-                                }}
-                            >
-                                <Search size={16} />
-                            </button>
+                        {isSearchExpanded && (
+                            <input
+                                ref={searchInputRef}
+                                type="text"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder="Search notes..."
+                                className={`w-full py-1 px-3 pr-8 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                                    isDarkMode
+                                        ? "bg-white bg-opacity-10 border-white border-opacity-20 text-white placeholder-gray-400"
+                                        : "bg-gray-100 border-gray-200 text-black placeholder-gray-400"
+                                } border`}
+                            />
                         )}
+                        <button
+                            onClick={handleSearchIconClick}
+                            className={`${
+                                isSearchExpanded ? "absolute right-2" : ""
+                            } p-1 rounded transition-colors ${
+                                isDarkMode
+                                    ? "text-white hover:bg-white hover:bg-opacity-10"
+                                    : "text-gray-600 hover:text-gray-800 hover:bg-gray-100"
+                            }`}
+                        >
+                            <Search size={16} />
+                        </button>
                     </div>
                     {/* New Note Button */}
                     <button
                         onClick={() => setIsAddingNote(true)}
-                        style={{
-                            padding: "6px",
-                            borderRadius: "8px",
-                            // border: "1px solid rgba(255, 255, 255, 0.2)",
-                            // background: "rgba(255, 255, 255, 0.1)",
-                            color: "#ffffff",
-                            cursor: "pointer",
-                            transition: "all 0.2s ease",
-                            display: "flex",
-                            alignItems: "center",
-                        }}
-                        onMouseEnter={(e) => {
-                            e.currentTarget.style.background =
-                                "rgba(255, 255, 255, 0.15)";
-                        }}
-                        onMouseLeave={(e) => {
-                            e.currentTarget.style.background = "transparent";
-                        }}
+                        className={`p-1 rounded transition-colors ${
+                            isDarkMode
+                                ? "text-white hover:bg-white hover:bg-opacity-15"
+                                : "text-gray-600 hover:text-gray-800 hover:bg-gray-100"
+                        }`}
                         title="New Note"
                     >
                         <Plus size={18} />
                     </button>
                 </div>
             </div>
-
             {/* Notes List */}
-            <div
-                style={{
-                    flex: 1,
-                    overflowY: "auto",
-                    display: "flex",
-                    flexDirection: "column",
-                    marginRight: "-8px",
-                    paddingRight: "8px",
-                }}
-            >
+            <div className="flex-1 overflow-y-auto">
                 {filteredNotes.map((note, index) => (
                     <div key={note.domain}>
                         <div
                             onClick={() => setSelectedNote(note)}
-                            style={{
-                                padding: "8px 0",
-                                cursor: "pointer",
-                            }}
+                            className={`py-1.5 cursor-pointer rounded-lg px-2 -mx-2 transition-colors ${
+                                isDarkMode
+                                    ? "hover:bg-white hover:bg-opacity-10"
+                                    : "hover:bg-gray-50"
+                            }`}
                         >
-                            <div
-                                style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "space-between",
-                                    marginBottom: "4px",
-                                }}
-                            >
+                            <div className="flex items-center justify-between mb-0.5">
                                 <div
-                                    style={{
-                                        fontSize: "14px",
-                                        fontWeight: 600,
-                                        color: "#ffffff",
-                                        fontFamily:
-                                            "system-ui, -apple-system, sans-serif",
-                                    }}
+                                    className={`text-sm font-semibold truncate flex-1 mr-2 ${
+                                        isDarkMode ? "text-white" : "text-black"
+                                    }`}
                                 >
                                     {note.domain}
                                 </div>
                                 <div
-                                    style={{
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: "6px",
-                                        fontSize: "12px",
-                                        color: "rgba(255, 255, 255, 0.5)",
-                                        fontFamily:
-                                            "system-ui, -apple-system, sans-serif",
-                                    }}
+                                    className={`flex items-center gap-1 text-xs flex-shrink-0 ${
+                                        isDarkMode
+                                            ? "text-white text-opacity-50"
+                                            : "text-gray-500"
+                                    }`}
                                 >
                                     {formatLastModified(note.lastModified)}
-                                    <ChevronRight size={14} />
+                                    <ChevronRight size={12} />
                                 </div>
                             </div>
                             <div
-                                style={{
-                                    fontSize: "13px",
-                                    color: "rgba(255, 255, 255, 0.7)",
-                                    fontFamily:
-                                        "system-ui, -apple-system, sans-serif",
-                                    lineHeight: "1.4",
-                                }}
+                                className={`text-xs truncate ${
+                                    isDarkMode
+                                        ? "text-white text-opacity-70"
+                                        : "text-gray-600"
+                                }`}
                             >
                                 {getPreviewText(note.content)}
                             </div>
                         </div>
                         {index < filteredNotes.length - 1 && (
                             <div
-                                style={{
-                                    height: "1px",
-                                    background: "rgba(255, 255, 255, 0.1)",
-                                    margin: "8px 0",
-                                }}
+                                className={`h-px my-1 ${
+                                    isDarkMode
+                                        ? "bg-white bg-opacity-10"
+                                        : "bg-gray-200"
+                                }`}
                             />
                         )}
                     </div>
                 ))}
-
                 {filteredNotes.length === 0 && !isAddingNote && (
                     <div
-                        style={{
-                            padding: "16px 0",
-                            textAlign: "center",
-                            color: "rgba(255, 255, 255, 0.5)",
-                            fontSize: "14px",
-                            fontFamily: "system-ui, -apple-system, sans-serif",
-                        }}
+                        className={`py-4 text-center text-sm ${
+                            isDarkMode
+                                ? "text-white text-opacity-50"
+                                : "text-gray-500"
+                        }`}
                     >
                         {searchQuery
                             ? "No matching notes found"
@@ -676,11 +493,9 @@ const NotesOverview: React.FC = () => {
                     </div>
                 )}
             </div>
-
             {/* Note Editor Modal */}
             {selectedNote &&
                 renderNoteEditor(selectedNote, () => setSelectedNote(null))}
-
             {/* New Note Modal */}
             {isAddingNote &&
                 renderNoteEditor(

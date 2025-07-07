@@ -11,15 +11,19 @@ interface TimerItem {
 interface TimerModalProps {
     onClose: () => void;
     onSave: (domain: string, minutes: number) => void;
+    isDarkMode?: boolean;
 }
 
-const TimerModal: React.FC<TimerModalProps> = ({ onClose, onSave }) => {
+const TimerModal: React.FC<TimerModalProps> = ({
+    onClose,
+    onSave,
+    isDarkMode = false,
+}) => {
     const [domain, setDomain] = useState("");
     const [minutes, setMinutes] = useState("");
 
     const handleSave = () => {
         if (!domain.trim() || !minutes.trim()) return;
-
         const minutesNum = parseInt(minutes);
         if (isNaN(minutesNum) || minutesNum <= 0) return;
 
@@ -39,103 +43,113 @@ const TimerModal: React.FC<TimerModalProps> = ({ onClose, onSave }) => {
 
     return (
         <div
-            style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                background: "rgba(0, 0, 0, 0.9)",
-                backdropFilter: "blur(4px)",
-                display: "flex",
-                flexDirection: "column",
-                borderRadius: "16px",
-                padding: "16px",
-            }}
+            className={`absolute inset-0 flex flex-col p-6 ${
+                isDarkMode
+                    ? "bg-black/80 border border-white/20 backdrop-blur-sm"
+                    : "bg-white border border-gray-200 shadow-2xl"
+            } rounded-2xl`}
         >
+            {/* Header */}
             <div
-                style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    marginBottom: "12px",
-                }}
+                className={`flex items-center gap-3 mb-6 pb-4 border-b ${
+                    isDarkMode ? "border-white/10" : "border-gray-100"
+                }`}
             >
-                <input
-                    type="text"
-                    placeholder="Website (e.g. youtube.com)"
-                    value={domain}
-                    onChange={(e) => setDomain(e.target.value)}
-                    style={{
-                        flex: 1,
-                        padding: "8px 12px",
-                        borderRadius: "8px",
-                        border: "1px solid rgba(255, 255, 255, 0.2)",
-                        background: "rgba(255, 255, 255, 0.1)",
-                        color: "#ffffff",
-                        fontSize: "14px",
-                        outline: "none",
-                    }}
-                />
-                <input
-                    type="number"
-                    placeholder="Minutes"
-                    value={minutes}
-                    onChange={(e) => setMinutes(e.target.value)}
-                    style={{
-                        width: "100px",
-                        padding: "8px 12px",
-                        borderRadius: "8px",
-                        border: "1px solid rgba(255, 255, 255, 0.2)",
-                        background: "rgba(255, 255, 255, 0.1)",
-                        color: "#ffffff",
-                        fontSize: "14px",
-                        outline: "none",
-                    }}
-                />
-                <button
-                    onClick={handleSave}
-                    disabled={!domain.trim() || !minutes.trim()}
-                    style={{
-                        background: "none",
-                        border: "none",
-                        color: "#ffffff",
-                        cursor: "pointer",
-                        display: "flex",
-                        opacity: !domain.trim() || !minutes.trim() ? 0.5 : 1,
-                        padding: "6px",
-                    }}
+                {/* Search Bar Container */}
+                <div
+                    className={`
+                        flex-1 p-3 rounded-lg border relative flex items-center gap-2
+                        ${
+                            isDarkMode
+                                ? "bg-white/5 border-white/20 backdrop-blur-sm"
+                                : "bg-gray-50 border-gray-200"
+                        }
+                    `}
                 >
-                    <ArrowRight size={16} />
-                </button>
+                    <input
+                        type="text"
+                        placeholder="Link"
+                        value={domain}
+                        onChange={(e) => setDomain(e.target.value)}
+                        className={`
+                            w-3/5 p-0 border-none text-sm outline-none bg-transparent
+                            ${
+                                isDarkMode
+                                    ? "text-white placeholder-white/50"
+                                    : "text-gray-900 placeholder-gray-500"
+                            }
+                        `}
+                    />
+                    <div className="absolute right-10 flex gap-1 items-center">
+                        <input
+                            type="number"
+                            placeholder="mins"
+                            value={minutes}
+                            onChange={(e) => setMinutes(e.target.value)}
+                            className={`
+                                w-16 p-0 border-none border-l pl-2 text-sm outline-none 
+                                bg-transparent appearance-none
+                                [&::-webkit-outer-spin-button]:appearance-none
+                                [&::-webkit-inner-spin-button]:appearance-none
+                                [-moz-appearance:textfield]
+                                ${
+                                    isDarkMode
+                                        ? "border-white/20 text-white placeholder-white/50"
+                                        : "border-gray-200 text-gray-900 placeholder-gray-500"
+                                }
+                            `}
+                        />
+                    </div>
+                    <button
+                        onClick={handleSave}
+                        disabled={!domain.trim() || !minutes.trim()}
+                        className={`
+                            absolute right-2 top-1/2 transform -translate-y-1/2
+                            w-8 h-8 rounded-lg border-none cursor-pointer
+                            transition-all duration-300 flex items-center justify-center
+                            disabled:opacity-50 disabled:cursor-not-allowed
+                            ${
+                                isDarkMode
+                                    ? "text-white hover:bg-blue-500"
+                                    : "text-gray-600 hover:text-blue-600 hover:bg-blue-50"
+                            }
+                        `}
+                    >
+                        <ArrowRight size={16} />
+                    </button>
+                </div>
+
+                {/* Close Button */}
                 <button
                     onClick={onClose}
-                    style={{
-                        background: "none",
-                        border: "none",
-                        color: "#ffffff",
-                        cursor: "pointer",
-                        padding: "6px",
-                        display: "flex",
-                        alignItems: "center",
-                        height: "32px",
-                        width: "32px",
-                    }}
+                    className="text-white hover:opacity-70 transition-opacity"
                 >
-                    <X size={16} />
+                    <X size={20} />
                 </button>
             </div>
+
+            {/* Help Text - only for light mode */}
+            {!isDarkMode && (
+                <div className="text-sm text-gray-600 leading-relaxed">
+                    <p className="mb-2">
+                        Set a timer for a specific website or domain.
+                    </p>
+                </div>
+            )}
         </div>
     );
 };
 
-const Timers: React.FC = () => {
+interface TimersProps {
+    isDarkMode?: boolean;
+}
+
+const Timers: React.FC<TimersProps> = ({ isDarkMode = false }) => {
     const [timers, setTimers] = useState<TimerItem[]>([]);
     const [showModal, setShowModal] = useState(false);
     const [isDeleteMode, setIsDeleteMode] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
     const [isExpanded, setIsExpanded] = useState(false);
-    const [containerHeight, setContainerHeight] = useState(0);
 
     useEffect(() => {
         // Load all timers from localStorage
@@ -148,7 +162,6 @@ const Timers: React.FC = () => {
                     const timerData = JSON.parse(
                         localStorage.getItem(key) || "{}",
                     );
-
                     if (timerData.endTime > Date.now()) {
                         activeTimers.push({
                             id: domain,
@@ -177,26 +190,13 @@ const Timers: React.FC = () => {
                 loadTimers();
             }
         };
+
         window.addEventListener("storage", handleStorageChange);
 
         return () => {
             clearInterval(interval);
             window.removeEventListener("storage", handleStorageChange);
         };
-    }, []);
-
-    // Track container height for responsive scaling
-    useEffect(() => {
-        const updateHeight = () => {
-            if (containerRef.current) {
-                const height = containerRef.current.offsetHeight;
-                setContainerHeight(height);
-            }
-        };
-
-        updateHeight();
-        window.addEventListener("resize", updateHeight);
-        return () => window.removeEventListener("resize", updateHeight);
     }, []);
 
     // Handle expansion animation
@@ -221,10 +221,10 @@ const Timers: React.FC = () => {
             minutes,
         };
 
-        // Save to localStorage (same as Reminders.tsx)
+        // Save to localStorage
         localStorage.setItem(`timer_${domain}`, JSON.stringify(timerData));
 
-        // Show notification when timer completes (same logic as Reminders.tsx)
+        // Show notification when timer completes
         setTimeout(() => {
             // Check if timer still exists (wasn't cancelled)
             const currentTimer = localStorage.getItem(`timer_${domain}`);
@@ -284,75 +284,33 @@ const Timers: React.FC = () => {
         setIsExpanded(false);
     };
 
-    // Calculate responsive dimensions based on container height
-    const getResponsiveDimensions = () => {
-        // Base dimensions for optimal layout
-        const baseHeight = 100; // Base container height
-        const baseCardHeight = 50;
-        const baseFontSize = 11;
-        const baseIconSize = 16;
-
-        // Calculate scale factor based on container height
-        const scale = Math.max(0.6, Math.min(1, containerHeight / baseHeight));
-
-        return {
-            cardHeight: Math.max(35, baseCardHeight * scale),
-            fontSize: Math.max(9, baseFontSize * scale),
-            iconSize: Math.max(12, baseIconSize * scale),
-            gap: Math.max(4, 8 * scale),
-            padding: Math.max(8, 12 * scale),
-        };
-    };
-
-    const dimensions = getResponsiveDimensions();
-
-    // Calculate how many placeholder slots we need
     const placeholdersNeeded = Math.max(0, 3 - timers.length);
 
     return (
         <div
             ref={containerRef}
-            style={{
-                background: "rgba(255, 255, 255, 0.05)",
-                borderRadius: "16px",
-                border: "1px solid rgba(255, 255, 255, 0.1)",
-                backdropFilter: "blur(10px)",
-                padding: `${dimensions.padding}px ${dimensions.padding}px 0px ${dimensions.padding}px`,
-                height: "100%",
-                display: "flex",
-                flexDirection: "column",
-                gap: `${dimensions.gap}px`,
-                position: "relative",
-                transition: "all 0.3s ease-in-out",
-            }}
+            className={`
+                h-full flex flex-col relative transition-all duration-300 p-3 gap-2
+                ${
+                    isDarkMode
+                        ? "bg-white/5 border border-white/10 backdrop-blur-sm"
+                        : "bg-white border border-gray-200 shadow-sm"
+                }
+                rounded-2xl
+            `}
         >
             {/* Header */}
-            <div
-                style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    marginBottom: "0px",
-                }}
-            >
-                <div
-                    style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: `${dimensions.gap}px`,
-                    }}
-                >
-                    <Timer size={dimensions.iconSize} color="#ffffff" />
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <Timer
+                        size={16}
+                        className={isDarkMode ? "text-white" : "text-gray-700"}
+                    />
                     <div
-                        style={{
-                            color: "#ffffff",
-                            fontSize: `${Math.max(
-                                12,
-                                dimensions.fontSize + 3,
-                            )}px`,
-                            fontWeight: 600,
-                            fontFamily: "system-ui, -apple-system, sans-serif",
-                        }}
+                        className={`
+                            text-sm font-medium
+                            ${isDarkMode ? "text-white" : "text-gray-900"}
+                        `}
                     >
                         Timers
                     </div>
@@ -361,213 +319,221 @@ const Timers: React.FC = () => {
                 {/* Delete mode toggle */}
                 <button
                     onClick={() => setIsDeleteMode(!isDeleteMode)}
-                    style={{
-                        background: "none",
-                        border: "none",
-                        padding: "4px",
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        transition: "all 0.2s ease",
-                    }}
+                    className={`
+                        p-1 rounded-lg transition-colors
+                        ${
+                            isDarkMode
+                                ? "hover:bg-white/10"
+                                : "hover:bg-gray-100"
+                        }
+                    `}
                 >
                     <Trash2
-                        size={Math.max(12, dimensions.iconSize - 2)}
-                        color={isDeleteMode ? "#e74c3c" : "#ffffff"}
+                        size={14}
+                        className={
+                            isDeleteMode
+                                ? "text-red-500"
+                                : isDarkMode
+                                ? "text-white/50"
+                                : "text-gray-400"
+                        }
                     />
                 </button>
             </div>
 
-            <div
-                style={{
-                    overflowX: timers.length > 3 ? "auto" : "hidden",
-                    overflowY: "hidden",
-                    margin: `0 -${dimensions.padding}px`,
-                    padding: `0 ${dimensions.padding}px`,
-                }}
-                className="hide-scrollbar"
-            >
+            {/* Timers Grid */}
+            <div className="overflow-x-auto overflow-y-hidden -mx-3 px-3">
                 <div
+                    className="grid gap-1"
                     style={{
-                        display: "grid",
                         gridTemplateColumns: `repeat(${Math.max(
                             4,
                             timers.length + 1,
                         )}, 1fr)`,
-                        gap: `${dimensions.gap}px`,
                         width: timers.length > 3 ? "fit-content" : "100%",
                     }}
                 >
                     {/* Add New Timer Button */}
                     <div
                         onClick={handleAddNewClick}
-                        style={{
-                            height: `${dimensions.cardHeight}px`,
-                            minWidth: "80px",
-                            background: "rgba(255, 255, 255, 0.1)",
-                            borderRadius: "8px",
-                            display: "flex",
-                            flexDirection: "column",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            gap: "2px",
-                            cursor: "pointer",
-                            border: "1px solid rgba(255, 255, 255, 0.2)",
-                            transition: "all 0.2s ease",
-                            padding: "4px",
-                        }}
-                        onMouseEnter={(e) => {
-                            e.currentTarget.style.background =
-                                "rgba(255, 255, 255, 0.15)";
-                        }}
-                        onMouseLeave={(e) => {
-                            e.currentTarget.style.background =
-                                "rgba(255, 255, 255, 0.1)";
-                        }}
+                        className={`
+                            h-12 min-w-20 p-2 rounded-lg border cursor-pointer
+                            flex flex-col items-center justify-center gap-1
+                            transition-all
+                            ${
+                                isDarkMode
+                                    ? "bg-white/10 border-white/20 hover:bg-white/20"
+                                    : "bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-gray-300"
+                            }
+                        `}
                     >
-                        <Plus size={dimensions.iconSize} color="#ffffff" />
+                        <Plus
+                            size={16}
+                            className={
+                                isDarkMode ? "text-white/70" : "text-gray-600"
+                            }
+                        />
                         <div
-                            style={{
-                                color: "#ffffff",
-                                fontSize: `${dimensions.fontSize}px`,
-                                fontFamily:
-                                    "system-ui, -apple-system, sans-serif",
-                            }}
+                            className={`
+                                text-xs font-medium text-center
+                                ${
+                                    isDarkMode
+                                        ? "text-white/70"
+                                        : "text-gray-600"
+                                }
+                            `}
                         >
                             Add Timer
                         </div>
                     </div>
 
                     {/* Timer Items */}
-                    {timers.map((timer) => (
-                        <div
-                            key={timer.id}
-                            style={{
-                                position: "relative",
-                            }}
-                        >
-                            {isDeleteMode && (
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleDeleteTimer(timer.id);
-                                    }}
-                                    style={{
-                                        position: "absolute",
-                                        top: "5%",
-                                        right: "5%",
-                                        zIndex: 2,
-                                        border: "none",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        cursor: "pointer",
-                                        padding: 0,
-                                        transition: "all 0.2s ease",
-                                    }}
-                                >
-                                    <X
-                                        size={Math.max(
-                                            10,
-                                            dimensions.iconSize - 4,
-                                        )}
-                                        color="#ffffff"
-                                    />
-                                </button>
-                            )}
-                            <div
-                                style={{
-                                    height: `${dimensions.cardHeight}px`,
-                                    minWidth: "80px",
-                                    background: "rgba(255, 255, 255, 0.1)",
-                                    borderRadius: "8px",
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    gap: "2px",
-                                    cursor: isDeleteMode
-                                        ? "default"
-                                        : "pointer",
-                                    border: "1px solid rgba(255, 255, 255, 0.2)",
-                                    transition: "all 0.2s ease",
-                                    padding: "4px",
-                                    backdropFilter: "blur(10px)",
-                                }}
-                                onMouseEnter={(e) => {
-                                    if (!isDeleteMode) {
-                                        e.currentTarget.style.background =
-                                            "rgba(255, 255, 255, 0.15)";
-                                    }
-                                }}
-                                onMouseLeave={(e) => {
-                                    if (!isDeleteMode) {
-                                        e.currentTarget.style.background =
-                                            "rgba(255, 255, 255, 0.1)";
-                                    }
-                                }}
-                            >
+                    {timers.map((timer) => {
+                        const isExpired = timer.endTime <= Date.now();
+                        return (
+                            <div key={timer.id} className="relative">
+                                {isDeleteMode && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleDeleteTimer(timer.id);
+                                        }}
+                                        className={`
+                                            absolute top-1 right-1 z-10 p-1 rounded-full border
+                                            transition-colors
+                                            ${
+                                                isDarkMode
+                                                    ? "bg-black/80 border-white/20 hover:bg-black/90"
+                                                    : "bg-white border-gray-200 hover:bg-red-50 hover:border-red-200"
+                                            }
+                                        `}
+                                    >
+                                        <X size={8} className="text-white" />
+                                    </button>
+                                )}
                                 <div
-                                    style={{
-                                        color: "#ffffff",
-                                        fontSize: `${dimensions.fontSize}px`,
-                                        fontFamily:
-                                            "system-ui, -apple-system, sans-serif",
-                                        textAlign: "center",
-                                        wordBreak: "break-word",
-                                        lineHeight: "1.2",
+                                    className={`
+                                        h-12 min-w-20 p-2 rounded-lg border
+                                        flex flex-col items-center justify-center gap-1
+                                        transition-all
+                                        ${
+                                            !isDeleteMode
+                                                ? "cursor-pointer"
+                                                : "cursor-default"
+                                        }
+                                        ${
+                                            isDarkMode
+                                                ? "border-white/20"
+                                                : isExpired
+                                                ? "bg-green-50 border-green-200"
+                                                : "bg-orange-50 border-orange-200"
+                                        }
+                                    `}
+                                    style={
+                                        isDarkMode
+                                            ? {
+                                                  background: isExpired
+                                                      ? "rgba(34, 197, 94, 0.2)"
+                                                      : "rgba(249, 115, 22, 0.2)",
+                                              }
+                                            : {}
+                                    }
+                                    onMouseEnter={(e) => {
+                                        if (!isDeleteMode) {
+                                            if (isDarkMode) {
+                                                e.currentTarget.style.background =
+                                                    isExpired
+                                                        ? "rgba(34, 197, 94, 0.3)"
+                                                        : "rgba(249, 115, 22, 0.3)";
+                                            } else if (!isExpired) {
+                                                e.currentTarget.style.backgroundColor =
+                                                    "#fed7aa40";
+                                                e.currentTarget.style.boxShadow =
+                                                    "0 4px 12px rgba(0, 0, 0, 0.1)";
+                                            }
+                                        }
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        if (!isDeleteMode) {
+                                            if (isDarkMode) {
+                                                e.currentTarget.style.background =
+                                                    isExpired
+                                                        ? "rgba(34, 197, 94, 0.2)"
+                                                        : "rgba(249, 115, 22, 0.2)";
+                                            } else if (!isExpired) {
+                                                e.currentTarget.style.backgroundColor =
+                                                    "#fff7ed";
+                                                e.currentTarget.style.boxShadow =
+                                                    "none";
+                                            }
+                                        }
                                     }}
                                 >
-                                    {timer.name}
-                                </div>
-                                <div
-                                    style={{
-                                        color: "rgba(255, 255, 255, 0.5)",
-                                        fontSize: `${Math.max(
-                                            8,
-                                            dimensions.fontSize - 1,
-                                        )}px`,
-                                        fontFamily:
-                                            "system-ui, -apple-system, sans-serif",
-                                    }}
-                                >
-                                    {formatTimeRemaining(timer.endTime)}
+                                    <div
+                                        className={`
+                                            text-xs font-medium text-center break-words leading-tight
+                                            ${
+                                                isDarkMode
+                                                    ? "text-white"
+                                                    : isExpired
+                                                    ? "text-green-700"
+                                                    : "text-orange-700"
+                                            }
+                                        `}
+                                    >
+                                        {timer.name}
+                                    </div>
+                                    <div
+                                        className={`
+                                            text-xs text-center font-medium
+                                            ${
+                                                isDarkMode
+                                                    ? "text-white/50"
+                                                    : isExpired
+                                                    ? "text-green-600"
+                                                    : "text-orange-600"
+                                            }
+                                        `}
+                                    >
+                                        {formatTimeRemaining(timer.endTime)}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
 
                     {/* Placeholder Timers */}
                     {Array.from({ length: placeholdersNeeded }).map(
                         (_, index) => (
                             <div
                                 key={`placeholder-${index}`}
-                                style={{
-                                    height: `${dimensions.cardHeight}px`,
-                                    minWidth: "80px",
-                                    background: "rgba(255, 255, 255, 0.05)",
-                                    borderRadius: "8px",
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    gap: "2px",
-                                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                                    padding: "4px",
-                                }}
+                                className={`
+                                h-12 min-w-20 p-2 rounded-lg border
+                                flex flex-col items-center justify-center gap-1
+                                ${
+                                    isDarkMode
+                                        ? "bg-white/5 border-white/10"
+                                        : "bg-gray-25 border-gray-100"
+                                }
+                            `}
                             >
                                 <Circle
-                                    size={dimensions.iconSize}
-                                    color="rgba(255, 255, 255, 0.3)"
+                                    size={16}
+                                    className={
+                                        isDarkMode
+                                            ? "text-white/30"
+                                            : "text-gray-300"
+                                    }
                                 />
                                 <div
-                                    style={{
-                                        color: "rgba(255, 255, 255, 0.3)",
-                                        fontSize: `${dimensions.fontSize}px`,
-                                        fontFamily:
-                                            "system-ui, -apple-system, sans-serif",
-                                    }}
+                                    className={`
+                                    text-xs text-center
+                                    ${
+                                        isDarkMode
+                                            ? "text-white/30"
+                                            : "text-gray-400"
+                                    }
+                                `}
                                 >
                                     Add Timer
                                 </div>
@@ -582,6 +548,7 @@ const Timers: React.FC = () => {
                 <TimerModal
                     onClose={handleModalClose}
                     onSave={handleSaveTimer}
+                    isDarkMode={isDarkMode}
                 />
             )}
         </div>

@@ -19,6 +19,7 @@ const MainTab: React.FC = () => {
     const [showDownloadMenu, setShowDownloadMenu] = useState(false);
     const [isInputFocused, setIsInputFocused] = useState(false);
     const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+    const [isDarkMode, setIsDarkMode] = useState(true);
 
     const tabs: Tab[] = [
         { id: "insights", label: "Insights" },
@@ -133,7 +134,7 @@ const MainTab: React.FC = () => {
             case "insights":
                 return <Insights onInputFocusChange={handleInputFocusChange} />;
             case "dashboard":
-                return <DashboardTab />;
+                return <DashboardTab isDarkMode={isDarkMode} />;
             case "network":
                 return (
                     <div
@@ -276,6 +277,12 @@ const MainTab: React.FC = () => {
                     width: 16px;
                     height: 16px;
                     fill: currentColor;
+                }
+                .dark-mode-toggle {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    margin-right: 12px;
                 }
             `}</style>
             <div className="main-tab-container">
@@ -451,8 +458,48 @@ const MainTab: React.FC = () => {
                                 </div>
                             ))}
                         </div>
-                        {/* Download Button */}
-                        <div style={{ position: "relative" }}>
+                        {/* Download Button Container */}
+                        <div
+                            style={{
+                                position: "relative",
+                                display: "flex",
+                                alignItems: "center",
+                            }}
+                        >
+                            {/* Dark Mode Toggle Button */}
+                            {activeTab === "dashboard" && (
+                                <button
+                                    onClick={() => setIsDarkMode(!isDarkMode)}
+                                    className="download-button dark-mode-toggle"
+                                    style={{
+                                        background: isDarkMode
+                                            ? "#2d3436"
+                                            : "#f8f9fa",
+                                        border: `2px solid ${
+                                            isDarkMode ? "#636e72" : "#ddd"
+                                        }`,
+                                        color: isDarkMode
+                                            ? "#ffffff"
+                                            : "#2d3436",
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.background =
+                                            isDarkMode ? "#636e72" : "#f1f3f5";
+                                        e.currentTarget.style.borderColor =
+                                            isDarkMode ? "#ffffff" : "#c5c9cc";
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.background =
+                                            isDarkMode ? "#2d3436" : "#f8f9fa";
+                                        e.currentTarget.style.borderColor =
+                                            isDarkMode ? "#636e72" : "#ddd";
+                                    }}
+                                >
+                                    {isDarkMode ? "🌙" : "☀️"}
+                                    {isDarkMode ? "Dark" : "Light"}
+                                </button>
+                            )}
+
                             <button
                                 className="download-button"
                                 onClick={() =>

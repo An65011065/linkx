@@ -1,7 +1,13 @@
 import React from "react";
 import { Combine } from "lucide-react";
 
-const ConsolidateTabs: React.FC = () => {
+interface ConsolidateTabsProps {
+    isDarkMode?: boolean;
+}
+
+const ConsolidateTabs: React.FC<ConsolidateTabsProps> = ({
+    isDarkMode = false,
+}) => {
     const handleConsolidateTabs = async () => {
         try {
             // Get all tabs in the current window
@@ -114,28 +120,16 @@ const ConsolidateTabs: React.FC = () => {
     return (
         <button
             onClick={handleConsolidateTabs}
-            style={{
-                background: "rgba(46, 204, 113, 0.2)",
-                border: "1px solid rgba(46, 204, 113, 0.3)",
-                borderRadius: "8px",
-                padding: "8px 12px",
-                color: "rgba(255, 255, 255, 0.9)",
-                cursor: "pointer",
-                transition: "all 0.2s ease",
-                fontSize: "13px",
-                fontWeight: "500",
-                fontFamily: "system-ui, -apple-system, sans-serif",
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                width: "100%",
-            }}
-            onMouseEnter={(e) => {
-                e.currentTarget.style.background = "rgba(46, 204, 113, 0.3)";
-            }}
-            onMouseLeave={(e) => {
-                e.currentTarget.style.background = "rgba(46, 204, 113, 0.2)";
-            }}
+            className={`
+                w-full px-3 py-2 rounded-lg text-xs font-medium
+                flex items-center justify-center gap-2
+                transition-all duration-200
+                ${
+                    isDarkMode
+                        ? "bg-green-500/20 border border-green-500/30 text-green-200 hover:bg-green-500/30 hover:border-green-500/50 hover:-translate-y-0.5"
+                        : "bg-green-50 border border-green-200 text-green-700 hover:bg-green-100 hover:border-green-300"
+                }
+            `}
             title="Consolidate all tabs into one list"
         >
             <Combine size={16} />

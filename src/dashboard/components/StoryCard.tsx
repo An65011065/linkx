@@ -1,41 +1,11 @@
 import React from "react";
 import DataService from "../../data/dataService";
+import type { BrowsingSession, TabSession } from "../../data/dataService";
+import type { UrlVisit } from "../../data/background";
 import Activity from "./Activity";
 
-interface SessionStats {
-    totalUrls: number;
-    uniqueUrls: number;
-    uniqueDomains: number;
-    totalTime: number;
-    workTime: number;
-    socialTime: number;
-    otherTime: number;
-    domainStats?: {
-        [domain: string]: {
-            category: "work" | "social" | "other";
-            time: number;
-        };
-    };
-}
-
-interface Visit {
-    domain: string;
-    url: string;
-    startTime: number;
-    endTime?: number;
-    activeTime: number;
-    category?: "work" | "social" | "other";
-}
-
-interface TabSession {
-    urlVisits: Visit[];
-}
-
 interface StoryCardProps {
-    currentSession: {
-        stats: SessionStats;
-        tabSessions: TabSession[];
-    } | null;
+    currentSession: BrowsingSession | null;
     cardType:
         | "overview"
         | "domains"
@@ -47,6 +17,7 @@ interface StoryCardProps {
     onToggleAutoPlay?: () => void;
     currentIndex?: number;
     totalCards?: number;
+    isDarkMode?: boolean;
 }
 
 interface DomainStats {
@@ -68,6 +39,7 @@ export const StoryCard: React.FC<StoryCardProps> = ({
     onToggleAutoPlay,
     currentIndex = 0,
     totalCards = 6,
+    isDarkMode = false,
 }) => {
     if (!currentSession) return null;
 
@@ -75,7 +47,6 @@ export const StoryCard: React.FC<StoryCardProps> = ({
     const productiveTime = stats.workTime + stats.otherTime;
     const leisureTime = stats.socialTime;
     const totalTime = stats.totalTime;
-
     const dataService = DataService.getInstance();
 
     const formatTimeOfDay = (timestamp: number): string => {
@@ -91,7 +62,6 @@ export const StoryCard: React.FC<StoryCardProps> = ({
         const minutes = Math.floor(
             (milliseconds % (1000 * 60 * 60)) / (1000 * 60),
         );
-
         if (hours > 0) {
             return `${hours}h ${minutes}m`;
         } else {
@@ -107,7 +77,6 @@ export const StoryCard: React.FC<StoryCardProps> = ({
                     (domainTimes[visit.domain] || 0) + visit.activeTime;
             });
         });
-
         return Object.entries(domainTimes)
             .sort(([, a], [, b]) => b - a)
             .slice(0, 12)
@@ -138,7 +107,6 @@ export const StoryCard: React.FC<StoryCardProps> = ({
         }
 
         const MAX_GAP_BETWEEN_SESSIONS = 10 * 60 * 1000;
-
         let longestStreak: FocusStreak = {
             time: 0,
             startTime: 0,
@@ -195,7 +163,6 @@ export const StoryCard: React.FC<StoryCardProps> = ({
                     urls: [visit.url],
                 };
             }
-
             lastVisitEnd = visitEnd;
         });
 
@@ -220,8 +187,8 @@ export const StoryCard: React.FC<StoryCardProps> = ({
         // Get all visits and sort them by time
         const allVisits: TimeRange[] = currentSession.tabSessions
             .flatMap((tab: TabSession) => tab.urlVisits)
-            .filter((visit: Visit) => visit.activeTime > 0)
-            .map((visit: Visit) => ({
+            .filter((visit: UrlVisit) => visit.activeTime > 0)
+            .map((visit: UrlVisit) => ({
                 start: visit.startTime,
                 end: visit.endTime || visit.startTime + visit.activeTime,
             }))
@@ -322,9 +289,15 @@ export const StoryCard: React.FC<StoryCardProps> = ({
             today.getDate(),
         );
 
-        // Find last activity time (could be today or yesterday)
-        const lastVisit = allVisits[allVisits.length - 1];
-        const lastActivityTime = lastVisit.startTime + lastVisit.activeTime;
+        // Find the visit with the latest END time (not latest start time)
+        let lastActivityTime = 0;
+        allVisits.forEach((visit) => {
+            const visitEndTime =
+                visit.endTime || visit.startTime + visit.activeTime;
+            if (visitEndTime > lastActivityTime) {
+                lastActivityTime = visitEndTime;
+            }
+        });
 
         // Find first activity time of today
         const todayVisits = allVisits.filter(
@@ -337,7 +310,6 @@ export const StoryCard: React.FC<StoryCardProps> = ({
 
         // Calculate estimated sleep duration
         const lastActivityDate = new Date(lastActivityTime);
-
         // If last activity was today, estimate sleep based on typical bedtime
         let estimatedSleepHours = 0;
         if (lastActivityDate.getDate() === today.getDate()) {
@@ -374,7 +346,6 @@ export const StoryCard: React.FC<StoryCardProps> = ({
         const baseScore =
             dataService.calculateDigitalWellnessScore(currentSession);
         const sleepData = analyzeSleepPatterns();
-
         let sleepBonus = 0;
         let sleepPenalty = 0;
 
@@ -405,67 +376,130 @@ export const StoryCard: React.FC<StoryCardProps> = ({
     };
 
     const renderContent = () => {
-        //   const score = calculateScore();
-
         switch (cardType) {
             case "overview":
                 return (
                     <div className="h-full grid grid-cols-2 gap-6 p-12 relative">
                         <div className="flex flex-col justify-between">
                             <div>
-                                <div className="text-3xl text-white mb-2">
-                                    <strong className="font-extrabold text-blue-500">
+                                <div
+                                    className={`${
+                                        isDarkMode
+                                            ? "text-6xl font-light mb-3 tracking-tight text-white"
+                                            : "text-6xl font-extralight mb-3 tracking-tight text-black"
+                                    }`}
+                                >
+                                    <strong
+                                        className={`${
+                                            isDarkMode
+                                                ? "font-normal text-blue-400"
+                                                : ""
+                                        }`}
+                                    >
                                         {formatTime(totalTime)}
                                     </strong>
                                 </div>
-                                <div className="text-xl text-white mb-2">
+                                <div
+                                    className={`${
+                                        isDarkMode
+                                            ? "text-lg font-normal text-gray-300"
+                                            : "text-lg font-light text-gray-600"
+                                    }`}
+                                >
                                     across{" "}
-                                    <strong className="text-3xl text-blue-500">
+                                    <span
+                                        className={`${
+                                            isDarkMode
+                                                ? "font-medium text-white"
+                                                : "font-medium text-black"
+                                        }`}
+                                    >
                                         {stats.uniqueUrls}
-                                    </strong>{" "}
+                                    </span>{" "}
                                     websites today.
                                 </div>
-                                <div className="text-xl text-white"></div>
                             </div>
-                            <div className="flex gap-8">
-                                <div className="flex flex-col gap-2">
-                                    <span className="text-3xl font-extrabold text-blue-500">
+                            <div
+                                className={`flex ${
+                                    isDarkMode ? "gap-12" : "gap-12"
+                                } items-baseline`}
+                            >
+                                <div>
+                                    <div
+                                        className={`${
+                                            isDarkMode
+                                                ? "text-3xl font-normal mb-1 text-blue-400"
+                                                : "text-3xl font-light mb-1 text-black"
+                                        }`}
+                                    >
                                         {formatTime(productiveTime)}
-                                    </span>
-                                    <span className="text-xs text-gray-300 uppercase tracking-wider">
+                                    </div>
+                                    <div
+                                        className={`${
+                                            isDarkMode
+                                                ? "text-xs font-medium uppercase tracking-widest text-gray-400"
+                                                : "text-xs font-medium uppercase tracking-widest text-gray-400"
+                                        }`}
+                                    >
                                         PRODUCTIVE
-                                    </span>
+                                    </div>
                                 </div>
-                                <div className="flex flex-col gap-2">
-                                    <span className="text-3xl font-extrabold text-orange-500">
+                                <div>
+                                    <div
+                                        className={`${
+                                            isDarkMode
+                                                ? "text-3xl font-normal mb-1 text-orange-400"
+                                                : "text-3xl font-light mb-1 text-black"
+                                        }`}
+                                    >
                                         {formatTime(leisureTime)}
-                                    </span>
-                                    <span className="text-xs text-gray-300 uppercase tracking-wider">
+                                    </div>
+                                    <div
+                                        className={`${
+                                            isDarkMode
+                                                ? "text-xs font-medium uppercase tracking-widest text-gray-400"
+                                                : "text-xs font-medium uppercase tracking-widest text-gray-400"
+                                        }`}
+                                    >
                                         LEISURE
-                                    </span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                         <div className="flex justify-end items-start">
-                            <div className="grid grid-cols-[repeat(4,min-content)] gap-1 justify-center w-fit">
+                            <div className="grid grid-cols-4 gap-1 justify-center w-fit">
                                 {getTopDomains()
                                     .slice(0, 12)
                                     .map((item, index) => (
                                         <div
                                             key={index}
-                                            className="flex flex-col items-center w-12 p-0.5 rounded-lg hover:bg-white/10 transition-all hover:-translate-y-0.5"
+                                            className={`${
+                                                isDarkMode
+                                                    ? "flex flex-col items-center w-12 p-2 rounded-lg hover:bg-white/10 transition-all hover:-translate-y-0.5"
+                                                    : "bg-white rounded-lg p-2 flex flex-col items-center gap-1 transition-all duration-200 hover:shadow-md cursor-pointer w-12"
+                                            }`}
                                         >
                                             <img
                                                 src={`https://www.google.com/s2/favicons?domain=${item.domain}&sz=32`}
                                                 alt={item.domain}
-                                                className="w-6 h-6 rounded-md shadow-md"
+                                                className={`${
+                                                    isDarkMode
+                                                        ? "w-5 h-5 rounded opacity-80"
+                                                        : "w-5 h-5 rounded opacity-80"
+                                                }`}
                                                 onError={(e) => {
                                                     (
                                                         e.target as HTMLImageElement
                                                     ).style.display = "none";
                                                 }}
                                             />
-                                            <div className="text-xs text-white/80 font-normal text-center">
+                                            <div
+                                                className={`${
+                                                    isDarkMode
+                                                        ? "text-xs font-normal text-gray-300 text-center mt-1"
+                                                        : "text-xs font-medium text-gray-700 text-center"
+                                                }`}
+                                            >
                                                 {formatTime(item.time)}
                                             </div>
                                         </div>
@@ -475,7 +509,11 @@ export const StoryCard: React.FC<StoryCardProps> = ({
                         {onToggleAutoPlay && (
                             <button
                                 onClick={onToggleAutoPlay}
-                                className="absolute bottom-6 right-6 h-10 pl-3 pr-4 rounded-full flex items-center gap-3 bg-black/80 hover:bg-black/90 transition-colors shadow-lg backdrop-blur-sm border border-white/10"
+                                className={`absolute bottom-6 right-6 h-10 pl-3 pr-4 rounded-full flex items-center gap-3 transition-colors shadow-lg ${
+                                    isDarkMode
+                                        ? "bg-black/80 hover:bg-black/90 backdrop-blur-sm border border-white/10"
+                                        : "bg-white border border-gray-200 hover:bg-gray-50"
+                                }`}
                             >
                                 <div className="w-6 h-6 flex items-center justify-center">
                                     {isAutoPlaying ? (
@@ -485,7 +523,9 @@ export const StoryCard: React.FC<StoryCardProps> = ({
                                             height="16"
                                             viewBox="0 0 24 24"
                                             fill="none"
-                                            stroke="white"
+                                            stroke={
+                                                isDarkMode ? "white" : "#6c757d"
+                                            }
                                             strokeWidth="2.5"
                                             strokeLinecap="round"
                                             strokeLinejoin="round"
@@ -510,7 +550,9 @@ export const StoryCard: React.FC<StoryCardProps> = ({
                                             height="16"
                                             viewBox="0 0 24 24"
                                             fill="none"
-                                            stroke="white"
+                                            stroke={
+                                                isDarkMode ? "white" : "#6c757d"
+                                            }
                                             strokeWidth="2.5"
                                             strokeLinecap="round"
                                             strokeLinejoin="round"
@@ -519,7 +561,13 @@ export const StoryCard: React.FC<StoryCardProps> = ({
                                         </svg>
                                     )}
                                 </div>
-                                <div className="text-sm font-medium text-white">
+                                <div
+                                    className={`text-sm font-medium ${
+                                        isDarkMode
+                                            ? "text-white"
+                                            : "text-gray-600"
+                                    }`}
+                                >
                                     {currentIndex + 1}/{totalCards}
                                 </div>
                             </button>
@@ -533,27 +581,47 @@ export const StoryCard: React.FC<StoryCardProps> = ({
                         <div className="flex flex-col justify-between">
                             <div></div>
                             <div className="flex flex-col gap-2">
-                                <div className="text-xs text-gray-300 uppercase tracking-wider">
-                                    Longest Break
+                                <div
+                                    className={`${
+                                        isDarkMode
+                                            ? "text-xs font-medium uppercase tracking-widest text-gray-400"
+                                            : "text-xs font-medium uppercase tracking-widest text-gray-400"
+                                    }`}
+                                >
+                                    LONGEST BREAK
                                 </div>
-                                <div className="text-3xl font-extrabold text-green-500">
+                                <div
+                                    className={`${
+                                        isDarkMode
+                                            ? "text-5xl font-light mb-2 tracking-tight text-green-400"
+                                            : "text-5xl font-extralight mb-2 tracking-tight text-green-500"
+                                    }`}
+                                >
                                     {formatTime(getLongestBreak().duration)}
                                 </div>
-                                <div className="text-sm text-gray-300">
+                                <div
+                                    className={`${
+                                        isDarkMode
+                                            ? "text-sm font-normal text-gray-300"
+                                            : "text-sm font-light text-gray-600"
+                                    }`}
+                                >
                                     {formatTimeOfDay(getLongestBreak().start)} -{" "}
                                     {formatTimeOfDay(getLongestBreak().end)}
                                 </div>
                             </div>
                         </div>
-
                         <div className="flex justify-end items-start">
-                            <Activity />
+                            <Activity isDarkMode={isDarkMode} />
                         </div>
-
                         {onToggleAutoPlay && (
                             <button
                                 onClick={onToggleAutoPlay}
-                                className="absolute bottom-6 right-6 h-10 pl-3 pr-4 rounded-full flex items-center gap-3 bg-black/80 hover:bg-black/90 transition-colors shadow-lg backdrop-blur-sm border border-white/10"
+                                className={`absolute bottom-6 right-6 h-10 pl-3 pr-4 rounded-full flex items-center gap-3 transition-colors shadow-lg ${
+                                    isDarkMode
+                                        ? "bg-black/80 hover:bg-black/90 backdrop-blur-sm border border-white/10"
+                                        : "bg-white border border-gray-200 hover:bg-gray-50"
+                                }`}
                             >
                                 <div className="w-6 h-6 flex items-center justify-center">
                                     {isAutoPlaying ? (
@@ -563,7 +631,9 @@ export const StoryCard: React.FC<StoryCardProps> = ({
                                             height="16"
                                             viewBox="0 0 24 24"
                                             fill="none"
-                                            stroke="white"
+                                            stroke={
+                                                isDarkMode ? "white" : "#6c757d"
+                                            }
                                             strokeWidth="2.5"
                                             strokeLinecap="round"
                                             strokeLinejoin="round"
@@ -588,7 +658,9 @@ export const StoryCard: React.FC<StoryCardProps> = ({
                                             height="16"
                                             viewBox="0 0 24 24"
                                             fill="none"
-                                            stroke="white"
+                                            stroke={
+                                                isDarkMode ? "white" : "#6c757d"
+                                            }
                                             strokeWidth="2.5"
                                             strokeLinecap="round"
                                             strokeLinejoin="round"
@@ -597,7 +669,13 @@ export const StoryCard: React.FC<StoryCardProps> = ({
                                         </svg>
                                     )}
                                 </div>
-                                <div className="text-sm font-medium text-white">
+                                <div
+                                    className={`text-sm font-medium ${
+                                        isDarkMode
+                                            ? "text-white"
+                                            : "text-gray-600"
+                                    }`}
+                                >
                                     {currentIndex + 1}/{totalCards}
                                 </div>
                             </button>
@@ -613,34 +691,75 @@ export const StoryCard: React.FC<StoryCardProps> = ({
                         <div className="flex flex-col justify-between">
                             <div></div>
                             <div className="flex flex-col gap-2">
-                                <div className="text-xs text-gray-300 uppercase tracking-wider">
-                                    Longest Focus Streak
+                                <div
+                                    className={`${
+                                        isDarkMode
+                                            ? "text-xs font-medium uppercase tracking-widest text-gray-400"
+                                            : "text-xs font-medium uppercase tracking-widest text-gray-400"
+                                    }`}
+                                >
+                                    LONGEST FOCUS STREAK
                                 </div>
-                                <div className="text-3xl font-extrabold text-green-500">
+                                <div
+                                    className={`${
+                                        isDarkMode
+                                            ? "text-5xl font-light mb-2 tracking-tight text-green-400"
+                                            : "text-5xl font-extralight mb-2 tracking-tight text-green-500"
+                                    }`}
+                                >
                                     {formatTime(longestStreak.time)}
                                 </div>
-                                <div className="text-sm text-gray-400">
-                                    {formatTimeOfDay(longestStreak.startTime)}
+                                <div
+                                    className={`${
+                                        isDarkMode
+                                            ? "text-sm font-normal text-gray-300"
+                                            : "text-sm font-light text-gray-600"
+                                    }`}
+                                >
+                                    {longestStreak.time > 0
+                                        ? `${formatTimeOfDay(
+                                              longestStreak.startTime,
+                                          )} - ${formatTimeOfDay(
+                                              longestStreak.startTime +
+                                                  longestStreak.time,
+                                          )}`
+                                        : "No focus sessions today"}
                                 </div>
                             </div>
                         </div>
                         <div className="flex justify-end items-start">
-                            <div className="flex flex-col gap-2 bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10 w-fit">
-                                <div className="text-xs text-gray-300 uppercase tracking-wider mb-2">
-                                    Number of Links
+                            <div
+                                className={`${
+                                    isDarkMode
+                                        ? "flex flex-col gap-2 bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10 w-fit"
+                                        : "bg-white/80 backdrop-blur-sm rounded-xl p-6 border border-gray-200 w-fit"
+                                }`}
+                            >
+                                <div
+                                    className={`${
+                                        isDarkMode
+                                            ? "text-xs font-medium uppercase tracking-widest text-gray-400 mb-6"
+                                            : "text-xs font-medium uppercase tracking-widest text-gray-400 mb-6"
+                                    }`}
+                                >
+                                    NUMBER OF LINKS
                                 </div>
-                                <div className="grid grid-cols-[repeat(4,min-content)] gap-1 justify-center">
+                                <div className="grid grid-cols-4 gap-3 justify-center">
                                     {Array.from(longestStreak.domains.entries())
                                         .slice(0, 12)
                                         .map(([domain, data], index) => (
                                             <div
                                                 key={index}
-                                                className="flex flex-col items-center w-12 p-0.5 rounded-lg hover:bg-white/10 transition-all hover:-translate-y-0.5"
+                                                className={`flex flex-col items-center w-12 p-1 rounded-lg transition-all ${
+                                                    isDarkMode
+                                                        ? "hover:bg-white/10 hover:-translate-y-0.5"
+                                                        : "hover:bg-gray-50 hover:-translate-y-0.5"
+                                                }`}
                                             >
                                                 <img
                                                     src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`}
                                                     alt={domain}
-                                                    className="w-6 h-6 rounded-md shadow-md"
+                                                    className="w-6 h-6 rounded-md"
                                                     onError={(e) => {
                                                         (
                                                             e.target as HTMLImageElement
@@ -648,7 +767,13 @@ export const StoryCard: React.FC<StoryCardProps> = ({
                                                             "none";
                                                     }}
                                                 />
-                                                <div className="text-xs text-white/90 font-normal text-center">
+                                                <div
+                                                    className={`text-xs font-normal text-center mt-1 ${
+                                                        isDarkMode
+                                                            ? "text-gray-300"
+                                                            : "text-gray-800"
+                                                    }`}
+                                                >
                                                     {data.count}
                                                 </div>
                                             </div>
@@ -656,6 +781,72 @@ export const StoryCard: React.FC<StoryCardProps> = ({
                                 </div>
                             </div>
                         </div>
+                        {onToggleAutoPlay && (
+                            <button
+                                onClick={onToggleAutoPlay}
+                                className={`absolute bottom-6 right-6 h-10 pl-3 pr-4 rounded-full flex items-center gap-3 transition-colors shadow-lg ${
+                                    isDarkMode
+                                        ? "bg-black/80 hover:bg-black/90 backdrop-blur-sm border border-white/10"
+                                        : "bg-white border border-gray-200 hover:bg-gray-50"
+                                }`}
+                            >
+                                <div className="w-6 h-6 flex items-center justify-center">
+                                    {isAutoPlaying ? (
+                                        <svg
+                                            xmlns="http://www.w3.org/2000/svg"
+                                            width="16"
+                                            height="16"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke={
+                                                isDarkMode ? "white" : "#6c757d"
+                                            }
+                                            strokeWidth="2.5"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                        >
+                                            <rect
+                                                x="6"
+                                                y="4"
+                                                width="4"
+                                                height="16"
+                                            ></rect>
+                                            <rect
+                                                x="14"
+                                                y="4"
+                                                width="4"
+                                                height="16"
+                                            ></rect>
+                                        </svg>
+                                    ) : (
+                                        <svg
+                                            xmlns="http://www.w3.org/2000/svg"
+                                            width="16"
+                                            height="16"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke={
+                                                isDarkMode ? "white" : "#6c757d"
+                                            }
+                                            strokeWidth="2.5"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                        >
+                                            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                                        </svg>
+                                    )}
+                                </div>
+                                <div
+                                    className={`text-sm font-medium ${
+                                        isDarkMode
+                                            ? "text-white"
+                                            : "text-gray-600"
+                                    }`}
+                                >
+                                    {currentIndex + 1}/{totalCards}
+                                </div>
+                            </button>
+                        )}
                     </div>
                 );
             }
@@ -667,7 +858,6 @@ export const StoryCard: React.FC<StoryCardProps> = ({
                     if (score >= 50) return "text-yellow-500";
                     return "text-red-500";
                 };
-
                 const productivityRatio =
                     (stats.workTime + stats.otherTime) / stats.totalTime;
                 const longestStreakTime = getLongestStreak().time;
@@ -817,30 +1007,49 @@ export const StoryCard: React.FC<StoryCardProps> = ({
                 };
 
                 return (
-                    <div className="h-full grid grid-cols-2 gap-6 p-12">
+                    <div className="h-full grid grid-cols-2 gap-6 p-12 relative">
                         <div className="flex flex-col justify-between">
                             <div></div>
                             <div className="flex flex-col items-start gap-2">
-                                <div className="text-xs text-gray-300 uppercase tracking-wider">
-                                    Wellness Score
+                                <div
+                                    className={`${
+                                        isDarkMode
+                                            ? "text-xs font-medium uppercase tracking-widest text-gray-400"
+                                            : "text-xs font-medium uppercase tracking-widest text-gray-400"
+                                    }`}
+                                >
+                                    WELLNESS SCORE
                                 </div>
                                 <div className="flex items-baseline gap-2">
                                     <div
-                                        className={`text-6xl font-extrabold ${getScoreColor(
-                                            score,
-                                        )} drop-shadow-lg`}
+                                        className={`${
+                                            isDarkMode
+                                                ? "text-6xl font-light tracking-tight drop-shadow-lg"
+                                                : "text-6xl font-extralight tracking-tight"
+                                        } ${getScoreColor(score)}`}
                                     >
                                         {Math.round(score)}
                                     </div>
-                                    <div className="text-2xl text-gray-300 font-semibold">
+                                    <div
+                                        className={`${
+                                            isDarkMode
+                                                ? "text-2xl font-normal text-gray-300"
+                                                : "text-2xl font-light text-gray-400"
+                                        }`}
+                                    >
                                         / 100
                                     </div>
                                 </div>
                             </div>
                         </div>
-
                         <div className="flex flex-col items-start">
-                            <h2 className="text-xl font-bold text-white mb-6">
+                            <h2
+                                className={`${
+                                    isDarkMode
+                                        ? "text-lg font-medium text-white mb-6"
+                                        : "text-lg font-medium text-black mb-6"
+                                }`}
+                            >
                                 Insights & Suggestions
                             </h2>
                             <div className="flex flex-col gap-4">
@@ -860,10 +1069,22 @@ export const StoryCard: React.FC<StoryCardProps> = ({
                                             }`}
                                         />
                                         <div>
-                                            <div className="text-white text-sm">
+                                            <div
+                                                className={`text-sm font-medium ${
+                                                    isDarkMode
+                                                        ? "text-white"
+                                                        : "text-black"
+                                                }`}
+                                            >
                                                 {suggestion.text}
                                             </div>
-                                            <div className="font-medium text-gray-400">
+                                            <div
+                                                className={`text-xs ${
+                                                    isDarkMode
+                                                        ? "font-normal text-gray-300"
+                                                        : "text-gray-600"
+                                                }`}
+                                            >
                                                 {suggestion.detail}
                                             </div>
                                         </div>
@@ -871,6 +1092,72 @@ export const StoryCard: React.FC<StoryCardProps> = ({
                                 ))}
                             </div>
                         </div>
+                        {onToggleAutoPlay && (
+                            <button
+                                onClick={onToggleAutoPlay}
+                                className={`absolute bottom-6 right-6 h-10 pl-3 pr-4 rounded-full flex items-center gap-3 transition-colors shadow-lg ${
+                                    isDarkMode
+                                        ? "bg-black/80 hover:bg-black/90 backdrop-blur-sm border border-white/10"
+                                        : "bg-white border border-gray-200 hover:bg-gray-50"
+                                }`}
+                            >
+                                <div className="w-6 h-6 flex items-center justify-center">
+                                    {isAutoPlaying ? (
+                                        <svg
+                                            xmlns="http://www.w3.org/2000/svg"
+                                            width="16"
+                                            height="16"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke={
+                                                isDarkMode ? "white" : "#6c757d"
+                                            }
+                                            strokeWidth="2.5"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                        >
+                                            <rect
+                                                x="6"
+                                                y="4"
+                                                width="4"
+                                                height="16"
+                                            ></rect>
+                                            <rect
+                                                x="14"
+                                                y="4"
+                                                width="4"
+                                                height="16"
+                                            ></rect>
+                                        </svg>
+                                    ) : (
+                                        <svg
+                                            xmlns="http://www.w3.org/2000/svg"
+                                            width="16"
+                                            height="16"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke={
+                                                isDarkMode ? "white" : "#6c757d"
+                                            }
+                                            strokeWidth="2.5"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                        >
+                                            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                                        </svg>
+                                    )}
+                                </div>
+                                <div
+                                    className={`text-sm font-medium ${
+                                        isDarkMode
+                                            ? "text-white"
+                                            : "text-gray-600"
+                                    }`}
+                                >
+                                    {currentIndex + 1}/{totalCards}
+                                </div>
+                            </button>
+                        )}
                     </div>
                 );
             }
@@ -881,27 +1168,40 @@ export const StoryCard: React.FC<StoryCardProps> = ({
     };
 
     return (
-        <div className="bg-black rounded-2xl relative overflow-hidden backdrop-blur-xl border border-white/10 w-full h-full font-sans flex flex-col">
-            {/* Blue gradient - top right */}
+        <div
+            className={`rounded-2xl relative overflow-hidden w-full h-full font-sans flex flex-col ${
+                isDarkMode
+                    ? "bg-black backdrop-blur-xl border border-white/10"
+                    : "bg-white shadow-2xl border border-gray-200"
+            }`}
+        >
+            {isDarkMode && (
+                <>
+                    {/* Blue gradient - top right */}
+                    <div
+                        className="absolute top-0 right-0 w-[300px] h-[300px] z-10 pointer-events-none"
+                        style={{
+                            background:
+                                "radial-gradient(circle, rgba(66, 133, 244, 0.4) 0%, rgba(255, 107, 71, 0.2) 50%, transparent 80%)",
+                            filter: "blur(40px)",
+                        }}
+                    />
+                    {/* Orange gradient - bottom left */}
+                    <div
+                        className="absolute bottom-0 left-0 w-[200px] h-[200px] z-10 pointer-events-none"
+                        style={{
+                            background:
+                                "radial-gradient(circle, rgba(255, 107, 71, 0.3) 0%, transparent 70%)",
+                            filter: "blur(30px)",
+                        }}
+                    />
+                </>
+            )}
             <div
-                className="absolute top-0 right-0 w-[300px] h-[300px] z-10 pointer-events-none"
-                style={{
-                    background:
-                        "radial-gradient(circle, rgba(66, 133, 244, 0.4) 0%, rgba(255, 107, 71, 0.2) 50%, transparent 80%)",
-                    filter: "blur(40px)",
-                }}
-            />
-            {/* Orange gradient - bottom left */}
-            <div
-                className="absolute bottom-0 left-0 w-[200px] h-[200px] z-10 pointer-events-none"
-                style={{
-                    background:
-                        "radial-gradient(circle, rgba(255, 107, 71, 0.3) 0%, transparent 70%)",
-                    filter: "blur(30px)",
-                }}
-            />
-
-            <div className="flex-1 relative z-20 text-white">
+                className={`flex-1 relative z-20 ${
+                    isDarkMode ? "text-white" : ""
+                }`}
+            >
                 {renderContent()}
             </div>
         </div>

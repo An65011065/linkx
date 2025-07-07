@@ -15,13 +15,18 @@ interface HourlyData {
     leisure: number; // in minutes
 }
 
-const Activity: React.FC = () => {
+interface ActivityProps {
+    isDarkMode?: boolean;
+}
+
+const Activity: React.FC<ActivityProps> = ({ isDarkMode = false }) => {
     const { currentSession, isLoading, error } = useExtensionData();
     const chartRef = useRef<SVGSVGElement>(null);
 
     // Process data into hourly buckets
     const processHourlyData = (): HourlyData[] => {
         if (!currentSession) return [];
+
         const now = Date.now();
         const hourlyBuckets: HourlyData[] = [];
         const timeLabels = generateTimeLabels();
@@ -43,9 +48,11 @@ const Activity: React.FC = () => {
         allVisits.forEach((visit) => {
             const visitTime = visit.startTime;
             const hoursAgo = Math.floor((now - visitTime) / (1000 * 60 * 60));
+
             if (hoursAgo >= 0 && hoursAgo < 24) {
                 const bucketIndex = 23 - hoursAgo;
                 const activeTimeMinutes = (visit.activeTime || 0) / (1000 * 60);
+
                 if (visit.category === "social") {
                     hourlyBuckets[bucketIndex].leisure += activeTimeMinutes;
                 } else {
@@ -62,6 +69,7 @@ const Activity: React.FC = () => {
     const generateTimeLabels = (): string[] => {
         const labels = [];
         const now = new Date();
+
         for (let i = 23; i >= 0; i--) {
             const time = new Date(now.getTime() - i * 60 * 60 * 1000);
             const hours = time.getHours();
@@ -69,12 +77,14 @@ const Activity: React.FC = () => {
             const displayHours = hours % 12 || 12;
             labels.push(`${displayHours}${ampm}`);
         }
+
         return labels;
     };
 
-    // Create D3 line chart with dark theme styling
+    // Create D3 line chart with theme-appropriate styling
     useEffect(() => {
         if (!chartRef.current || !currentSession) return;
+
         const hourlyData = processHourlyData();
 
         // Clear previous chart
@@ -194,41 +204,64 @@ const Activity: React.FC = () => {
             .attr("fill", "url(#leisureGradient)")
             .attr("d", leisureArea);
 
-        // Add lines with glow effect
+        // Add lines with theme-appropriate styling
         svg.append("path")
             .datum(hourlyData)
             .attr("fill", "none")
             .attr("stroke", "#4285f4")
-            .attr("stroke-width", 3)
+            .attr("stroke-width", isDarkMode ? 3 : 2)
             .attr("stroke-linecap", "round")
             .attr("stroke-linejoin", "round")
-            .attr("filter", "drop-shadow(0 0 6px rgba(66, 133, 244, 0.4))")
+            .attr(
+                "filter",
+                isDarkMode
+                    ? "drop-shadow(0 0 6px rgba(66, 133, 244, 0.4))"
+                    : "none",
+            )
             .attr("d", productiveLine);
 
         svg.append("path")
             .datum(hourlyData)
             .attr("fill", "none")
             .attr("stroke", "#ff6b47")
-            .attr("stroke-width", 3)
+            .attr("stroke-width", isDarkMode ? 3 : 2)
             .attr("stroke-linecap", "round")
             .attr("stroke-linejoin", "round")
-            .attr("filter", "drop-shadow(0 0 6px rgba(255, 107, 71, 0.4))")
+            .attr(
+                "filter",
+                isDarkMode
+                    ? "drop-shadow(0 0 6px rgba(255, 107, 71, 0.4))"
+                    : "none",
+            )
             .attr("d", leisureLine);
 
-        // Create tooltip with dark theme
+        // Create tooltip with theme-appropriate styling
         const tooltip = d3
             .select("body")
             .append("div")
             .attr("class", "activity-tooltip")
             .style("position", "absolute")
             .style("visibility", "hidden")
-            .style("background-color", "rgba(0, 0, 0, 0.9)")
-            .style("color", "white")
+            .style(
+                "background-color",
+                isDarkMode ? "rgba(0, 0, 0, 0.9)" : "rgba(255, 255, 255, 0.95)",
+            )
+            .style("color", isDarkMode ? "white" : "#374151")
             .style("padding", "12px 16px")
-            .style("border-radius", "12px")
-            .style("box-shadow", "0 8px 32px rgba(0,0,0,0.3)")
+            .style("border-radius", isDarkMode ? "12px" : "8px")
+            .style(
+                "box-shadow",
+                isDarkMode
+                    ? "0 8px 32px rgba(0,0,0,0.3)"
+                    : "0 4px 12px rgba(0,0,0,0.1)",
+            )
             .style("backdrop-filter", "blur(10px)")
-            .style("border", "1px solid rgba(255, 255, 255, 0.1)")
+            .style(
+                "border",
+                isDarkMode
+                    ? "1px solid rgba(255, 255, 255, 0.1)"
+                    : "1px solid rgba(229, 231, 235, 0.8)",
+            )
             .style("font-family", "system-ui, -apple-system, sans-serif")
             .style("font-size", "13px")
             .style("pointer-events", "none")
@@ -253,23 +286,43 @@ const Activity: React.FC = () => {
                     tooltip
                         .style("visibility", "visible")
                         .html(
-                            `
-                            <div style="font-weight: 600; margin-bottom: 8px; color: #ffffff">${
-                                d.hour
-                            }</div>
-                            <div style="display: flex; align-items: center; margin-bottom: 4px;">
-                                <div style="width: 8px; height: 8px; background: #4285f4; border-radius: 50%; margin-right: 8px;"></div>
-                                <span style="color: #e0e0e0">Productive: ${Math.round(
-                                    d.productive,
-                                )}m</span>
-                            </div>
-                            <div style="display: flex; align-items: center;">
-                                <div style="width: 8px; height: 8px; background: #ff6b47; border-radius: 50%; margin-right: 8px;"></div>
-                                <span style="color: #e0e0e0">Leisure: ${Math.round(
-                                    d.leisure,
-                                )}m</span>
-                            </div>
-                        `,
+                            isDarkMode
+                                ? `
+                                <div style="font-weight: 600; margin-bottom: 8px; color: #ffffff">${
+                                    d.hour
+                                }</div>
+                                <div style="display: flex; align-items: center; margin-bottom: 4px;">
+                                    <div style="width: 8px; height: 8px; background: #4285f4; border-radius: 50%; margin-right: 8px;"></div>
+                                    <span style="color: #e0e0e0">Productive: ${Math.round(
+                                        d.productive,
+                                    )}m</span>
+                                </div>
+                                <div style="display: flex; align-items: center;">
+                                    <div style="width: 8px; height: 8px; background: #ff6b47; border-radius: 50%; margin-right: 8px;"></div>
+                                    <span style="color: #e0e0e0">Leisure: ${Math.round(
+                                        d.leisure,
+                                    )}m</span>
+                                </div>
+                                `
+                                : `
+                                <div style="font-weight: 600; margin-bottom: 8px; color: #111827;">${
+                                    d.hour
+                                }</div>
+                                <div style="display: flex; flex-direction: column; gap: 4px;">
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <div style="width: 8px; height: 8px; background: #4285f4; border-radius: 50%;"></div>
+                                        <span style="color: #6b7280;">Productive: ${Math.round(
+                                            d.productive,
+                                        )}m</span>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <div style="width: 8px; height: 8px; background: #ff6b47; border-radius: 50%;"></div>
+                                        <span style="color: #6b7280;">Leisure: ${Math.round(
+                                            d.leisure,
+                                        )}m</span>
+                                    </div>
+                                </div>
+                                `,
                         )
                         .style("left", event.pageX + 15 + "px")
                         .style("top", event.pageY - 10 + "px");
@@ -282,9 +335,14 @@ const Activity: React.FC = () => {
                         .attr("x2", x(d.hour)!)
                         .attr("y1", 0)
                         .attr("y2", height)
-                        .attr("stroke", "rgba(255, 255, 255, 0.3)")
-                        .attr("stroke-width", 2)
-                        .attr("stroke-dasharray", "4,4");
+                        .attr(
+                            "stroke",
+                            isDarkMode
+                                ? "rgba(255, 255, 255, 0.3)"
+                                : "rgba(107, 114, 128, 0.3)",
+                        )
+                        .attr("stroke-width", isDarkMode ? 2 : 1)
+                        .attr("stroke-dasharray", isDarkMode ? "4,4" : "2,2");
                 }
             })
             .on("mouseleave", function () {
@@ -292,7 +350,7 @@ const Activity: React.FC = () => {
                 svg.selectAll(".hover-line").remove();
             });
 
-        // Style axes for dark theme
+        // Style axes with theme-appropriate colors
         svg.append("g")
             .attr("transform", `translate(0,${height})`)
             .call(d3.axisBottom(x).tickFormat((d, i) => (i % 4 === 0 ? d : "")))
@@ -302,8 +360,9 @@ const Activity: React.FC = () => {
             .attr("dy", ".15em")
             .attr("transform", "rotate(-45)")
             .style("font-size", "11px")
-            .style("fill", "rgba(255, 255, 255, 0.7)")
-            .style("font-family", "system-ui, -apple-system, sans-serif");
+            .style("fill", isDarkMode ? "rgba(255, 255, 255, 0.7)" : "#9ca3af")
+            .style("font-family", "system-ui, -apple-system, sans-serif")
+            .style("font-weight", isDarkMode ? "400" : "400");
 
         svg.append("g")
             .call(
@@ -314,19 +373,26 @@ const Activity: React.FC = () => {
             )
             .selectAll("text")
             .style("font-size", "11px")
-            .style("fill", "rgba(255, 255, 255, 0.7)")
-            .style("font-family", "system-ui, -apple-system, sans-serif");
+            .style("fill", isDarkMode ? "rgba(255, 255, 255, 0.7)" : "#9ca3af")
+            .style("font-family", "system-ui, -apple-system, sans-serif")
+            .style("font-weight", "400");
 
-        // Style axis lines
+        // Style axis lines with theme-appropriate colors
         svg.selectAll(".domain")
-            .style("stroke", "rgba(255, 255, 255, 0.2)")
+            .style(
+                "stroke",
+                isDarkMode ? "rgba(255, 255, 255, 0.2)" : "#e5e7eb",
+            )
             .style("stroke-width", "1px");
 
         svg.selectAll(".tick line")
-            .style("stroke", "rgba(255, 255, 255, 0.1)")
+            .style(
+                "stroke",
+                isDarkMode ? "rgba(255, 255, 255, 0.1)" : "#f3f4f6",
+            )
             .style("stroke-width", "1px");
 
-        // Add legend with better styling
+        // Add legend with theme-appropriate styling
         const legend = svg
             .append("g")
             .attr("transform", `translate(${width - 120}, 20)`);
@@ -336,42 +402,44 @@ const Activity: React.FC = () => {
             .append("circle")
             .attr("cx", 0)
             .attr("cy", 0)
-            .attr("r", 4)
+            .attr("r", isDarkMode ? 4 : 3)
             .attr("fill", "#4285f4");
 
         legend
             .append("text")
-            .attr("x", 12)
+            .attr("x", isDarkMode ? 12 : 10)
             .attr("y", 0)
             .attr("dy", "0.35em")
-            .style("font-size", "12px")
-            .style("fill", "rgba(255, 255, 255, 0.9)")
+            .style("font-size", isDarkMode ? "12px" : "11px")
+            .style("fill", isDarkMode ? "rgba(255, 255, 255, 0.9)" : "#6b7280")
             .style("font-family", "system-ui, -apple-system, sans-serif")
+            .style("font-weight", isDarkMode ? "400" : "500")
             .text("Productive");
 
         // Leisure legend
         legend
             .append("circle")
             .attr("cx", 0)
-            .attr("cy", 20)
-            .attr("r", 4)
+            .attr("cy", isDarkMode ? 20 : 16)
+            .attr("r", isDarkMode ? 4 : 3)
             .attr("fill", "#ff6b47");
 
         legend
             .append("text")
-            .attr("x", 12)
-            .attr("y", 20)
+            .attr("x", isDarkMode ? 12 : 10)
+            .attr("y", isDarkMode ? 20 : 16)
             .attr("dy", "0.35em")
-            .style("font-size", "12px")
-            .style("fill", "rgba(255, 255, 255, 0.9)")
+            .style("font-size", isDarkMode ? "12px" : "11px")
+            .style("fill", isDarkMode ? "rgba(255, 255, 255, 0.9)" : "#6b7280")
             .style("font-family", "system-ui, -apple-system, sans-serif")
+            .style("font-weight", isDarkMode ? "400" : "500")
             .text("Leisure");
 
         // Cleanup function
         return () => {
             d3.select("body").selectAll(".activity-tooltip").remove();
         };
-    }, [currentSession]);
+    }, [currentSession, isDarkMode]);
 
     if (isLoading) {
         return (
@@ -379,15 +447,19 @@ const Activity: React.FC = () => {
                 style={{
                     width: "450px",
                     height: "300px",
-                    background: "rgba(255, 255, 255, 0.01)",
+                    background: isDarkMode
+                        ? "rgba(255, 255, 255, 0.01)"
+                        : "rgba(255, 255, 255, 0.95)",
                     borderRadius: "16px",
-                    border: "1px solid rgba(255, 255, 255, 0.1)",
+                    border: isDarkMode
+                        ? "1px solid rgba(255, 255, 255, 0.1)"
+                        : "1px solid rgba(229, 231, 235, 0.8)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     fontFamily: "system-ui, -apple-system, sans-serif",
                     fontSize: "14px",
-                    color: "rgba(255, 255, 255, 0.7)",
+                    color: isDarkMode ? "rgba(255, 255, 255, 0.7)" : "#6b7280",
                     backdropFilter: "blur(10px)",
                 }}
             >
@@ -402,9 +474,13 @@ const Activity: React.FC = () => {
                 style={{
                     width: "450px",
                     height: "300px",
-                    background: "rgba(255, 255, 255, 0.05)",
+                    background: isDarkMode
+                        ? "rgba(255, 255, 255, 0.05)"
+                        : "rgba(255, 255, 255, 0.95)",
                     borderRadius: "16px",
-                    border: "1px solid rgba(255, 107, 71, 0.3)",
+                    border: isDarkMode
+                        ? "1px solid rgba(255, 107, 71, 0.3)"
+                        : "1px solid rgba(229, 231, 235, 0.8)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -425,15 +501,19 @@ const Activity: React.FC = () => {
                 style={{
                     width: "450px",
                     height: "300px",
-                    background: "rgba(255, 255, 255, 0.05)",
+                    background: isDarkMode
+                        ? "rgba(255, 255, 255, 0.05)"
+                        : "rgba(255, 255, 255, 0.95)",
                     borderRadius: "16px",
-                    border: "1px solid rgba(255, 255, 255, 0.1)",
+                    border: isDarkMode
+                        ? "1px solid rgba(255, 255, 255, 0.1)"
+                        : "1px solid rgba(229, 231, 235, 0.8)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     fontFamily: "system-ui, -apple-system, sans-serif",
                     fontSize: "14px",
-                    color: "rgba(255, 255, 255, 0.7)",
+                    color: isDarkMode ? "rgba(255, 255, 255, 0.7)" : "#6b7280",
                     backdropFilter: "blur(10px)",
                 }}
             >
@@ -445,11 +525,16 @@ const Activity: React.FC = () => {
     return (
         <div
             style={{
-                background: "rgba(255, 255, 255, 0.05)",
+                background: isDarkMode
+                    ? "rgba(255, 255, 255, 0.05)"
+                    : "rgba(255, 255, 255, 0.8)",
                 borderRadius: "16px",
-                border: "1px solid rgba(255, 255, 255, 0.1)",
+                border: isDarkMode
+                    ? "1px solid rgba(255, 255, 255, 0.1)"
+                    : "1px solid rgba(229, 231, 235, 0.8)",
                 backdropFilter: "blur(10px)",
                 padding: "16px",
+                width: "fit-content",
             }}
         >
             <svg

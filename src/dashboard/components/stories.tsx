@@ -1,9 +1,15 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useExtensionData } from "../../data/useExtensionData";
-// import StoryCard from "../components/StoryCard";
-import { StoryCard } from "./light-mode/StoryCard";
+import { StoryCard } from "../components/StoryCard";
+// import { StoryCard } from "./light-mode/StoryCard";
 
-const StoriesComponent: React.FC = () => {
+interface StoriesComponentProps {
+    isDarkMode?: boolean;
+}
+
+const StoriesComponent: React.FC<StoriesComponentProps> = ({
+    isDarkMode = false,
+}) => {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isAutoPlaying, setIsAutoPlaying] = useState(false);
     const autoPlayRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -123,6 +129,7 @@ const StoriesComponent: React.FC = () => {
                             }
                             currentIndex={currentIndex}
                             totalCards={cardTypes.length}
+                            isDarkMode={isDarkMode}
                         />
                     </div>
                 ))}

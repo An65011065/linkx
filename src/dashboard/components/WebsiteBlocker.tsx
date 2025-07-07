@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { Lock } from "lucide-react";
 import { websiteBlocker } from "../../data/websiteBlocker";
 import type { BlockedSite } from "../../shared/types/common.types";
 import UnblockMiniGame from "./UnblockMiniGame";
@@ -35,21 +36,27 @@ const WORK_DOMAINS = [
     "drive.google.com",
     "calendar.google.com",
     "meet.google.com",
-    "mail.google.com", // Gmail
-    "outlook.com", // Microsoft Outlook
-    "outlook.office.com", // Microsoft 365
-    "outlook.live.com", // Microsoft Live
-    "yahoo.com", // Yahoo Mail
-    "mail.yahoo.com", // Yahoo Mail alternate
-    "proton.me", // Proton Mail
-    "zoho.com", // Zoho Mail
-    "fastmail.com", // FastMail
-    "mail.com", // Mail.com
-    "aol.com", // AOL Mail
-    "icloud.com", // Apple iCloud Mail
+    "mail.google.com",
+    "outlook.com",
+    "outlook.office.com",
+    "outlook.live.com",
+    "yahoo.com",
+    "mail.yahoo.com",
+    "proton.me",
+    "zoho.com",
+    "fastmail.com",
+    "mail.com",
+    "aol.com",
+    "icloud.com",
 ];
 
-const WebsiteBlocker: React.FC = () => {
+interface WebsiteBlockerProps {
+    isDarkMode?: boolean;
+}
+
+const WebsiteBlocker: React.FC<WebsiteBlockerProps> = ({
+    isDarkMode = false,
+}) => {
     const [domain, setDomain] = useState("");
     const [startTime, setStartTime] = useState("");
     const [endTime, setEndTime] = useState("");
@@ -61,7 +68,6 @@ const WebsiteBlocker: React.FC = () => {
     useEffect(() => {
         loadBlockedSites();
         const interval = setInterval(loadBlockedSites, 60000);
-        // Set default values
         const now = new Date();
         const later = new Date(now.getTime() + 60 * 60 * 1000);
         setStartTime(now.toTimeString().slice(0, 5));
@@ -81,7 +87,7 @@ const WebsiteBlocker: React.FC = () => {
     const handleBlockLeisure = async () => {
         try {
             for (const domain of LEISURE_DOMAINS) {
-                await websiteBlocker.blockWebsite(domain, 1); // Block for 1 hour
+                await websiteBlocker.blockWebsite(domain, 1);
             }
             await loadBlockedSites();
         } catch (error) {
@@ -92,7 +98,7 @@ const WebsiteBlocker: React.FC = () => {
     const handleBlockWork = async () => {
         try {
             for (const domain of WORK_DOMAINS) {
-                await websiteBlocker.blockWebsite(domain, 1); // Block for 1 hour
+                await websiteBlocker.blockWebsite(domain, 1);
             }
             await loadBlockedSites();
         } catch (error) {
@@ -104,13 +110,12 @@ const WebsiteBlocker: React.FC = () => {
         e.preventDefault();
         if (!domain.trim() || !startTime || !endTime) return;
 
-        setIsLocked(true); // Start animation
+        setIsLocked(true);
         try {
             const cleanDomain = domain
                 .replace(/^(https?:\/\/)?(www\.)?/, "")
                 .split("/")[0];
 
-            // Validate time range
             const startMinutes =
                 parseInt(startTime.split(":")[0]) * 60 +
                 parseInt(startTime.split(":")[1]);
@@ -124,19 +129,14 @@ const WebsiteBlocker: React.FC = () => {
                 return;
             }
 
-            // Calculate hours difference
             let hoursDiff = (endMinutes - startMinutes) / 60;
-
-            // Handle next day scenario (e.g., 23:00 to 01:00)
             if (hoursDiff <= 0) {
                 hoursDiff += 24;
             }
 
-            // Block the website for the calculated hours
             await websiteBlocker.blockWebsite(cleanDomain, hoursDiff);
             await loadBlockedSites();
             setDomain("");
-            // Reset lock state after successful block
             setTimeout(() => {
                 setIsLocked(false);
             }, 1000);
@@ -168,13 +168,11 @@ const WebsiteBlocker: React.FC = () => {
     const handleMiniGameSuccess = async () => {
         try {
             if (selectedDomain === "*") {
-                // Delete all blocked sites
                 const sites = await websiteBlocker.getBlockedSites();
                 for (const site of sites) {
                     await websiteBlocker.unlockWebsite(site.domain);
                 }
             } else {
-                // Unlock single domain
                 await websiteBlocker.unlockWebsite(selectedDomain);
             }
             await loadBlockedSites();
@@ -228,9 +226,15 @@ const WebsiteBlocker: React.FC = () => {
         } else if (site.scheduledStartTime) {
             return "Scheduled";
         } else {
-            return "Active"; // Fallback for legacy blocks
+            return "Active";
         }
     };
+
+    const containerClasses = `${
+        isDarkMode
+            ? "bg-white bg-opacity-5 border-white border-opacity-10"
+            : "bg-white border-gray-200"
+    } rounded-2xl border shadow-lg p-3 h-full flex flex-col gap-3 relative backdrop-blur-sm`;
 
     return (
         <>
@@ -258,110 +262,51 @@ const WebsiteBlocker: React.FC = () => {
                     background: none;
                     display: none;
                 }
-                /* Hide scrollbar for Chrome, Safari and Opera */
                 ::-webkit-scrollbar {
                     display: none;
                 }
-                /* Hide scrollbar for IE, Edge and Firefox */
                 * {
-                    -ms-overflow-style: none;  /* IE and Edge */
-                    scrollbar-width: none;  /* Firefox */
+                    -ms-overflow-style: none;
+                    scrollbar-width: none;
                 }
             `}</style>
-            <div
-                style={{
-                    background: "rgba(255, 255, 255, 0.05)",
-                    borderRadius: "16px",
-                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                    backdropFilter: "blur(10px)",
-                    padding: "20px",
-                    height: "100%",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "16px",
-                    position: "relative",
-                }}
-            >
-                <div
-                    style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        marginBottom: "4px",
-                    }}
-                >
-                    <div
-                        style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "12px",
-                        }}
-                    >
+            <div className={containerClasses}>
+                <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                        <Lock
+                            size={16}
+                            className={
+                                isDarkMode ? "text-white" : "text-gray-700"
+                            }
+                        />
                         <h2
-                            style={{
-                                margin: 0,
-                                fontSize: "16px",
-                                color: "#ffffff",
-                                fontWeight: "600",
-                                fontFamily:
-                                    "system-ui, -apple-system, sans-serif",
-                            }}
+                            className={`text-sm font-medium ${
+                                isDarkMode ? "text-white" : "text-gray-900"
+                            }`}
                         >
                             Locking In
                         </h2>
                     </div>
-                    <div style={{ display: "flex", gap: "6px" }}>
+                    <div className="flex gap-2">
                         <button
                             onClick={handleBlockLeisure}
-                            style={{
-                                background: "rgba(255, 107, 71, 0.2)",
-                                border: "1px solid rgba(255, 107, 71, 0.3)",
-                                borderRadius: "6px",
-                                padding: "4px 8px",
-                                color: "rgba(255, 255, 255, 0.9)",
-                                cursor: "pointer",
-                                transition: "all 0.2s ease",
-                                fontSize: "11px",
-                                fontWeight: "500",
-                                fontFamily:
-                                    "system-ui, -apple-system, sans-serif",
-                            }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.background =
-                                    "rgba(255, 107, 71, 0.3)";
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.background =
-                                    "rgba(255, 107, 71, 0.2)";
-                            }}
+                            className={`rounded-lg px-2 py-1 cursor-pointer transition-all duration-200 text-xs font-medium ${
+                                isDarkMode
+                                    ? "bg-red-500 bg-opacity-20 border-red-500 border-opacity-30 text-white text-opacity-90 hover:bg-opacity-30"
+                                    : "bg-red-100 hover:bg-red-200 border-red-200 text-red-700"
+                            } border`}
                             title="Block leisure sites for 1 hour"
                         >
                             Lock Leisure
                         </button>
                         <button
                             onClick={handleBlockWork}
-                            style={{
-                                background: "rgba(66, 133, 244, 0.2)",
-                                border: "1px solid rgba(66, 133, 244, 0.3)",
-                                borderRadius: "6px",
-                                padding: "4px 8px",
-                                color: "rgba(255, 255, 255, 0.9)",
-                                cursor: "pointer",
-                                transition: "all 0.2s ease",
-                                fontSize: "11px",
-                                fontWeight: "500",
-                                fontFamily:
-                                    "system-ui, -apple-system, sans-serif",
-                            }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.background =
-                                    "rgba(66, 133, 244, 0.3)";
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.background =
-                                    "transparent";
-                            }}
-                            title="Block work sites for 1  hour"
+                            className={`rounded-lg px-2 py-1 cursor-pointer transition-all duration-200 text-xs font-medium ${
+                                isDarkMode
+                                    ? "bg-blue-500 bg-opacity-20 border-blue-500 border-opacity-30 text-white text-opacity-90 hover:bg-opacity-30"
+                                    : "bg-blue-100 hover:bg-blue-200 border-blue-200 text-blue-700"
+                            } border`}
+                            title="Block work sites for 1 hour"
                         >
                             Lock Work
                         </button>
@@ -370,27 +315,11 @@ const WebsiteBlocker: React.FC = () => {
                                 setSelectedDomain("*");
                                 setShowMiniGame(true);
                             }}
-                            style={{
-                                background: "rgba(255, 68, 68, 0.2)",
-                                border: "1px solid rgba(255, 68, 68, 0.3)",
-                                borderRadius: "6px",
-                                padding: "4px 8px",
-                                color: "rgba(255, 255, 255, 0.9)",
-                                cursor: "pointer",
-                                transition: "all 0.2s ease",
-                                fontSize: "11px",
-                                fontWeight: "500",
-                                fontFamily:
-                                    "system-ui, -apple-system, sans-serif",
-                            }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.background =
-                                    "rgba(255, 68, 68, 0.3)";
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.background =
-                                    "rgba(255, 68, 68, 0.2)";
-                            }}
+                            className={`rounded-lg px-2 py-1 cursor-pointer transition-all duration-200 text-xs font-medium ${
+                                isDarkMode
+                                    ? "bg-red-500 bg-opacity-20 border-red-500 border-opacity-30 text-white text-opacity-90 hover:bg-opacity-30"
+                                    : "bg-red-100 hover:bg-red-200 border-red-200 text-red-700"
+                            } border`}
                             title="Delete all blocked sites"
                         >
                             Unlock All
@@ -400,125 +329,61 @@ const WebsiteBlocker: React.FC = () => {
 
                 <form onSubmit={handleBlock}>
                     <div
-                        style={{
-                            padding: "8px 12px",
-                            backgroundColor: "rgba(255, 255, 255, 0.05)",
-                            borderRadius: "8px",
-                            border: "1px solid rgba(255, 255, 255, 0.2)",
-                            position: "relative",
-                            backdropFilter: "blur(10px)",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "8px",
-                        }}
+                        className={`p-3 rounded-lg border relative flex items-center gap-2 ${
+                            isDarkMode
+                                ? "bg-white bg-opacity-5 border-white border-opacity-20"
+                                : "bg-gray-50 border-gray-200"
+                        } backdrop-blur-sm`}
                     >
                         <input
                             type="text"
                             value={domain}
                             onChange={(e) => setDomain(e.target.value)}
                             placeholder="Domain"
-                            style={{
-                                width: "40%",
-                                padding: "0",
-                                border: "none",
-                                fontFamily:
-                                    "system-ui, -apple-system, sans-serif",
-                                fontSize: "14px",
-                                outline: "none",
-                                backgroundColor: "transparent",
-                                color: "#ffffff",
-                            }}
+                            className={`w-2/5 p-0 border-none text-sm outline-none bg-transparent ${
+                                isDarkMode
+                                    ? "text-white placeholder-gray-400"
+                                    : "text-black placeholder-gray-500"
+                            }`}
                         />
-                        <div
-                            style={{
-                                position: "absolute",
-                                right: "50px",
-                                display: "flex",
-                                gap: "4px",
-                                alignItems: "center",
-                            }}
-                        >
+                        <div className="absolute right-12 flex gap-1 items-center">
                             <input
                                 type="time"
                                 value={startTime}
                                 onChange={(e) => setStartTime(e.target.value)}
-                                style={{
-                                    width: "85px",
-                                    padding: "0",
-                                    border: "none",
-                                    borderLeft:
-                                        "1px solid rgba(255, 255, 255, 0.2)",
-                                    paddingLeft: "8px",
-                                    fontFamily:
-                                        "system-ui, -apple-system, sans-serif",
-                                    fontSize: "14px",
-                                    outline: "none",
-                                    backgroundColor: "transparent",
-                                    color: "#ffffff",
-                                }}
+                                className={`w-20 p-0 border-none pl-2 text-sm outline-none bg-transparent ${
+                                    isDarkMode
+                                        ? "text-white border-white border-opacity-20"
+                                        : "text-black border-gray-200"
+                                } border-l`}
                             />
                             <input
                                 type="time"
                                 value={endTime}
                                 onChange={(e) => setEndTime(e.target.value)}
-                                style={{
-                                    width: "85px",
-                                    padding: "0",
-                                    border: "none",
-                                    borderLeft:
-                                        "1px solid rgba(255, 255, 255, 0.2)",
-                                    paddingLeft: "8px",
-                                    fontFamily:
-                                        "system-ui, -apple-system, sans-serif",
-                                    fontSize: "14px",
-                                    outline: "none",
-                                    backgroundColor: "transparent",
-                                    color: "#ffffff",
-                                }}
+                                className={`w-20 p-0 border-none pl-2 text-sm outline-none bg-transparent ${
+                                    isDarkMode
+                                        ? "text-white border-white border-opacity-20"
+                                        : "text-black border-gray-200"
+                                } border-l`}
                             />
                         </div>
-                        {/* Floating lock button */}
                         <button
                             type="submit"
                             className={`lock-button ${
                                 isLocked ? "locked" : ""
+                            } absolute right-2 top-1/2 transform -translate-y-1/2 w-8 h-8 border-none rounded-lg cursor-pointer transition-all duration-300 flex items-center justify-center ${
+                                isDarkMode
+                                    ? "text-white hover:bg-blue-500 hover:bg-opacity-30"
+                                    : "text-gray-600 hover:text-blue-600 hover:bg-blue-50"
                             }`}
-                            style={{
-                                position: "absolute",
-                                right: "8px",
-                                top: "50%",
-                                transform: "translateY(-50%)",
-                                width: "36px",
-                                height: "36px",
-
-                                color: "white",
-                                border: "none",
-                                borderRadius: "8px",
-                                cursor: "pointer",
-                                transition: "all 0.3s ease",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                            }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor =
-                                    "#4da3ff";
-                                e.currentTarget.style.boxShadow =
-                                    "0 6px 16px transparent";
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor =
-                                    "transparent";
-                                e.currentTarget.style.boxShadow =
-                                    "0 4px 12px transparent";
-                            }}
                         >
                             <svg
                                 className={`lock-icon ${
                                     isLocked ? "locked" : ""
                                 }`}
-                                width="18"
-                                height="18"
+                                width="16"
+                                height="16"
                                 viewBox="0 0 24 24"
                                 fill="none"
                                 stroke="currentColor"
@@ -556,31 +421,15 @@ const WebsiteBlocker: React.FC = () => {
                     </div>
                 </form>
 
-                {/* Blocked sites list */}
-                <div
-                    style={{
-                        flex: 1,
-                        overflowY: "auto",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "8px",
-                        marginRight: "-8px",
-                        paddingRight: "8px",
-                        marginBottom: "16px",
-                    }}
-                >
+                <div className="flex-1 overflow-y-auto flex flex-col gap-3 -mr-2 pr-2">
                     {blockedSites.length > 0 && (
                         <>
                             <h3
-                                style={{
-                                    fontFamily:
-                                        "system-ui, -apple-system, sans-serif",
-                                    fontSize: "14px",
-                                    color: "#ffffff",
-                                    marginBottom: "8px",
-                                    fontWeight: "500",
-                                    opacity: 0.7,
-                                }}
+                                className={`text-sm font-medium mb-2 ${
+                                    isDarkMode
+                                        ? "text-white text-opacity-70"
+                                        : "text-gray-600"
+                                }`}
                             >
                                 Active Locks ({blockedSites.length})
                             </h3>
@@ -590,76 +439,55 @@ const WebsiteBlocker: React.FC = () => {
                                 return (
                                     <div
                                         key={site.domain}
-                                        style={{
-                                            display: "flex",
-                                            justifyContent: "space-between",
-                                            alignItems: "flex-start",
-                                            padding: "12px",
-                                            backgroundColor: expired
-                                                ? "rgba(255, 118, 117, 0.1)"
+                                        className={`flex justify-between items-start p-3 rounded-lg border-l-4 border backdrop-blur-sm ${
+                                            expired
+                                                ? isDarkMode
+                                                    ? "bg-red-500 bg-opacity-10 border-red-400 border-white border-opacity-10"
+                                                    : "bg-red-50 border-red-400 border-red-100"
                                                 : status === "Scheduled"
-                                                ? "rgba(116, 185, 255, 0.1)"
-                                                : "rgba(0, 184, 148, 0.1)",
-                                            borderRadius: "12px",
-                                            marginLeft: "5px",
-                                            borderLeft: `4px solid ${
-                                                expired
-                                                    ? "#ff7675"
-                                                    : status === "Scheduled"
-                                                    ? "#74b9ff"
-                                                    : "#00b894"
-                                            }`,
-                                            border: "1px solid rgba(255, 255, 255, 0.1)",
-                                            backdropFilter: "blur(10px)",
-                                        }}
+                                                ? isDarkMode
+                                                    ? "bg-blue-500 bg-opacity-10 border-blue-400 border-white border-opacity-10"
+                                                    : "bg-blue-50 border-blue-400 border-blue-100"
+                                                : isDarkMode
+                                                ? "bg-green-500 bg-opacity-10 border-green-400 border-white border-opacity-10"
+                                                : "bg-green-50 border-green-400 border-green-100"
+                                        }`}
                                     >
-                                        <div style={{ flex: 1 }}>
+                                        <div className="flex-1">
                                             <div
-                                                style={{
-                                                    fontFamily:
-                                                        "system-ui, -apple-system, sans-serif",
-                                                    fontSize: "14px",
-                                                    color: expired
-                                                        ? "#a0a0a0"
-                                                        : "#ffffff",
-                                                    marginBottom: "4px",
-                                                    fontWeight: "600",
-                                                }}
+                                                className={`text-sm font-semibold mb-1 ${
+                                                    isDarkMode
+                                                        ? expired
+                                                            ? "text-gray-400"
+                                                            : "text-white"
+                                                        : "text-black"
+                                                }`}
                                             >
                                                 {site.domain}
                                                 <span
-                                                    style={{
-                                                        marginLeft: "8px",
-                                                        fontSize: "12px",
-                                                        padding: "2px 6px",
-                                                        borderRadius: "6px",
-                                                        backgroundColor: expired
-                                                            ? "#ff7675"
+                                                    className={`ml-2 text-xs px-2 py-1 rounded font-medium text-white uppercase tracking-wide ${
+                                                        expired
+                                                            ? "bg-red-500"
                                                             : status ===
                                                               "Scheduled"
-                                                            ? "#74b9ff"
-                                                            : "#00b894",
-                                                        color: "white",
-                                                        textTransform:
-                                                            "uppercase",
-                                                        letterSpacing: "0.5px",
-                                                        fontWeight: "500",
-                                                    }}
+                                                            ? "bg-blue-500"
+                                                            : "bg-green-500"
+                                                    }`}
                                                 >
                                                     {status}
                                                 </span>
                                             </div>
                                             {site.timezone && (
                                                 <div
-                                                    style={{
-                                                        fontFamily:
-                                                            "system-ui, -apple-system, sans-serif",
-                                                        fontSize: "12px",
-                                                        color: expired
-                                                            ? "#666666"
-                                                            : "#a0a0a0",
-                                                        lineHeight: "1.3",
-                                                    }}
+                                                    className={`text-xs leading-relaxed ${
+                                                        isDarkMode
+                                                            ? expired
+                                                                ? "text-gray-600"
+                                                                : "text-gray-400"
+                                                            : expired
+                                                            ? "text-gray-500"
+                                                            : "text-gray-600"
+                                                    }`}
                                                 >
                                                     {formatScheduledTime(site)}
                                                 </div>
@@ -673,45 +501,15 @@ const WebsiteBlocker: React.FC = () => {
                                                           site.domain,
                                                       )
                                             }
-                                            style={{
-                                                padding: "6px 12px",
-                                                backgroundColor:
-                                                    "rgba(255, 255, 255, 0.1)",
-                                                color: expired
-                                                    ? "#a0a0a0"
-                                                    : "#ffffff",
-                                                border: `1px solid ${
-                                                    expired
-                                                        ? "rgba(255, 255, 255, 0.2)"
-                                                        : "rgba(255, 255, 255, 0.3)"
-                                                }`,
-                                                borderRadius: "8px",
-                                                fontFamily:
-                                                    "system-ui, -apple-system, sans-serif",
-                                                fontSize: "12px",
-                                                textTransform: "uppercase",
-                                                letterSpacing: "0.5px",
-                                                cursor: "pointer",
-                                                transition: "all 0.2s",
-                                                marginTop: "4px",
-                                                fontWeight: "500",
-                                            }}
-                                            onMouseEnter={(e) => {
-                                                if (!expired) {
-                                                    e.currentTarget.style.backgroundColor =
-                                                        "rgba(255, 255, 255, 0.2)";
-                                                    e.currentTarget.style.borderColor =
-                                                        "rgba(255, 255, 255, 0.5)";
-                                                }
-                                            }}
-                                            onMouseLeave={(e) => {
-                                                e.currentTarget.style.backgroundColor =
-                                                    "rgba(255, 255, 255, 0.1)";
-                                                e.currentTarget.style.borderColor =
-                                                    expired
-                                                        ? "rgba(255, 255, 255, 0.2)"
-                                                        : "rgba(255, 255, 255, 0.3)";
-                                            }}
+                                            className={`px-3 py-1 rounded-lg text-xs font-medium uppercase tracking-wide transition-all duration-200 ${
+                                                isDarkMode
+                                                    ? expired
+                                                        ? "bg-white bg-opacity-10 text-gray-400 border-white border-opacity-20 hover:bg-opacity-20"
+                                                        : "bg-white bg-opacity-10 text-white border-white border-opacity-30 hover:bg-opacity-20"
+                                                    : expired
+                                                    ? "bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200"
+                                                    : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+                                            } border`}
                                         >
                                             {expired ? "Remove" : "Unlock"}
                                         </button>
@@ -722,18 +520,11 @@ const WebsiteBlocker: React.FC = () => {
                     )}
                     {blockedSites.length === 0 && (
                         <div
-                            style={{
-                                padding: "20px",
-                                textAlign: "center",
-                                color: "#a0a0a0",
-                                fontFamily:
-                                    "system-ui, -apple-system, sans-serif",
-                                fontSize: "14px",
-                                backgroundColor: "rgba(255, 255, 255, 0.05)",
-                                borderRadius: "12px",
-                                border: "1px solid rgba(255, 255, 255, 0.1)",
-                                backdropFilter: "blur(10px)",
-                            }}
+                            className={`p-5 text-center text-sm rounded-lg border ${
+                                isDarkMode
+                                    ? "text-gray-400 bg-white bg-opacity-5 border-white border-opacity-10"
+                                    : "text-gray-500 bg-gray-50 border-gray-100"
+                            } backdrop-blur-sm`}
                         >
                             No websites currently locked
                         </div>
