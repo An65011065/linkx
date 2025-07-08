@@ -1,5 +1,14 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Timer, Plus, Circle, X, ArrowRight, Trash2 } from "lucide-react";
+import {
+    Timer,
+    Plus,
+    Circle,
+    X,
+    ArrowRight,
+    Trash2,
+    AlertTriangle,
+} from "lucide-react";
+import { freeTrial } from "../../main/MainTab";
 
 interface TimerItem {
     id: string;
@@ -148,8 +157,23 @@ const Timers: React.FC<TimersProps> = ({ isDarkMode = false }) => {
     const [timers, setTimers] = useState<TimerItem[]>([]);
     const [showModal, setShowModal] = useState(false);
     const [isDeleteMode, setIsDeleteMode] = useState(false);
+    const [isTrialMode, setIsTrialMode] = useState(freeTrial);
     const containerRef = useRef<HTMLDivElement>(null);
     const [isExpanded, setIsExpanded] = useState(false);
+
+    useEffect(() => {
+        const checkTrialStatus = () => {
+            setIsTrialMode(freeTrial);
+        };
+
+        // Check immediately
+        checkTrialStatus();
+
+        // Set up an interval to check frequently
+        const interval = setInterval(checkTrialStatus, 100);
+
+        return () => clearInterval(interval);
+    }, []);
 
     useEffect(() => {
         // Load all timers from localStorage
@@ -215,6 +239,13 @@ const Timers: React.FC<TimersProps> = ({ isDarkMode = false }) => {
     }, [isExpanded]);
 
     const handleSaveTimer = (domain: string, minutes: number) => {
+        if (isTrialMode && timers.length >= 1) {
+            alert(
+                "Free trial allows only 1 timer at a time. Please remove the existing timer first.",
+            );
+            return;
+        }
+
         const endTime = Date.now() + minutes * 60 * 1000;
         const timerData = {
             endTime,
@@ -275,6 +306,12 @@ const Timers: React.FC<TimersProps> = ({ isDarkMode = false }) => {
     };
 
     const handleAddNewClick = () => {
+        if (isTrialMode && timers.length >= 1) {
+            alert(
+                "Free trial allows only 1 timer at a time. Please remove the existing timer first.",
+            );
+            return;
+        }
         setIsExpanded(true);
         setShowModal(true);
     };
@@ -285,6 +322,7 @@ const Timers: React.FC<TimersProps> = ({ isDarkMode = false }) => {
     };
 
     const placeholdersNeeded = Math.max(0, 3 - timers.length);
+    const hasHiddenTimers = isTrialMode && timers.length > 1;
 
     return (
         <div
@@ -341,6 +379,8 @@ const Timers: React.FC<TimersProps> = ({ isDarkMode = false }) => {
                 </button>
             </div>
 
+            {/* Warning Message for Free Trial */}
+
             {/* Timers Grid */}
             <div className="overflow-x-auto overflow-y-hidden -mx-3 px-3">
                 <div
@@ -365,6 +405,11 @@ const Timers: React.FC<TimersProps> = ({ isDarkMode = false }) => {
                                     ? "bg-white/10 border-white/20 hover:bg-white/20"
                                     : "bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-gray-300"
                             }
+                            ${
+                                isTrialMode && timers.length >= 1
+                                    ? "opacity-50 cursor-not-allowed"
+                                    : ""
+                            }
                         `}
                     >
                         <Plus
@@ -387,18 +432,19 @@ const Timers: React.FC<TimersProps> = ({ isDarkMode = false }) => {
                         </div>
                     </div>
 
-                    {/* Timer Items */}
-                    {timers.map((timer) => {
-                        const isExpired = timer.endTime <= Date.now();
-                        return (
-                            <div key={timer.id} className="relative">
-                                {isDeleteMode && (
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleDeleteTimer(timer.id);
-                                        }}
-                                        className={`
+                    {/* Timer Items - only show first timer in trial mode */}
+                    {(isTrialMode ? timers.slice(0, 1) : timers).map(
+                        (timer) => {
+                            const isExpired = timer.endTime <= Date.now();
+                            return (
+                                <div key={timer.id} className="relative">
+                                    {isDeleteMode && (
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleDeleteTimer(timer.id);
+                                            }}
+                                            className={`
                                             absolute top-1 right-1 z-10 p-1 rounded-full border
                                             transition-colors
                                             ${
@@ -407,12 +453,15 @@ const Timers: React.FC<TimersProps> = ({ isDarkMode = false }) => {
                                                     : "bg-white border-gray-200 hover:bg-red-50 hover:border-red-200"
                                             }
                                         `}
-                                    >
-                                        <X size={8} className="text-white" />
-                                    </button>
-                                )}
-                                <div
-                                    className={`
+                                        >
+                                            <X
+                                                size={8}
+                                                className="text-white"
+                                            />
+                                        </button>
+                                    )}
+                                    <div
+                                        className={`
                                         h-12 min-w-20 p-2 rounded-lg border
                                         flex flex-col items-center justify-center gap-1
                                         transition-all
@@ -429,48 +478,48 @@ const Timers: React.FC<TimersProps> = ({ isDarkMode = false }) => {
                                                 : "bg-orange-50 border-orange-200"
                                         }
                                     `}
-                                    style={
-                                        isDarkMode
-                                            ? {
-                                                  background: isExpired
-                                                      ? "rgba(34, 197, 94, 0.2)"
-                                                      : "rgba(249, 115, 22, 0.2)",
-                                              }
-                                            : {}
-                                    }
-                                    onMouseEnter={(e) => {
-                                        if (!isDeleteMode) {
-                                            if (isDarkMode) {
-                                                e.currentTarget.style.background =
-                                                    isExpired
-                                                        ? "rgba(34, 197, 94, 0.3)"
-                                                        : "rgba(249, 115, 22, 0.3)";
-                                            } else if (!isExpired) {
-                                                e.currentTarget.style.backgroundColor =
-                                                    "#fed7aa40";
-                                                e.currentTarget.style.boxShadow =
-                                                    "0 4px 12px rgba(0, 0, 0, 0.1)";
-                                            }
+                                        style={
+                                            isDarkMode
+                                                ? {
+                                                      background: isExpired
+                                                          ? "rgba(34, 197, 94, 0.2)"
+                                                          : "rgba(249, 115, 22, 0.2)",
+                                                  }
+                                                : {}
                                         }
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        if (!isDeleteMode) {
-                                            if (isDarkMode) {
-                                                e.currentTarget.style.background =
-                                                    isExpired
-                                                        ? "rgba(34, 197, 94, 0.2)"
-                                                        : "rgba(249, 115, 22, 0.2)";
-                                            } else if (!isExpired) {
-                                                e.currentTarget.style.backgroundColor =
-                                                    "#fff7ed";
-                                                e.currentTarget.style.boxShadow =
-                                                    "none";
+                                        onMouseEnter={(e) => {
+                                            if (!isDeleteMode) {
+                                                if (isDarkMode) {
+                                                    e.currentTarget.style.background =
+                                                        isExpired
+                                                            ? "rgba(34, 197, 94, 0.3)"
+                                                            : "rgba(249, 115, 22, 0.3)";
+                                                } else if (!isExpired) {
+                                                    e.currentTarget.style.backgroundColor =
+                                                        "#fed7aa40";
+                                                    e.currentTarget.style.boxShadow =
+                                                        "0 4px 12px rgba(0, 0, 0, 0.1)";
+                                                }
                                             }
-                                        }
-                                    }}
-                                >
-                                    <div
-                                        className={`
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            if (!isDeleteMode) {
+                                                if (isDarkMode) {
+                                                    e.currentTarget.style.background =
+                                                        isExpired
+                                                            ? "rgba(34, 197, 94, 0.2)"
+                                                            : "rgba(249, 115, 22, 0.2)";
+                                                } else if (!isExpired) {
+                                                    e.currentTarget.style.backgroundColor =
+                                                        "#fff7ed";
+                                                    e.currentTarget.style.boxShadow =
+                                                        "none";
+                                                }
+                                            }
+                                        }}
+                                    >
+                                        <div
+                                            className={`
                                             text-xs font-medium text-center break-words leading-tight
                                             ${
                                                 isDarkMode
@@ -480,11 +529,11 @@ const Timers: React.FC<TimersProps> = ({ isDarkMode = false }) => {
                                                     : "text-orange-700"
                                             }
                                         `}
-                                    >
-                                        {timer.name}
-                                    </div>
-                                    <div
-                                        className={`
+                                        >
+                                            {timer.name}
+                                        </div>
+                                        <div
+                                            className={`
                                             text-xs text-center font-medium
                                             ${
                                                 isDarkMode
@@ -494,13 +543,14 @@ const Timers: React.FC<TimersProps> = ({ isDarkMode = false }) => {
                                                     : "text-orange-600"
                                             }
                                         `}
-                                    >
-                                        {formatTimeRemaining(timer.endTime)}
+                                        >
+                                            {formatTimeRemaining(timer.endTime)}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        );
-                    })}
+                            );
+                        },
+                    )}
 
                     {/* Placeholder Timers */}
                     {Array.from({ length: placeholdersNeeded }).map(

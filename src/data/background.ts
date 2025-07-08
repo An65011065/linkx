@@ -105,6 +105,14 @@ class BackgroundTracker {
             this.handleCreatedNavigationTarget.bind(this),
         );
 
+        // Context menu for selected text
+        this.setupContextMenu();
+
+        // Listen for messages from content script
+        chrome.runtime.onMessage.addListener(
+            this.handleRuntimeMessage.bind(this),
+        );
+
         console.log("🚀 BackgroundTracker initialized with all listeners");
     }
 
@@ -538,6 +546,95 @@ class BackgroundTracker {
         }
     }
 
+    // Set up context menu for selected text
+    private setupContextMenu(): void {
+        chrome.contextMenus.removeAll(() => {
+            chrome.contextMenus.create({
+                id: "addToLyncX",
+                title: "Add to LyncX",
+                contexts: ["selection"],
+            });
+        });
+
+        chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+            if (
+                info.menuItemId === "addToLyncX" &&
+                info.selectionText &&
+                tab?.id
+            ) {
+                try {
+                    // Get current tab URL to extract domain
+                    const domain = this.extractDomain(tab.url || "");
+
+                    // Prepare the content with timestamp and URL
+                    const timestamp = new Date().toLocaleString();
+                    const selectedContent = `--- ${timestamp} ---\nFrom: ${tab.url}\n\n${info.selectionText}`;
+
+                    // Get existing note for this domain
+                    const existingNote = await chrome.storage.local.get(
+                        `note_${domain}`,
+                    );
+                    const currentContent = existingNote[`note_${domain}`] || "";
+
+                    // Append new content to existing note
+                    const updatedContent = currentContent
+                        ? `${currentContent}\n\n${selectedContent}`
+                        : selectedContent;
+
+                    // Save to storage
+                    const timestampKey = `note_timestamp_${domain}`;
+                    const createdKey = `note_created_${domain}`;
+                    const now = Date.now();
+
+                    // Get existing creation timestamp or use current time
+                    const existingCreated = await chrome.storage.local.get(
+                        createdKey,
+                    );
+                    const createdAt = existingCreated[createdKey] || now;
+
+                    await chrome.storage.local.set({
+                        [`note_${domain}`]: updatedContent,
+                        [timestampKey]: now,
+                        [createdKey]: createdAt,
+                    });
+
+                    console.log(
+                        `📝 Added selected text to note for domain: ${domain}`,
+                    );
+
+                    // Send notification message to content script
+                    chrome.tabs
+                        .sendMessage(tab.id, {
+                            action: "showNotification",
+                            message: "Added to LyncX notes!",
+                        })
+                        .catch(() => {
+                            // Ignore if content script isn't available
+                        });
+                } catch (error) {
+                    console.error("Error saving selected text:", error);
+                }
+            }
+        });
+    }
+
+    // Handle messages from content scripts
+    private handleRuntimeMessage(
+        request: { action: string; [key: string]: unknown },
+        sender: chrome.runtime.MessageSender,
+        sendResponse: (response?: {
+            success: boolean;
+            [key: string]: unknown;
+        }) => void,
+    ): boolean {
+        if (request.action === "getSelectedText") {
+            // This could be used for future enhancements
+            sendResponse({ success: true });
+            return true;
+        }
+        return false;
+    }
+
     // Clean up resources when tracker is destroyed
     public destroy(): void {
         this.isDestroyed = true;
@@ -568,6 +665,12 @@ class BackgroundTracker {
         chrome.webNavigation.onCreatedNavigationTarget.removeListener(
             this.handleCreatedNavigationTarget.bind(this),
         );
+        chrome.runtime.onMessage.removeListener(
+            this.handleRuntimeMessage.bind(this),
+        );
+
+        // Clean up context menu
+        chrome.contextMenus.removeAll();
 
         // Clear state
         this.tabStates.clear();

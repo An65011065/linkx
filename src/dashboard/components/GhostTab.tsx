@@ -142,6 +142,7 @@ const GhostTab: React.FC<GhostTabProps> = ({ isDarkMode = false }) => {
                     ? "bg-white/5 border border-white/10"
                     : "bg-white border border-gray-200 shadow-lg"
             }`}
+            style={{ overflow: "visible" }}
         >
             {/* Title */}
             <div className="flex items-center gap-2 mb-2">
@@ -165,8 +166,12 @@ const GhostTab: React.FC<GhostTabProps> = ({ isDarkMode = false }) => {
                         {wasteData.map((urlData) => (
                             <div
                                 key={urlData.url}
-                                onMouseEnter={() => setHoveredUrl(urlData.url)}
-                                onMouseLeave={() => setHoveredUrl(null)}
+                                onMouseEnter={() => {
+                                    setHoveredUrl(urlData.url);
+                                }}
+                                onMouseLeave={() => {
+                                    setHoveredUrl(null);
+                                }}
                                 className={`
                                     flex flex-col items-center gap-1 cursor-pointer 
                                     transition-all duration-200 p-1 rounded-lg 
@@ -282,15 +287,21 @@ const GhostTab: React.FC<GhostTabProps> = ({ isDarkMode = false }) => {
             {hoveredUrl && (
                 <div
                     className={`
-                        absolute top-full left-1/2 transform -translate-x-1/2 mt-2 
-                        rounded-lg shadow-xl p-3 z-50 min-w-48 max-w-64 border 
-                        backdrop-blur-sm
-                        ${
-                            isDarkMode
-                                ? "bg-black/90 border-white/20"
-                                : "bg-white border-gray-200"
-                        }
-                    `}
+            fixed pointer-events-none z-50
+            rounded-lg shadow-xl p-3 min-w-48 max-w-64 border 
+            backdrop-blur-sm
+            ${
+                isDarkMode
+                    ? "bg-black/90 border-white/20"
+                    : "bg-white border-gray-200"
+            }
+        `}
+                    style={{
+                        left: "50%",
+                        top: "20%",
+                        transform: "translate(-50%, 20%)",
+                        zIndex: 9999,
+                    }}
                 >
                     {(() => {
                         const data = wasteData.find(

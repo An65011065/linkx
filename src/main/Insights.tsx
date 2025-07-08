@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Send } from "lucide-react";
 import DataService from "../data/dataService";
 import AIService from "./services/AIService";
+import { freeTrial } from "./MainTab";
 
 interface Insight {
     id: string;
@@ -94,6 +95,21 @@ const Insights: React.FC<InsightsProps> = ({ onInputFocusChange }) => {
         setVisibleInsights(updatedInsights.length);
         persistentInsights = updatedInsights;
         setMessage("");
+
+        // Check if free trial is active
+        if (freeTrial) {
+            const freeTrialMessage: Insight = {
+                id: `freetrial-${Date.now()}`,
+                text: "Hi, I would love to help but your plan does not support LyncX conversations.",
+                type: "insight",
+            };
+
+            const finalInsights = [...updatedInsights, freeTrialMessage];
+            setInsights(finalInsights);
+            setVisibleInsights(finalInsights.length);
+            persistentInsights = finalInsights;
+            return;
+        }
 
         try {
             const loadingMessage: Insight = {

@@ -7,7 +7,9 @@ import {
     Layout,
     Trash2,
     Circle,
+    AlertTriangle,
 } from "lucide-react";
+import { freeTrial } from "../../main/MainTab";
 
 interface Template {
     name: string;
@@ -452,11 +454,26 @@ const Templates: React.FC<TemplatesProps> = ({ isDarkMode = false }) => {
     const [modalMode, setModalMode] = useState<"current" | "new">("current");
     const [isExpanded, setIsExpanded] = useState(false);
     const [isDeleteMode, setIsDeleteMode] = useState(false);
+    const [isTrialMode, setIsTrialMode] = useState(freeTrial);
     const containerRef = useRef<HTMLDivElement>(null);
     const [showModeSelector, setShowModeSelector] = useState(false);
 
     useEffect(() => {
         loadTemplates();
+    }, []);
+
+    useEffect(() => {
+        const checkTrialStatus = () => {
+            setIsTrialMode(freeTrial);
+        };
+
+        // Check immediately
+        checkTrialStatus();
+
+        // Set up an interval to check frequently
+        const interval = setInterval(checkTrialStatus, 100);
+
+        return () => clearInterval(interval);
     }, []);
 
     // Handle expansion animation
@@ -483,6 +500,13 @@ const Templates: React.FC<TemplatesProps> = ({ isDarkMode = false }) => {
     };
 
     const handleSaveTemplate = (template: Template) => {
+        if (isTrialMode && templates.length >= 2) {
+            alert(
+                "Free trial allows only 2 templates at a time. Please delete an existing template first.",
+            );
+            return;
+        }
+
         const newTemplates = [...templates, template];
         setTemplates(newTemplates);
         chrome.storage.local.set({ templates: newTemplates }, () => {
@@ -498,6 +522,12 @@ const Templates: React.FC<TemplatesProps> = ({ isDarkMode = false }) => {
     };
 
     const handleAddNewClick = () => {
+        if (isTrialMode && templates.length >= 2) {
+            alert(
+                "Free trial allows only 2 templates at a time. Please delete an existing template first.",
+            );
+            return;
+        }
         setIsExpanded(true);
         setShowModeSelector(true);
     };
@@ -523,7 +553,9 @@ const Templates: React.FC<TemplatesProps> = ({ isDarkMode = false }) => {
         await chrome.storage.local.set({ templates: updatedTemplates });
     };
 
-    const placeholdersNeeded = Math.max(0, 3 - templates.length);
+    const displayedTemplates = isTrialMode ? templates.slice(0, 2) : templates;
+    const hasHiddenTemplates = isTrialMode && templates.length > 2;
+    const placeholdersNeeded = Math.max(0, 3 - displayedTemplates.length);
 
     return (
         <div
@@ -580,6 +612,8 @@ const Templates: React.FC<TemplatesProps> = ({ isDarkMode = false }) => {
                 </button>
             </div>
 
+            {/* Warning Message for Free Trial */}
+
             {/* Templates Grid */}
             <div className="overflow-x-auto overflow-y-hidden -mx-3 px-3">
                 <div
@@ -587,9 +621,12 @@ const Templates: React.FC<TemplatesProps> = ({ isDarkMode = false }) => {
                     style={{
                         gridTemplateColumns: `repeat(${Math.max(
                             4,
-                            templates.length + 1,
+                            displayedTemplates.length + 1,
                         )}, 1fr)`,
-                        width: templates.length > 3 ? "fit-content" : "100%",
+                        width:
+                            displayedTemplates.length > 3
+                                ? "fit-content"
+                                : "100%",
                     }}
                 >
                     {/* Add New Template Button */}
@@ -603,6 +640,11 @@ const Templates: React.FC<TemplatesProps> = ({ isDarkMode = false }) => {
                                 isDarkMode
                                     ? "bg-white/10 border-white/20 hover:bg-white/20"
                                     : "bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-gray-300"
+                            }
+                            ${
+                                isTrialMode && templates.length >= 2
+                                    ? "opacity-50 cursor-not-allowed"
+                                    : ""
                             }
                         `}
                     >
@@ -626,8 +668,8 @@ const Templates: React.FC<TemplatesProps> = ({ isDarkMode = false }) => {
                         </div>
                     </div>
 
-                    {/* Template Items */}
-                    {templates.map((template, index) => (
+                    {/* Template Items - only show first 2 in trial mode */}
+                    {displayedTemplates.map((template, index) => (
                         <div key={index} className="relative">
                             {isDeleteMode && (
                                 <button

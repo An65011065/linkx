@@ -4,9 +4,10 @@ class WebsiteBlocker {
     private static readonly BLOCK_RULES_KEY = "blocked_sites";
     private static readonly BLOCK_RULE_ID_COUNTER_KEY = "block_rule_id_counter";
     private currentRuleId = 1;
+    private initPromise: Promise<void> | null = null;
 
     constructor() {
-        this.initialize();
+        this.initPromise = this.initialize();
     }
 
     private async initialize() {
@@ -15,9 +16,20 @@ class WebsiteBlocker {
         );
         this.currentRuleId =
             data[WebsiteBlocker.BLOCK_RULE_ID_COUNTER_KEY] || 1;
+
+        // Clean up orphaned rules on startup
+        await this.cleanupOrphanedRules();
+    }
+
+    private async ensureInitialized() {
+        if (this.initPromise) {
+            await this.initPromise;
+            this.initPromise = null;
+        }
     }
 
     private async getNextRuleId(): Promise<number> {
+        await this.ensureInitialized();
         const ruleId = this.currentRuleId++;
         await chrome.storage.local.set({
             [WebsiteBlocker.BLOCK_RULE_ID_COUNTER_KEY]: this.currentRuleId,
@@ -33,12 +45,9 @@ class WebsiteBlocker {
         const cleanDomain = domain
             .replace(/^https?:\/\//, "")
             .replace(/^www\./, "")
-            .split("/")[0]; // Remove any path
+            .split("/")[0];
 
-        // Create comprehensive blocking rules
         const rules: chrome.declarativeNetRequest.Rule[] = [];
-
-        // All possible resource types to block
         const resourceTypes = [
             "main_frame",
             "sub_frame",
@@ -159,7 +168,47 @@ class WebsiteBlocker {
         return rules;
     }
 
+    // NEW: Clean up orphaned rules on startup
+    private async cleanupOrphanedRules(): Promise<void> {
+        try {
+            const [currentRules, blockedSites] = await Promise.all([
+                chrome.declarativeNetRequest.getDynamicRules(),
+                this.getBlockedSites(),
+            ]);
+
+            // Get all rule IDs that should exist based on stored sites
+            const validRuleIds = new Set<number>();
+            for (const site of blockedSites) {
+                for (let i = 0; i < 8; i++) {
+                    validRuleIds.add(site.ruleId + i);
+                }
+            }
+
+            // Find orphaned rules (rules that exist but aren't in storage)
+            const orphanedRuleIds = currentRules
+                .map((rule) => rule.id)
+                .filter((id) => !validRuleIds.has(id));
+
+            if (orphanedRuleIds.length > 0) {
+                console.log(
+                    `Found ${orphanedRuleIds.length} orphaned rules, cleaning up...`,
+                );
+                await chrome.declarativeNetRequest.updateDynamicRules({
+                    removeRuleIds: orphanedRuleIds,
+                    addRules: [],
+                });
+                console.log(
+                    `Cleaned up orphaned rules: ${orphanedRuleIds.join(", ")}`,
+                );
+            }
+        } catch (error) {
+            console.error("Error cleaning up orphaned rules:", error);
+        }
+    }
+
     public async blockWebsite(domain: string, hours: number): Promise<void> {
+        await this.ensureInitialized();
+
         try {
             const data = await chrome.storage.local.get(
                 WebsiteBlocker.BLOCK_RULES_KEY,
@@ -190,7 +239,7 @@ class WebsiteBlocker {
             const startTime = Date.now();
             const endTime = startTime + hours * 60 * 60 * 1000;
 
-            // Create and apply the blocking rules immediately
+            // Create the blocking rules
             const rules = this.createBlockRules(cleanDomain, ruleId);
 
             console.log(
@@ -198,19 +247,32 @@ class WebsiteBlocker {
                 rules,
             );
 
+            // Apply the rules first
             await chrome.declarativeNetRequest.updateDynamicRules({
                 addRules: rules,
                 removeRuleIds: [],
             });
 
-            // Verify rules were added
+            // Verify rules were actually added
             const existingRules =
                 await chrome.declarativeNetRequest.getDynamicRules();
-            console.log(
-                `Total dynamic rules after adding: ${existingRules.length}`,
+            const addedRuleIds = rules.map((r) => r.id);
+            const actuallyAdded = existingRules.filter((r) =>
+                addedRuleIds.includes(r.id),
             );
 
-            // Store the block info
+            if (actuallyAdded.length !== rules.length) {
+                // If not all rules were added, clean up the ones that were
+                await chrome.declarativeNetRequest.updateDynamicRules({
+                    removeRuleIds: actuallyAdded.map((r) => r.id),
+                    addRules: [],
+                });
+                throw new Error(
+                    `Failed to add all blocking rules. Added ${actuallyAdded.length} out of ${rules.length} rules.`,
+                );
+            }
+
+            // Only store the block info if all rules were successfully added
             const blockInfo: BlockedSite = {
                 domain: cleanDomain,
                 ruleId,
@@ -234,6 +296,8 @@ class WebsiteBlocker {
     }
 
     public async unlockWebsite(domain: string): Promise<void> {
+        await this.ensureInitialized();
+
         try {
             const data = await chrome.storage.local.get(
                 WebsiteBlocker.BLOCK_RULES_KEY,
@@ -290,6 +354,8 @@ class WebsiteBlocker {
     }
 
     public async cleanupExpiredBlocks(): Promise<void> {
+        await this.ensureInitialized();
+
         const blockedSites = await this.getBlockedSites();
         const now = Date.now();
         const expiredSites = blockedSites.filter((site) => site.endTime <= now);
@@ -309,13 +375,40 @@ class WebsiteBlocker {
         }
     }
 
+    // NEW: Force cleanup of all orphaned rules
+    public async forceCleanupOrphanedRules(): Promise<void> {
+        await this.ensureInitialized();
+        await this.cleanupOrphanedRules();
+    }
+
     // Debug method to check current rules
     public async debugRules(): Promise<void> {
+        await this.ensureInitialized();
+
         const rules = await chrome.declarativeNetRequest.getDynamicRules();
         console.log("Current dynamic rules:", rules);
 
         const blockedSites = await this.getBlockedSites();
         console.log("Blocked sites in storage:", blockedSites);
+
+        // Check for mismatches
+        const validRuleIds = new Set<number>();
+        for (const site of blockedSites) {
+            for (let i = 0; i < 8; i++) {
+                validRuleIds.add(site.ruleId + i);
+            }
+        }
+
+        const orphanedRuleIds = rules
+            .map((rule) => rule.id)
+            .filter((id) => !validRuleIds.has(id));
+
+        if (orphanedRuleIds.length > 0) {
+            console.warn(
+                `Found ${orphanedRuleIds.length} orphaned rules:`,
+                orphanedRuleIds,
+            );
+        }
     }
 
     // Helper method to check if a site is currently blocked

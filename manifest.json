@@ -12,7 +12,8 @@
         "windows",
         "declarativeNetRequest",
         "scripting",
-        "downloads"
+        "downloads",
+        "contextMenus"
     ],
     "host_permissions": ["*://*/*", "<all_urls>"],
     "content_security_policy": {

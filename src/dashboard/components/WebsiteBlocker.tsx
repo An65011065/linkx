@@ -3,6 +3,7 @@ import { Lock } from "lucide-react";
 import { websiteBlocker } from "../../data/websiteBlocker";
 import type { BlockedSite } from "../../shared/types/common.types";
 import UnblockMiniGame from "./UnblockMiniGame";
+import { freeTrial } from "../../main/MainTab";
 
 // Common leisure/social media domains
 const LEISURE_DOMAINS = [
@@ -64,6 +65,21 @@ const WebsiteBlocker: React.FC<WebsiteBlockerProps> = ({
     const [showMiniGame, setShowMiniGame] = useState(false);
     const [selectedDomain, setSelectedDomain] = useState<string>("");
     const [isLocked, setIsLocked] = useState(false);
+    const [isTrialMode, setIsTrialMode] = useState(freeTrial);
+
+    useEffect(() => {
+        const checkTrialStatus = () => {
+            setIsTrialMode(freeTrial);
+        };
+
+        // Check immediately
+        checkTrialStatus();
+
+        // Set up an interval to check frequently
+        const interval = setInterval(checkTrialStatus, 100);
+
+        return () => clearInterval(interval);
+    }, []);
 
     useEffect(() => {
         loadBlockedSites();
@@ -85,6 +101,12 @@ const WebsiteBlocker: React.FC<WebsiteBlockerProps> = ({
     };
 
     const handleBlockLeisure = async () => {
+        if (freeTrial) {
+            alert(
+                "Free trial allows blocking only 2 websites at a time. Please block sites individually.",
+            );
+            return;
+        }
         try {
             for (const domain of LEISURE_DOMAINS) {
                 await websiteBlocker.blockWebsite(domain, 1);
@@ -96,6 +118,12 @@ const WebsiteBlocker: React.FC<WebsiteBlockerProps> = ({
     };
 
     const handleBlockWork = async () => {
+        if (freeTrial) {
+            alert(
+                "Free trial allows blocking only 2 websites at a time. Please block sites individually.",
+            );
+            return;
+        }
         try {
             for (const domain of WORK_DOMAINS) {
                 await websiteBlocker.blockWebsite(domain, 1);
@@ -110,11 +138,25 @@ const WebsiteBlocker: React.FC<WebsiteBlockerProps> = ({
         e.preventDefault();
         if (!domain.trim() || !startTime || !endTime) return;
 
+        if (freeTrial && blockedSites.length >= 2) {
+            alert(
+                "Free trial allows blocking only 2 websites at a time. Please unlock a website before blocking a new one.",
+            );
+            return;
+        }
+
         setIsLocked(true);
         try {
             const cleanDomain = domain
                 .replace(/^(https?:\/\/)?(www\.)?/, "")
                 .split("/")[0];
+
+            // Check if domain is already blocked
+            if (blockedSites.some((site) => site.domain === cleanDomain)) {
+                alert("This website is already blocked.");
+                setIsLocked(false);
+                return;
+            }
 
             const startMinutes =
                 parseInt(startTime.split(":")[0]) * 60 +
@@ -284,32 +326,36 @@ const WebsiteBlocker: React.FC<WebsiteBlockerProps> = ({
                                 isDarkMode ? "text-white" : "text-gray-900"
                             }`}
                         >
-                            Locking In
+                            Locking in
                         </h2>
                     </div>
                     <div className="flex gap-2">
-                        <button
-                            onClick={handleBlockLeisure}
-                            className={`rounded-lg px-2 py-1 cursor-pointer transition-all duration-200 text-xs font-medium ${
-                                isDarkMode
-                                    ? "bg-red-500 bg-opacity-20 border-red-500 border-opacity-30 text-white text-opacity-90 hover:bg-opacity-30"
-                                    : "bg-red-100 hover:bg-red-200 border-red-200 text-red-700"
-                            } border`}
-                            title="Block leisure sites for 1 hour"
-                        >
-                            Lock Leisure
-                        </button>
-                        <button
-                            onClick={handleBlockWork}
-                            className={`rounded-lg px-2 py-1 cursor-pointer transition-all duration-200 text-xs font-medium ${
-                                isDarkMode
-                                    ? "bg-blue-500 bg-opacity-20 border-blue-500 border-opacity-30 text-white text-opacity-90 hover:bg-opacity-30"
-                                    : "bg-blue-100 hover:bg-blue-200 border-blue-200 text-blue-700"
-                            } border`}
-                            title="Block work sites for 1 hour"
-                        >
-                            Lock Work
-                        </button>
+                        {!isTrialMode && (
+                            <>
+                                <button
+                                    onClick={handleBlockLeisure}
+                                    className={`rounded-lg px-2 py-1 cursor-pointer transition-all duration-200 text-xs font-medium ${
+                                        isDarkMode
+                                            ? "bg-red-500 bg-opacity-20 border-red-500 border-opacity-30 text-white text-opacity-90 hover:bg-opacity-30"
+                                            : "bg-red-100 hover:bg-red-200 border-red-200 text-red-700"
+                                    } border`}
+                                    title="Block leisure sites for 1 hour"
+                                >
+                                    Lock Leisure
+                                </button>
+                                <button
+                                    onClick={handleBlockWork}
+                                    className={`rounded-lg px-2 py-1 cursor-pointer transition-all duration-200 text-xs font-medium ${
+                                        isDarkMode
+                                            ? "bg-blue-500 bg-opacity-20 border-blue-500 border-opacity-30 text-white text-opacity-90 hover:bg-opacity-30"
+                                            : "bg-blue-100 hover:bg-blue-200 border-blue-200 text-blue-700"
+                                    } border`}
+                                    title="Block work sites for 1 hour"
+                                >
+                                    Lock Work
+                                </button>
+                            </>
+                        )}
                         <button
                             onClick={() => {
                                 setSelectedDomain("*");

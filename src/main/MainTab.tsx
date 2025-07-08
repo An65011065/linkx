@@ -3,7 +3,11 @@ import Insights from "./Insights";
 import DashboardTab from "../dashboard/components/DashboardTab";
 import GraphVisualization from "../graph/components/GraphVisualization";
 import { downloadSessionData } from "../data/useExtensionData";
+import { Download, Sun, Moon } from "lucide-react";
 import "./styles/sunlit-window.css";
+
+// Global variable for free trial state
+export let freeTrial = false;
 
 // Define tab types
 type TabType = "insights" | "dashboard" | "network";
@@ -20,6 +24,14 @@ const MainTab: React.FC = () => {
     const [isInputFocused, setIsInputFocused] = useState(false);
     const [windowWidth, setWindowWidth] = useState(window.innerWidth);
     const [isDarkMode, setIsDarkMode] = useState(true);
+
+    // Add free trial state
+    const [isFreeTrial, setIsFreeTrial] = useState(false);
+
+    // Update global variable when state changes
+    useEffect(() => {
+        freeTrial = isFreeTrial;
+    }, [isFreeTrial]);
 
     const tabs: Tab[] = [
         { id: "insights", label: "Insights" },
@@ -138,12 +150,8 @@ const MainTab: React.FC = () => {
             case "network":
                 return (
                     <div
-                        style={{
-                            width: "100%",
-                            height: "100%",
-                            opacity: networkLoaded ? 1 : 0,
-                            transition: "opacity 0.5s ease-in-out",
-                        }}
+                        className="w-full h-full opacity-0 transition-opacity duration-500 ease-in-out"
+                        style={{ opacity: networkLoaded ? 1 : 0 }}
                     >
                         <GraphVisualization />
                     </div>
@@ -230,62 +238,75 @@ const MainTab: React.FC = () => {
                     0% { transform: rotate(0deg); }
                     100% { transform: rotate(360deg); }
                 }
-                .download-button {
-                    background: #f8f9fa;
-                    border: 2px solid #ddd;
-                    border-radius: 8px;
-                    padding: 8px 16px;
-                    font-family: Nunito-Bold, Arial, sans-serif;
-                    font-size: 14px;
-                    color: #2d3436;
-                    cursor: pointer;
-                    transition: all 0.2s ease;
-                    position: relative;
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                }
-                .download-button:hover {
-                    background: #f1f3f5;
-                    border-color: #c5c9cc;
-                }
-                .download-menu {
-                    position: absolute;
-                    top: 100%;
-                    right: 0;
-                    margin-top: 8px;
-                    background: white;
-                    border: 2px solid #ddd;
-                    border-radius: 8px;
-                    padding: 8px 0;
-                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+                .free-trial-switch {
+                    position: fixed;
+                    top: 20px;
+                    left: 20px;
                     z-index: 1000;
-                }
-                .download-option {
-                    padding: 8px 16px;
-                    font-family: Nunito-Regular, Arial, sans-serif;
-                    font-size: 14px;
-                    color: #2d3436;
-                    cursor: pointer;
-                    transition: background 0.2s ease;
-                    white-space: nowrap;
-                }
-                .download-option:hover {
-                    background: #f8f9fa;
-                }
-                .download-icon {
-                    width: 16px;
-                    height: 16px;
-                    fill: currentColor;
-                }
-                .dark-mode-toggle {
                     display: flex;
                     align-items: center;
                     gap: 8px;
-                    margin-right: 12px;
+                }
+                .switch {
+                    position: relative;
+                    display: inline-block;
+                    width: 40px;
+                    height: 20px;
+                }
+                .switch input {
+                    opacity: 0;
+                    width: 0;
+                    height: 0;
+                }
+                .slider {
+                    position: absolute;
+                    cursor: pointer;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background-color: #ccc;
+                    transition: .4s;
+                    border-radius: 34px;
+                }
+                .slider:before {
+                    position: absolute;
+                    content: "";
+                    height: 16px;
+                    width: 16px;
+                    left: 2px;
+                    bottom: 2px;
+                    background-color: white;
+                    transition: .4s;
+                    border-radius: 50%;
+                }
+                input:checked + .slider {
+                    background-color: #2196F3;
+                }
+                input:checked + .slider:before {
+                    transform: translateX(20px);
                 }
             `}</style>
             <div className="main-tab-container">
+                {/* Free Trial Switch */}
+                <div className="free-trial-switch">
+                    <label className="switch">
+                        <input
+                            type="checkbox"
+                            checked={isFreeTrial}
+                            onChange={(e) => setIsFreeTrial(e.target.checked)}
+                        />
+                        <span className="slider"></span>
+                    </label>
+                    <span
+                        style={{
+                            color: "#2d3436",
+                            fontFamily: "Nunito-Regular, Arial, sans-serif",
+                        }}
+                    >
+                        Free Trial
+                    </span>
+                </div>
                 {/* Animation Background Layer */}
                 <div
                     className={`animation-background animation-container ${
@@ -298,13 +319,7 @@ const MainTab: React.FC = () => {
                         <div className="perspective">
                             {activeTab === "insights" && (
                                 <div id="leaves">
-                                    <svg
-                                        style={{
-                                            width: 0,
-                                            height: 0,
-                                            position: "absolute",
-                                        }}
-                                    >
+                                    <svg className="w-0 h-0 absolute">
                                         <defs>
                                             <filter
                                                 id="wind"
@@ -369,6 +384,7 @@ const MainTab: React.FC = () => {
                 <div className="content-layer">
                     {/* Tab Navigation Container */}
                     <div
+                        className="flex justify-center items-center pt-10 mb-10 relative"
                         style={{
                             width: (() => {
                                 const fixedWidth = 1200;
@@ -382,63 +398,36 @@ const MainTab: React.FC = () => {
                                 const shouldScale = windowWidth <= fixedWidth;
                                 return shouldScale ? "none" : `${fixedWidth}px`;
                             })(),
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            paddingTop: "40px",
-                            marginBottom: "40px",
                         }}
                     >
                         {/* Tabs */}
-                        <div
-                            style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "60px",
-                            }}
-                        >
+                        <div className="flex items-center gap-[60px]">
                             {tabs.map((tab) => (
                                 <div
                                     key={tab.id}
-                                    style={{
-                                        display: "flex",
-                                        flexDirection: "column",
-                                        alignItems: "center",
-                                        cursor: "pointer",
-                                    }}
+                                    className="flex flex-col items-center cursor-pointer"
                                 >
                                     {/* Circle Indicator */}
                                     <div
+                                        className="w-2 h-2 rounded-full mb-0 transition-colors duration-200"
                                         style={{
-                                            width: "8px",
-                                            height: "8px",
-                                            borderRadius: "50%",
                                             backgroundColor:
                                                 activeTab === tab.id
                                                     ? "#d63031"
                                                     : "transparent",
-                                            marginBottom: "0px",
-                                            transition:
-                                                "background-color 0.2s ease",
                                         }}
                                     />
                                     {/* Tab Button */}
                                     <button
                                         onClick={() => handleTabClick(tab.id)}
+                                        className="bg-transparent border-none px-4 py-2 text-lg cursor-pointer transition-colors duration-200 outline-none"
                                         style={{
-                                            background: "none",
-                                            border: "none",
-                                            padding: "8px 16px",
                                             fontFamily:
                                                 "Nunito-Bold, Arial, sans-serif",
-                                            fontSize: "18px",
                                             color:
                                                 activeTab === tab.id
                                                     ? "#2d3436"
                                                     : "#636e72",
-                                            cursor: "pointer",
-                                            transition: "color 0.2s ease",
-                                            outline: "none",
                                         }}
                                         onMouseEnter={(e) => {
                                             if (activeTab !== tab.id) {
@@ -458,50 +447,76 @@ const MainTab: React.FC = () => {
                                 </div>
                             ))}
                         </div>
-                        {/* Download Button Container */}
-                        <div
+                    </div>
+
+                    {/* Glass View Window */}
+                    <div style={getViewportStyle()}>
+                        {/* Loading overlay for network tab */}
+                        {activeTab === "network" && !networkLoaded && (
+                            <div className="network-loading-overlay">
+                                <div className="text-center">
+                                    <div className="loading-spinner"></div>
+                                    <div
+                                        className="mt-4 text-[#666] text-sm"
+                                        style={{
+                                            fontFamily:
+                                                "Nunito-Regular, Arial, sans-serif",
+                                        }}
+                                    >
+                                        Loading network visualization...
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        {renderTabContent()}
+                    </div>
+                </div>
+
+                {/* Action Buttons - positioned outside content layer at bottom-right */}
+                {activeTab === "dashboard" && (
+                    <div
+                        className="fixed flex flex-col gap-0 z-20 -mb-0.5"
+                        style={{
+                            bottom: "0.5rem",
+                            right: (() => {
+                                const fixedWidth = 1200;
+                                const shouldScale = windowWidth <= fixedWidth;
+                                if (shouldScale) {
+                                    return "20px"; // Close to screen edge when scaled
+                                } else {
+                                    const leftMargin =
+                                        (windowWidth - fixedWidth) / 2;
+                                    return `${leftMargin - 40}px`; // 60px to the left of viewport (outside it)
+                                }
+                            })(),
+                        }}
+                    >
+                        {/* Dark Mode Toggle Button */}
+                        <button
+                            onClick={() => setIsDarkMode(!isDarkMode)}
+                            className="p-2 rounded-lg cursor-pointer transition-all duration-200 hover:bg-black/5 -mb-2"
                             style={{
-                                position: "relative",
-                                display: "flex",
-                                alignItems: "center",
+                                background: "transparent",
+                                border: "none",
+                                color: "#636e72",
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.color = "#000";
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.color = "#636e72";
                             }}
                         >
-                            {/* Dark Mode Toggle Button */}
-                            {activeTab === "dashboard" && (
-                                <button
-                                    onClick={() => setIsDarkMode(!isDarkMode)}
-                                    className="download-button dark-mode-toggle"
-                                    style={{
-                                        background: isDarkMode
-                                            ? "#2d3436"
-                                            : "#f8f9fa",
-                                        border: `2px solid ${
-                                            isDarkMode ? "#636e72" : "#ddd"
-                                        }`,
-                                        color: isDarkMode
-                                            ? "#ffffff"
-                                            : "#2d3436",
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        e.currentTarget.style.background =
-                                            isDarkMode ? "#636e72" : "#f1f3f5";
-                                        e.currentTarget.style.borderColor =
-                                            isDarkMode ? "#ffffff" : "#c5c9cc";
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.currentTarget.style.background =
-                                            isDarkMode ? "#2d3436" : "#f8f9fa";
-                                        e.currentTarget.style.borderColor =
-                                            isDarkMode ? "#636e72" : "#ddd";
-                                    }}
-                                >
-                                    {isDarkMode ? "🌙" : "☀️"}
-                                    {isDarkMode ? "Dark" : "Light"}
-                                </button>
+                            {isDarkMode ? (
+                                <Moon size={20} />
+                            ) : (
+                                <Sun size={20} />
                             )}
+                        </button>
 
+                        {/* Download Button */}
+                        <div className="relative">
                             <button
-                                className="download-button"
                                 onClick={() =>
                                     setShowDownloadMenu(!showDownloadMenu)
                                 }
@@ -511,19 +526,29 @@ const MainTab: React.FC = () => {
                                         200,
                                     )
                                 }
+                                className="p-2 rounded-lg cursor-pointer transition-all duration-200 hover:bg-black/5"
+                                style={{
+                                    background: "transparent",
+                                    border: "none",
+                                    color: "#636e72",
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.color = "#2d3436";
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.color = "#636e72";
+                                }}
                             >
-                                <svg
-                                    className="download-icon"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
-                                </svg>
-                                Export Data
+                                <Download size={20} />
                             </button>
                             {showDownloadMenu && (
-                                <div className="download-menu">
+                                <div className="absolute bottom-full right-0 mb-2 bg-white border border-gray-200 rounded-lg py-2 shadow-lg z-[1000] min-w-[140px]">
                                     <div
-                                        className="download-option"
+                                        className="px-4 py-2 text-sm text-[#2d3436] cursor-pointer transition-colors duration-200 whitespace-nowrap hover:bg-[#f8f9fa]"
+                                        style={{
+                                            fontFamily:
+                                                "Nunito-Regular, Arial, sans-serif",
+                                        }}
                                         onClick={() => {
                                             downloadSessionData("json");
                                             setShowDownloadMenu(false);
@@ -532,7 +557,11 @@ const MainTab: React.FC = () => {
                                         Download as JSON
                                     </div>
                                     <div
-                                        className="download-option"
+                                        className="px-4 py-2 text-sm text-[#2d3436] cursor-pointer transition-colors duration-200 whitespace-nowrap hover:bg-[#f8f9fa]"
+                                        style={{
+                                            fontFamily:
+                                                "Nunito-Regular, Arial, sans-serif",
+                                        }}
                                         onClick={() => {
                                             downloadSessionData("csv");
                                             setShowDownloadMenu(false);
@@ -544,30 +573,7 @@ const MainTab: React.FC = () => {
                             )}
                         </div>
                     </div>
-                    {/* Glass View Window */}
-                    <div style={getViewportStyle()}>
-                        {/* Loading overlay for network tab */}
-                        {activeTab === "network" && !networkLoaded && (
-                            <div className="network-loading-overlay">
-                                <div style={{ textAlign: "center" }}>
-                                    <div className="loading-spinner"></div>
-                                    <div
-                                        style={{
-                                            marginTop: "16px",
-                                            fontFamily:
-                                                "Nunito-Regular, Arial, sans-serif",
-                                            color: "#666",
-                                            fontSize: "14px",
-                                        }}
-                                    >
-                                        Loading network visualization...
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                        {renderTabContent()}
-                    </div>
-                </div>
+                )}
             </div>
         </>
     );

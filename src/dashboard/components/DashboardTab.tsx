@@ -7,6 +7,7 @@ import Shortcuts from "./Shortcuts";
 import WeeklyInsights from "./WeeklyInsights";
 import Timers from "./Timers";
 import Templates from "./Templates";
+import ConsolidateTabs from "./ConsolidateTabs";
 // import Templates from "./light-mode/Templates";
 // import Timers from "./light-mode/Timers";
 // import WeeklyInsights from "./light-mode/WeeklyInsights";

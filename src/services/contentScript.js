@@ -119,6 +119,59 @@ function extractPageText() {
     }
 }
 
+// Function to show notification when text is added to notes
+function showNotification(message) {
+    // Remove any existing notifications
+    const existingNotification = document.getElementById("lyncx-notification");
+    if (existingNotification) {
+        existingNotification.remove();
+    }
+
+    // Create notification element
+    const notification = document.createElement("div");
+    notification.id = "lyncx-notification";
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-size: 14px;
+        font-weight: 500;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        z-index: 10000;
+        opacity: 0;
+        transform: translateX(100%);
+        transition: all 0.3s ease-out;
+        max-width: 300px;
+        word-wrap: break-word;
+    `;
+    notification.textContent = message;
+
+    // Add to page
+    document.body.appendChild(notification);
+
+    // Animate in
+    setTimeout(() => {
+        notification.style.opacity = "1";
+        notification.style.transform = "translateX(0)";
+    }, 100);
+
+    // Animate out and remove after 3 seconds
+    setTimeout(() => {
+        notification.style.opacity = "0";
+        notification.style.transform = "translateX(100%)";
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 300);
+    }, 3000);
+}
+
 // Listen for messages from popup/background script
 if (typeof chrome !== "undefined" && chrome.runtime) {
     chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -134,6 +187,12 @@ if (typeof chrome !== "undefined" && chrome.runtime) {
                 sendResponse({ success: false, error: error.message });
             }
             return true; // Keep message channel open for async response
+        }
+
+        if (request.action === "showNotification") {
+            showNotification(request.message);
+            sendResponse({ success: true });
+            return false;
         }
 
         return false; // Don't keep channel open for other messages

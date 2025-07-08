@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import {
     Camera,
     FileText,
-    Bookmark,
     Bell,
     MoreHorizontal,
     Search,
@@ -16,6 +15,7 @@ import DataService from "../../data/dataService";
 import Reminders from "./Reminders";
 import NotepadView from "./NotepadView";
 import CrossTabSearch from "./CrosstabSearch";
+import ConsolidateTabs from "../../dashboard/components/ConsolidateTabs";
 import "../../shared/styles/fonts.css";
 
 const PopupApp: React.FC = () => {
@@ -233,6 +233,21 @@ const PopupApp: React.FC = () => {
                 : `${hours}h`;
         }
         return `${minutes}m`;
+    };
+
+    // Format domain name for display
+    const formatDomainName = (domain: string): string => {
+        if (!domain) return "";
+
+        // Remove common extensions
+        const withoutExtension = domain
+            .replace(/\.(com|org|net|edu|gov|co\.uk|co\.in|io|app|dev)$/i, "")
+            .replace(/^www\./, "");
+
+        // Capitalize first letter
+        return (
+            withoutExtension.charAt(0).toUpperCase() + withoutExtension.slice(1)
+        );
     };
 
     const handleScreenshot = async () => {
@@ -488,7 +503,8 @@ const PopupApp: React.FC = () => {
                             color: "#2c3e50",
                         }}
                     >
-                        {formatTime(domainTime)} on this domain
+                        {formatTime(domainTime)} on{" "}
+                        {formatDomainName(currentDomain)}
                     </div>
 
                     {/* Timer display */}
@@ -559,29 +575,10 @@ const PopupApp: React.FC = () => {
                     </div>
                 </CrossTabSearch>
 
-                <div
-                    style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        cursor: "pointer",
-                        padding: "6px",
-                        borderRadius: "10px",
-                        transition: "all 0.2s ease",
-                    }}
-                    onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = "#e9ecef";
-                    }}
-                    onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = "transparent";
-                    }}
+                <ConsolidateTabs
+                    shouldConsolidate={true}
+                    className="flex flex-col items-center cursor-pointer p-[6px] rounded-[10px] transition-all duration-200 ease-in-out hover:bg-[#e9ecef]"
                 >
-                    <Bookmark
-                        fill="#4dabf7"
-                        size={24}
-                        color="#0475d1"
-                        strokeWidth={2}
-                    />
                     <span
                         style={{
                             fontSize: "12px",
@@ -591,9 +588,9 @@ const PopupApp: React.FC = () => {
                             marginTop: "4px",
                         }}
                     >
-                        Bookmark
+                        Consolidate
                     </span>
-                </div>
+                </ConsolidateTabs>
 
                 <div
                     onClick={handleScreenshot}

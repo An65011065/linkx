@@ -3,6 +3,38 @@ import DataService from "../../data/dataService";
 import type { BrowsingSession, TabSession } from "../../data/dataService";
 import type { UrlVisit } from "../../data/background";
 import Activity from "./Activity";
+import { freeTrial } from "../../main/MainTab";
+
+// Secure blur component that can't be bypassed with CSS
+const SecureBlur: React.FC<{
+    children: React.ReactNode;
+    isActive?: boolean;
+}> = ({ children, isActive = true }) => {
+    if (!isActive || !freeTrial) return <>{children}</>;
+
+    return (
+        <div
+            className="relative select-none pointer-events-none"
+            style={{ filter: "blur(15px)" }}
+        >
+            {/* Anti-inspect overlay */}
+            <div className="absolute inset-0 z-50 bg-transparent" />
+            {/* Content with multiple layers of security */}
+            <div
+                className="opacity-90"
+                style={{
+                    WebkitUserSelect: "none",
+                    MozUserSelect: "none",
+                    msUserSelect: "none",
+                    userSelect: "none",
+                    WebkitTouchCallout: "none",
+                }}
+            >
+                {children}
+            </div>
+        </div>
+    );
+};
 
 interface StoryCardProps {
     currentSession: BrowsingSession | null;
@@ -467,44 +499,47 @@ export const StoryCard: React.FC<StoryCardProps> = ({
                             </div>
                         </div>
                         <div className="flex justify-end items-start">
-                            <div className="grid grid-cols-4 gap-1 justify-center w-fit">
-                                {getTopDomains()
-                                    .slice(0, 12)
-                                    .map((item, index) => (
-                                        <div
-                                            key={index}
-                                            className={`${
-                                                isDarkMode
-                                                    ? "flex flex-col items-center w-12 p-2 rounded-lg hover:bg-white/10 transition-all hover:-translate-y-0.5"
-                                                    : "bg-white rounded-lg p-2 flex flex-col items-center gap-1 transition-all duration-200 hover:shadow-md cursor-pointer w-12"
-                                            }`}
-                                        >
-                                            <img
-                                                src={`https://www.google.com/s2/favicons?domain=${item.domain}&sz=32`}
-                                                alt={item.domain}
-                                                className={`${
-                                                    isDarkMode
-                                                        ? "w-5 h-5 rounded opacity-80"
-                                                        : "w-5 h-5 rounded opacity-80"
-                                                }`}
-                                                onError={(e) => {
-                                                    (
-                                                        e.target as HTMLImageElement
-                                                    ).style.display = "none";
-                                                }}
-                                            />
+                            <SecureBlur>
+                                <div className="grid grid-cols-4 gap-1 justify-center w-fit">
+                                    {getTopDomains()
+                                        .slice(0, 12)
+                                        .map((item, index) => (
                                             <div
+                                                key={index}
                                                 className={`${
                                                     isDarkMode
-                                                        ? "text-xs font-normal text-gray-300 text-center mt-1"
-                                                        : "text-xs font-medium text-gray-700 text-center"
+                                                        ? "flex flex-col items-center w-12 p-2 rounded-lg hover:bg-white/10 transition-all hover:-translate-y-0.5"
+                                                        : "bg-white rounded-lg p-2 flex flex-col items-center gap-1 transition-all duration-200 hover:shadow-md cursor-pointer w-12"
                                                 }`}
                                             >
-                                                {formatTime(item.time)}
+                                                <img
+                                                    src={`https://www.google.com/s2/favicons?domain=${item.domain}&sz=32`}
+                                                    alt={item.domain}
+                                                    className={`${
+                                                        isDarkMode
+                                                            ? "w-5 h-5 rounded opacity-80"
+                                                            : "w-5 h-5 rounded opacity-80"
+                                                    }`}
+                                                    onError={(e) => {
+                                                        (
+                                                            e.target as HTMLImageElement
+                                                        ).style.display =
+                                                            "none";
+                                                    }}
+                                                />
+                                                <div
+                                                    className={`${
+                                                        isDarkMode
+                                                            ? "text-xs font-normal text-gray-300 text-center mt-1"
+                                                            : "text-xs font-medium text-gray-700 text-center"
+                                                    }`}
+                                                >
+                                                    {formatTime(item.time)}
+                                                </div>
                                             </div>
-                                        </div>
-                                    ))}
-                            </div>
+                                        ))}
+                                </div>
+                            </SecureBlur>
                         </div>
                         {onToggleAutoPlay && (
                             <button
@@ -590,6 +625,7 @@ export const StoryCard: React.FC<StoryCardProps> = ({
                                 >
                                     LONGEST BREAK
                                 </div>
+
                                 <div
                                     className={`${
                                         isDarkMode
@@ -599,20 +635,27 @@ export const StoryCard: React.FC<StoryCardProps> = ({
                                 >
                                     {formatTime(getLongestBreak().duration)}
                                 </div>
-                                <div
-                                    className={`${
-                                        isDarkMode
-                                            ? "text-sm font-normal text-gray-300"
-                                            : "text-sm font-light text-gray-600"
-                                    }`}
-                                >
-                                    {formatTimeOfDay(getLongestBreak().start)} -{" "}
-                                    {formatTimeOfDay(getLongestBreak().end)}
-                                </div>
+                                <SecureBlur>
+                                    <div
+                                        className={`${
+                                            isDarkMode
+                                                ? "text-sm font-normal text-gray-300"
+                                                : "text-sm font-light text-gray-600"
+                                        }`}
+                                    >
+                                        {formatTimeOfDay(
+                                            getLongestBreak().start,
+                                        )}{" "}
+                                        -{" "}
+                                        {formatTimeOfDay(getLongestBreak().end)}
+                                    </div>
+                                </SecureBlur>
                             </div>
                         </div>
                         <div className="flex justify-end items-start">
-                            <Activity isDarkMode={isDarkMode} />
+                            <SecureBlur>
+                                <Activity isDarkMode={isDarkMode} />
+                            </SecureBlur>
                         </div>
                         {onToggleAutoPlay && (
                             <button
@@ -700,31 +743,33 @@ export const StoryCard: React.FC<StoryCardProps> = ({
                                 >
                                     LONGEST FOCUS STREAK
                                 </div>
-                                <div
-                                    className={`${
-                                        isDarkMode
-                                            ? "text-5xl font-light mb-2 tracking-tight text-green-400"
-                                            : "text-5xl font-extralight mb-2 tracking-tight text-green-500"
-                                    }`}
-                                >
-                                    {formatTime(longestStreak.time)}
-                                </div>
-                                <div
-                                    className={`${
-                                        isDarkMode
-                                            ? "text-sm font-normal text-gray-300"
-                                            : "text-sm font-light text-gray-600"
-                                    }`}
-                                >
-                                    {longestStreak.time > 0
-                                        ? `${formatTimeOfDay(
-                                              longestStreak.startTime,
-                                          )} - ${formatTimeOfDay(
-                                              longestStreak.startTime +
-                                                  longestStreak.time,
-                                          )}`
-                                        : "No focus sessions today"}
-                                </div>
+                                <SecureBlur>
+                                    <div
+                                        className={`${
+                                            isDarkMode
+                                                ? "text-5xl font-light mb-2 tracking-tight text-green-400"
+                                                : "text-5xl font-extralight mb-2 tracking-tight text-green-500"
+                                        }`}
+                                    >
+                                        {formatTime(longestStreak.time)}
+                                    </div>
+                                    <div
+                                        className={`${
+                                            isDarkMode
+                                                ? "text-sm font-normal text-gray-300"
+                                                : "text-sm font-light text-gray-600"
+                                        }`}
+                                    >
+                                        {longestStreak.time > 0
+                                            ? `${formatTimeOfDay(
+                                                  longestStreak.startTime,
+                                              )} - ${formatTimeOfDay(
+                                                  longestStreak.startTime +
+                                                      longestStreak.time,
+                                              )}`
+                                            : "No focus sessions today"}
+                                    </div>
+                                </SecureBlur>
                             </div>
                         </div>
                         <div className="flex justify-end items-start">
@@ -744,41 +789,45 @@ export const StoryCard: React.FC<StoryCardProps> = ({
                                 >
                                     NUMBER OF LINKS
                                 </div>
-                                <div className="grid grid-cols-4 gap-3 justify-center">
-                                    {Array.from(longestStreak.domains.entries())
-                                        .slice(0, 12)
-                                        .map(([domain, data], index) => (
-                                            <div
-                                                key={index}
-                                                className={`flex flex-col items-center w-12 p-1 rounded-lg transition-all ${
-                                                    isDarkMode
-                                                        ? "hover:bg-white/10 hover:-translate-y-0.5"
-                                                        : "hover:bg-gray-50 hover:-translate-y-0.5"
-                                                }`}
-                                            >
-                                                <img
-                                                    src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`}
-                                                    alt={domain}
-                                                    className="w-6 h-6 rounded-md"
-                                                    onError={(e) => {
-                                                        (
-                                                            e.target as HTMLImageElement
-                                                        ).style.display =
-                                                            "none";
-                                                    }}
-                                                />
+                                <SecureBlur>
+                                    <div className="grid grid-cols-4 gap-3 justify-center">
+                                        {Array.from(
+                                            longestStreak.domains.entries(),
+                                        )
+                                            .slice(0, 12)
+                                            .map(([domain, data], index) => (
                                                 <div
-                                                    className={`text-xs font-normal text-center mt-1 ${
+                                                    key={index}
+                                                    className={`flex flex-col items-center w-12 p-1 rounded-lg transition-all ${
                                                         isDarkMode
-                                                            ? "text-gray-300"
-                                                            : "text-gray-800"
+                                                            ? "hover:bg-white/10 hover:-translate-y-0.5"
+                                                            : "hover:bg-gray-50 hover:-translate-y-0.5"
                                                     }`}
                                                 >
-                                                    {data.count}
+                                                    <img
+                                                        src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`}
+                                                        alt={domain}
+                                                        className="w-6 h-6 rounded-md"
+                                                        onError={(e) => {
+                                                            (
+                                                                e.target as HTMLImageElement
+                                                            ).style.display =
+                                                                "none";
+                                                        }}
+                                                    />
+                                                    <div
+                                                        className={`text-xs font-normal text-center mt-1 ${
+                                                            isDarkMode
+                                                                ? "text-gray-300"
+                                                                : "text-gray-800"
+                                                        }`}
+                                                    >
+                                                        {data.count}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        ))}
-                                </div>
+                                            ))}
+                                    </div>
+                                </SecureBlur>
                             </div>
                         </div>
                         {onToggleAutoPlay && (
@@ -1052,45 +1101,50 @@ export const StoryCard: React.FC<StoryCardProps> = ({
                             >
                                 Insights & Suggestions
                             </h2>
-                            <div className="flex flex-col gap-4">
-                                {getSuggestions().map((suggestion, index) => (
-                                    <div
-                                        key={index}
-                                        className="flex items-start gap-3"
-                                    >
-                                        <div
-                                            className={`w-3 h-3 rounded-full mt-1.5 ${
-                                                suggestion.status === "green"
-                                                    ? "bg-green-500"
-                                                    : suggestion.status ===
-                                                      "yellow"
-                                                    ? "bg-yellow-500"
-                                                    : "bg-red-500"
-                                            }`}
-                                        />
-                                        <div>
+                            <SecureBlur>
+                                <div className="flex flex-col gap-4">
+                                    {getSuggestions().map(
+                                        (suggestion, index) => (
                                             <div
-                                                className={`text-sm font-medium ${
-                                                    isDarkMode
-                                                        ? "text-white"
-                                                        : "text-black"
-                                                }`}
+                                                key={index}
+                                                className="flex items-start gap-3"
                                             >
-                                                {suggestion.text}
+                                                <div
+                                                    className={`w-3 h-3 rounded-full mt-1.5 ${
+                                                        suggestion.status ===
+                                                        "green"
+                                                            ? "bg-green-500"
+                                                            : suggestion.status ===
+                                                              "yellow"
+                                                            ? "bg-yellow-500"
+                                                            : "bg-red-500"
+                                                    }`}
+                                                />
+                                                <div>
+                                                    <div
+                                                        className={`text-sm font-medium ${
+                                                            isDarkMode
+                                                                ? "text-white"
+                                                                : "text-black"
+                                                        }`}
+                                                    >
+                                                        {suggestion.text}
+                                                    </div>
+                                                    <div
+                                                        className={`text-xs ${
+                                                            isDarkMode
+                                                                ? "font-normal text-gray-300"
+                                                                : "text-gray-600"
+                                                        }`}
+                                                    >
+                                                        {suggestion.detail}
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div
-                                                className={`text-xs ${
-                                                    isDarkMode
-                                                        ? "font-normal text-gray-300"
-                                                        : "text-gray-600"
-                                                }`}
-                                            >
-                                                {suggestion.detail}
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
+                                        ),
+                                    )}
+                                </div>
+                            </SecureBlur>
                         </div>
                         {onToggleAutoPlay && (
                             <button

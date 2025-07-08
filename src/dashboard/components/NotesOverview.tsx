@@ -10,7 +10,9 @@ import {
     Copy,
     Tag,
     ExternalLink,
+    AlertTriangle,
 } from "lucide-react";
+import { freeTrial } from "../../main/MainTab";
 
 interface Note {
     domain: string;
@@ -35,11 +37,26 @@ const NotesOverview: React.FC<NotesOverviewProps> = ({
     const [selectedNote, setSelectedNote] = useState<Note | null>(null);
     const [isSaving, setSaving] = useState(false);
     const [copyMessage, setCopyMessage] = useState("");
+    const [isTrialMode, setIsTrialMode] = useState(freeTrial);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const searchInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         loadNotes();
+    }, []);
+
+    useEffect(() => {
+        const checkTrialStatus = () => {
+            setIsTrialMode(freeTrial);
+        };
+
+        // Check immediately
+        checkTrialStatus();
+
+        // Set up an interval to check frequently
+        const interval = setInterval(checkTrialStatus, 100);
+
+        return () => clearInterval(interval);
     }, []);
 
     useEffect(() => {
@@ -53,7 +70,11 @@ const NotesOverview: React.FC<NotesOverviewProps> = ({
             const storage = await chrome.storage.local.get(null);
             const noteEntries: Note[] = [];
             for (const [key, value] of Object.entries(storage)) {
-                if (key.startsWith("note_") && !key.includes("timestamp")) {
+                if (
+                    key.startsWith("note_") &&
+                    !key.includes("timestamp") &&
+                    !key.includes("created")
+                ) {
                     const domain = key.replace("note_", "");
                     const timestamp =
                         storage[`note_timestamp_${domain}`] || Date.now();
@@ -66,7 +87,7 @@ const NotesOverview: React.FC<NotesOverviewProps> = ({
                     });
                 }
             }
-            noteEntries.sort((a, b) => b.createdAt - a.createdAt);
+            noteEntries.sort((a, b) => b.lastModified - a.lastModified);
             setNotes(noteEntries);
         } catch (err) {
             console.error("Error loading notes:", err);
@@ -180,6 +201,11 @@ const NotesOverview: React.FC<NotesOverviewProps> = ({
             note.domain.toLowerCase().includes(searchQuery.toLowerCase()) ||
             note.content.toLowerCase().includes(searchQuery.toLowerCase()),
     );
+
+    const displayedNotes = isTrialMode
+        ? filteredNotes.slice(0, 4)
+        : filteredNotes;
+    const hasHiddenNotes = isTrialMode && filteredNotes.length > 4;
 
     // Render note editor (used for both viewing and editing)
     const renderNoteEditor = (
@@ -427,9 +453,36 @@ const NotesOverview: React.FC<NotesOverviewProps> = ({
                     </button>
                 </div>
             </div>
+
+            {/* Warning Message for Free Trial */}
+            {hasHiddenNotes && (
+                <div
+                    className={`p-3 rounded-lg flex items-start gap-2 mb-2 ${
+                        isDarkMode
+                            ? "bg-yellow-500 bg-opacity-20 border border-yellow-500 border-opacity-30"
+                            : "bg-yellow-50 border border-yellow-200"
+                    }`}
+                >
+                    <AlertTriangle
+                        size={16}
+                        className={
+                            isDarkMode ? "text-yellow-400" : "text-yellow-600"
+                        }
+                    />
+                    <div
+                        className={`text-sm ${
+                            isDarkMode ? "text-yellow-400" : "text-yellow-700"
+                        }`}
+                    >
+                        Your plan only supports 4 notes at a time. Please access
+                        notes via extension popup.
+                    </div>
+                </div>
+            )}
+
             {/* Notes List */}
             <div className="flex-1 overflow-y-auto">
-                {filteredNotes.map((note, index) => (
+                {displayedNotes.map((note, index) => (
                     <div key={note.domain}>
                         <div
                             onClick={() => setSelectedNote(note)}
@@ -468,7 +521,7 @@ const NotesOverview: React.FC<NotesOverviewProps> = ({
                                 {getPreviewText(note.content)}
                             </div>
                         </div>
-                        {index < filteredNotes.length - 1 && (
+                        {index < displayedNotes.length - 1 && (
                             <div
                                 className={`h-px my-1 ${
                                     isDarkMode
@@ -479,7 +532,7 @@ const NotesOverview: React.FC<NotesOverviewProps> = ({
                         )}
                     </div>
                 ))}
-                {filteredNotes.length === 0 && !isAddingNote && (
+                {displayedNotes.length === 0 && !isAddingNote && (
                     <div
                         className={`py-4 text-center text-sm ${
                             isDarkMode

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import type { ReactNode } from "react";
 import { Bell, Clock, Lock, Plus, Timer, ArrowRight } from "lucide-react";
 import { websiteBlocker } from "../../data/websiteBlocker";
+import { freeTrial } from "../../main/MainTab";
 
 interface RemindersProps {
     currentDomain: string;
@@ -37,9 +38,32 @@ const Reminders: React.FC<RemindersProps> = ({
 
     const handleTimerStart = (minutes: number) => {
         try {
-            // Clear any existing timer for this domain
-            if (activeTimers[currentDomain]) {
-                clearTimeout(activeTimers[currentDomain]);
+            // If free trial is active, remove all existing timers first
+            if (freeTrial) {
+                // Get all timer keys from localStorage
+                const timerKeys = [];
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key?.startsWith("timer_")) {
+                        timerKeys.push(key);
+                    }
+                }
+
+                // Remove all existing timers
+                timerKeys.forEach((key) => {
+                    localStorage.removeItem(key);
+                });
+
+                // Clear all active timers in state
+                Object.values(activeTimers).forEach((timer) =>
+                    clearTimeout(timer),
+                );
+                setActiveTimers({});
+            } else {
+                // For non-trial mode, clear any existing timer for this domain
+                if (activeTimers[currentDomain]) {
+                    clearTimeout(activeTimers[currentDomain]);
+                }
             }
 
             // Set up the new timer
@@ -60,9 +84,22 @@ const Reminders: React.FC<RemindersProps> = ({
                     return newTimers;
                 });
 
+                // Remove from localStorage
+                localStorage.removeItem(`timer_${currentDomain}`);
+
                 // Call the clear callback
                 onTimerClear?.();
             }, minutes * 60 * 1000);
+
+            // Store in localStorage for persistence
+            const timerData = {
+                endTime: Date.now() + minutes * 60 * 1000,
+                minutes,
+            };
+            localStorage.setItem(
+                `timer_${currentDomain}`,
+                JSON.stringify(timerData),
+            );
 
             // Add to active timers
             setActiveTimers((prev) => ({
