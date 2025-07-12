@@ -11,7 +11,7 @@ export interface NetworkNode {
     activeTime: number;
     lastVisited: number;
     category?: string;
-    categoryConfidence?: number;
+
     tabId?: number;
     originalUrls: Set<string>;
     youtubeMetadata: YouTubeMetadata | null;

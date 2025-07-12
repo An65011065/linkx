@@ -13,9 +13,10 @@
         "declarativeNetRequest",
         "scripting",
         "downloads",
-        "contextMenus"
+        "contextMenus",
+        "alarms"
     ],
-    "host_permissions": ["*://*/*", "<all_urls>"],
+    "host_permissions": ["<all_urls>"],
     "content_security_policy": {
         "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
     },
@@ -23,7 +24,7 @@
         "default_popup": "src/popup/popup.html"
     },
     "background": {
-        "service_worker": "src/data/background.js"
+        "service_worker": "src/data/background.ts"
     },
     "content_scripts": [
         {
@@ -32,34 +33,15 @@
             "run_at": "document_end"
         }
     ],
-    "declarativeNetRequest": {
-        "rule_resources": [
-            {
-                "id": "ruleset_1",
-                "enabled": true,
-                "path": "rules.json"
-            }
-        ]
-    },
     "web_accessible_resources": [
         {
             "resources": [
+                "waterfall.html",
                 "src/graph/graph.html",
                 "src/dashboard/dashboard.html",
-                "src/assets/icons/icon128.png",
-                "src/assets/fonts/Nunito-ExtraBold.ttf",
-                "src/assets/fonts/Nunito-Bold.ttf",
-                "src/assets/fonts/Nunito-Medium.ttf",
-                "src/assets/fonts/Nunito-Regular.ttf",
-                "src/assets/fonts/Nunito-SemiBold.ttf",
-                "src/assets/fonts/Gaegu-Bold.ttf",
-                "src/assets/fonts/Gaegu-Light.ttf",
-                "src/assets/fonts/Gaegu-Regular.ttf",
-                "src/assets/fonts/gaegu-v8-latin-regular.ttf",
-                "src/assets/fonts/indie-flower-v11-latin-regular.ttf",
-                "src/assets/leaves.png",
-                "packages/roughviz.es.js",
-                "src/main/main.html"
+                "src/main/main.html",
+                "src/assets/fonts/*.ttf",
+                "src/assets/leaves.png"
             ],
             "matches": ["<all_urls>"]
         }

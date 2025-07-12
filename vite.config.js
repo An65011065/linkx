@@ -9,7 +9,14 @@ dotenv.config();
 export default defineConfig(function (_a) {
     var mode = _a.mode;
     return ({
-        plugins: [react(), crx({ manifest: manifest })],
+        plugins: [
+            react(),
+            crx({
+                manifest: manifest,
+                // Add this to help with service worker issues
+                browser: "chrome",
+            }),
+        ],
         resolve: {
             alias: {
                 "@": resolve(__dirname, "src"),
@@ -18,15 +25,20 @@ export default defineConfig(function (_a) {
         define: {
             "process.env.OPENAI_API_KEY": JSON.stringify(process.env.OPENAI_API_KEY),
         },
+        css: {
+            postcss: "./postcss.config.js",
+        },
         build: {
             watch: mode === "development" ? {} : undefined,
             rollupOptions: {
                 input: {
-                    background: "src/data/background.ts",
+                    // Remove background from here - let crx plugin handle it
+                    contentScript: "src/services/contentScript.js",
                     popup: resolve(__dirname, "src/popup/popup.html"),
                     graph: resolve(__dirname, "src/graph/graph.html"),
                     dashboard: resolve(__dirname, "src/dashboard/dashboard.html"),
                     main: resolve(__dirname, "src/main/main.html"),
+                    waterfall: resolve(__dirname, "waterfall.html"), // Add this
                 },
             },
         },

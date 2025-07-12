@@ -7,13 +7,14 @@ import Shortcuts from "./Shortcuts";
 import WeeklyInsights from "./WeeklyInsights";
 import Timers from "./Timers";
 import Templates from "./Templates";
-import ConsolidateTabs from "./ConsolidateTabs";
 // import Templates from "./light-mode/Templates";
 // import Timers from "./light-mode/Timers";
 // import WeeklyInsights from "./light-mode/WeeklyInsights";
 // import Shortcuts from "./light-mode/Shortcuts";
 import WebsiteBlocker from "./WebsiteBlocker";
 import NotesOverview from "./NotesOverview";
+import SmartBookmarks from "./Bookmark";
+import ScrollableContainer from "./ScrollableContainer";
 
 interface DashboardTabProps {
     isDarkMode?: boolean;
@@ -245,7 +246,7 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ isDarkMode = true }) => {
                             }}
                         >
                             <div style={{ height: "60%" }}>
-                                <GhostTab isDarkMode={isDarkMode} />
+                                <ScrollableContainer isDarkMode={isDarkMode} />
                             </div>
                             <div style={{ height: "40%" }}>
                                 <Shortcuts isDarkMode={isDarkMode} />

@@ -3,16 +3,16 @@ import {
     FileText,
     Search,
     ChevronRight,
-    Calendar,
     Plus,
     ArrowLeft,
-    Save,
     Copy,
-    Tag,
-    ExternalLink,
     AlertTriangle,
+    Trash2,
+    X,
 } from "lucide-react";
-import { freeTrial } from "../../main/MainTab";
+
+// Mock freeTrial for demo
+const freeTrial = false;
 
 interface Note {
     domain: string;
@@ -32,12 +32,11 @@ const NotesOverview: React.FC<NotesOverviewProps> = ({
     const [searchQuery, setSearchQuery] = useState("");
     const [isSearchExpanded, setIsSearchExpanded] = useState(false);
     const [isAddingNote, setIsAddingNote] = useState(false);
-    const [newNoteDomain, setNewNoteDomain] = useState("");
     const [newNoteContent, setNewNoteContent] = useState("");
     const [selectedNote, setSelectedNote] = useState<Note | null>(null);
-    const [isSaving, setSaving] = useState(false);
     const [copyMessage, setCopyMessage] = useState("");
     const [isTrialMode, setIsTrialMode] = useState(freeTrial);
+    const [isDeleteMode, setIsDeleteMode] = useState(false);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -49,13 +48,8 @@ const NotesOverview: React.FC<NotesOverviewProps> = ({
         const checkTrialStatus = () => {
             setIsTrialMode(freeTrial);
         };
-
-        // Check immediately
         checkTrialStatus();
-
-        // Set up an interval to check frequently
         const interval = setInterval(checkTrialStatus, 100);
-
         return () => clearInterval(interval);
     }, []);
 
@@ -94,9 +88,21 @@ const NotesOverview: React.FC<NotesOverviewProps> = ({
         }
     };
 
+    const handleDeleteNote = async (domain: string) => {
+        try {
+            await chrome.storage.local.remove([
+                `note_${domain}`,
+                `note_timestamp_${domain}`,
+                `note_created_${domain}`,
+            ]);
+            await loadNotes();
+        } catch (err) {
+            console.error("Error deleting note:", err);
+        }
+    };
+
     const handleSaveNote = async (domain: string, content: string) => {
         try {
-            setSaving(true);
             const timestamp = Date.now();
             await chrome.storage.local.set({
                 [`note_${domain}`]: content,
@@ -112,22 +118,24 @@ const NotesOverview: React.FC<NotesOverviewProps> = ({
             }
         } catch (err) {
             console.error("Error saving note:", err);
-        } finally {
-            setSaving(false);
         }
     };
 
-    const handleAddNote = async () => {
-        if (!newNoteDomain.trim() || !newNoteContent.trim()) return;
+    const handleAutoSaveNewNote = async (content: string) => {
+        if (!content.trim()) return;
+
         try {
+            // Extract first word as domain
+            const firstWord = content.trim().split(/\s+/)[0];
+            const domain = firstWord.toLowerCase();
+
             const timestamp = Date.now();
-            const domain = newNoteDomain.trim();
             await chrome.storage.local.set({
-                [`note_${domain}`]: newNoteContent,
+                [`note_${domain}`]: content,
                 [`note_timestamp_${domain}`]: timestamp,
                 [`note_created_${domain}`]: timestamp,
             });
-            setNewNoteDomain("");
+
             setNewNoteContent("");
             setIsAddingNote(false);
             loadNotes();
@@ -148,23 +156,6 @@ const NotesOverview: React.FC<NotesOverviewProps> = ({
         }
     };
 
-    const addTimestamp = (
-        content: string,
-        setContent: (content: string) => void,
-    ) => {
-        const timestamp = new Date().toLocaleString();
-        const newText =
-            content + (content ? "\n\n" : "") + `--- ${timestamp} ---\n`;
-        setContent(newText);
-        setTimeout(() => {
-            if (textareaRef.current) {
-                textareaRef.current.focus();
-                textareaRef.current.selectionStart =
-                    textareaRef.current.selectionEnd = newText.length;
-            }
-        }, 0);
-    };
-
     const formatLastModified = (timestamp: number) => {
         const date = new Date(timestamp);
         return date.toLocaleDateString("en-US", {
@@ -181,10 +172,6 @@ const NotesOverview: React.FC<NotesOverviewProps> = ({
         return firstLine.length > 80
             ? firstLine.slice(0, 80) + "..."
             : firstLine;
-    };
-
-    const openLink = (domain: string) => {
-        window.open(`https://${domain}`, "_blank");
     };
 
     const handleSearchIconClick = () => {
@@ -207,7 +194,13 @@ const NotesOverview: React.FC<NotesOverviewProps> = ({
         : filteredNotes;
     const hasHiddenNotes = isTrialMode && filteredNotes.length > 4;
 
-    // Render note editor (used for both viewing and editing)
+    // Get preview domain from new note content
+    const getPreviewDomain = (content: string) => {
+        if (!content.trim()) return "new-note";
+        const firstWord = content.trim().split(/\s+/)[0];
+        return firstWord.toLowerCase();
+    };
+
     const renderNoteEditor = (
         note: Note,
         onClose: () => void,
@@ -217,130 +210,73 @@ const NotesOverview: React.FC<NotesOverviewProps> = ({
             isDarkMode
                 ? "bg-black bg-opacity-95 border-white border-opacity-20"
                 : "bg-white border-gray-200"
-        } rounded-2xl flex flex-col p-5 border shadow-xl backdrop-blur-sm`;
+        } rounded-2xl flex flex-col border shadow-xl backdrop-blur-sm`;
+
+        const handleKeyDown = () => {
+            // No-op - removed keyboard shortcuts
+        };
 
         return (
             <div className={editorClasses}>
-                {/* Header */}
-                <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-3">
+                {/* Minimal Header */}
+                <div className="flex items-center justify-between p-3 border-b border-opacity-10">
+                    <div className="flex items-center gap-2">
                         <button
-                            onClick={onClose}
-                            className={`p-2 rounded-lg transition-colors ${
+                            onClick={() => {
+                                if (isNew && newNoteContent.trim()) {
+                                    handleAutoSaveNewNote(newNoteContent);
+                                } else {
+                                    onClose();
+                                }
+                            }}
+                            className={`p-1 rounded transition-colors ${
                                 isDarkMode
-                                    ? "bg-white bg-opacity-10 hover:bg-opacity-20 text-white"
-                                    : "hover:bg-gray-100 text-gray-600 hover:text-gray-800"
+                                    ? "hover:bg-white hover:bg-opacity-20 text-white"
+                                    : "hover:bg-gray-100 text-gray-600"
                             }`}
                         >
-                            <ArrowLeft size={20} />
+                            <ArrowLeft size={16} />
                         </button>
-                        <div>
-                            <div
-                                className={`text-lg font-medium flex items-center gap-2 ${
-                                    isDarkMode ? "text-white" : "text-black"
-                                }`}
-                            >
-                                <Tag size={16} />
-                                {isNew ? (
-                                    <input
-                                        type="text"
-                                        value={newNoteDomain}
-                                        onChange={(e) =>
-                                            setNewNoteDomain(e.target.value)
-                                        }
-                                        placeholder="Enter domain..."
-                                        className={`bg-transparent border-none outline-none text-lg placeholder-gray-400 ${
-                                            isDarkMode
-                                                ? "text-white"
-                                                : "text-black"
-                                        }`}
-                                    />
-                                ) : (
-                                    note.domain
-                                )}
-                            </div>
-                            <div
-                                className={`text-sm flex items-center gap-2 ${
-                                    isDarkMode
-                                        ? "text-white text-opacity-60"
-                                        : "text-gray-500"
-                                }`}
-                            >
-                                {isSaving ? (
-                                    <>
-                                        <Save size={12} />
-                                        Saving...
-                                    </>
-                                ) : (
-                                    formatLastModified(note.lastModified)
-                                )}
-                            </div>
-                        </div>
+                        <span
+                            className={`text-sm font-medium ${
+                                isDarkMode ? "text-white" : "text-black"
+                            }`}
+                        >
+                            {isNew
+                                ? getPreviewDomain(newNoteContent)
+                                : note.domain}
+                        </span>
                     </div>
-                    {/* Action buttons */}
-                    <div className="flex gap-2">
-                        <button
-                            onClick={() =>
-                                addTimestamp(
-                                    isNew ? newNoteContent : note.content,
-                                    isNew
-                                        ? setNewNoteContent
-                                        : (content) =>
-                                              handleSaveNote(
-                                                  note.domain,
-                                                  content,
-                                              ),
-                                )
-                            }
-                            className={`p-2 rounded-lg transition-colors ${
-                                isDarkMode
-                                    ? "bg-white bg-opacity-10 hover:bg-opacity-20 text-white"
-                                    : "hover:bg-gray-100 text-gray-600 hover:text-gray-800"
-                            }`}
-                            title="Add timestamp"
-                        >
-                            <Calendar size={16} />
-                        </button>
-                        <button
-                            onClick={() =>
-                                handleCopyNote(
-                                    isNew ? newNoteContent : note.content,
-                                )
-                            }
-                            className={`p-2 rounded-lg transition-colors ${
-                                isDarkMode
-                                    ? "bg-white bg-opacity-10 hover:bg-opacity-20 text-white"
-                                    : "hover:bg-gray-100 text-gray-600 hover:text-gray-800"
-                            }`}
-                            title="Copy note"
-                        >
-                            <Copy size={16} />
-                        </button>
-                        <button
-                            onClick={() => openLink(note.domain)}
-                            className={`p-2 rounded-lg transition-colors ${
-                                isDarkMode
-                                    ? "bg-white bg-opacity-10 hover:bg-opacity-20 text-white"
-                                    : "hover:bg-gray-100 text-gray-600 hover:text-gray-800"
-                            }`}
-                            title="Open website"
-                        >
-                            <ExternalLink size={16} />
-                        </button>
-                    </div>
+                    <button
+                        onClick={() =>
+                            handleCopyNote(
+                                isNew ? newNoteContent : note.content,
+                            )
+                        }
+                        className={`p-1 rounded transition-colors ${
+                            isDarkMode
+                                ? "hover:bg-white hover:bg-opacity-20 text-white"
+                                : "hover:bg-gray-100 text-gray-600"
+                        }`}
+                        title="Copy note"
+                    >
+                        <Copy size={16} />
+                    </button>
                 </div>
+
                 {/* Copy Message */}
                 {copyMessage && (
                     <div
-                        className={`p-2 rounded-lg text-sm mb-3 text-center border ${
+                        className={`mx-3 mt-2 p-2 rounded text-xs text-center ${
                             isDarkMode
-                                ? "bg-green-500 bg-opacity-20 text-green-400 border-green-400 border-opacity-30"
-                                : "bg-green-50 text-green-700 border-green-200"
+                                ? "bg-green-500 bg-opacity-20 text-green-400"
+                                : "bg-green-50 text-green-700"
                         }`}
                     >
                         {copyMessage}
                     </div>
                 )}
+
                 {/* Text Editor */}
                 <textarea
                     ref={textareaRef}
@@ -349,36 +285,32 @@ const NotesOverview: React.FC<NotesOverviewProps> = ({
                         if (isNew) {
                             setNewNoteContent(e.target.value);
                         } else {
-                            handleSaveNote(note.domain, e.target.value);
+                            const newContent = e.target.value;
+                            clearTimeout((window as any).notesSaveTimeout);
+                            (window as any).notesSaveTimeout = setTimeout(
+                                () => {
+                                    handleSaveNote(note.domain, newContent);
+                                },
+                                1000,
+                            );
+                            setSelectedNote((prev) =>
+                                prev ? { ...prev, content: newContent } : null,
+                            );
                         }
                     }}
-                    placeholder={`Write your note about ${note.domain}...`}
-                    className={`flex-1 p-4 rounded-lg resize-none text-sm leading-relaxed outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                    onKeyDown={handleKeyDown}
+                    placeholder={
+                        isNew
+                            ? "Start typing..."
+                            : `Write your note about ${note.domain}...`
+                    }
+                    className={`flex-1 p-4 m-3 rounded-lg resize-none text-sm leading-relaxed outline-none focus:ring-1 focus:ring-blue-500 ${
                         isDarkMode
-                            ? "bg-white bg-opacity-5 border-white border-opacity-10 text-white placeholder-gray-400"
-                            : "bg-gray-50 border-gray-200 text-black placeholder-gray-400"
+                            ? "bg-white bg-opacity-5 border-white border-opacity-10 text-white placeholder-gray-500"
+                            : "bg-gray-50 border-gray-200 text-black placeholder-gray-500"
                     } border`}
+                    autoFocus
                 />
-                {isNew && (
-                    <div className="flex justify-end gap-2 mt-4">
-                        <button
-                            onClick={onClose}
-                            className={`px-4 py-2 rounded-lg text-sm transition-colors ${
-                                isDarkMode
-                                    ? "border-white border-opacity-20 bg-transparent text-white hover:bg-white hover:bg-opacity-10"
-                                    : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
-                            } border`}
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            onClick={handleAddNote}
-                            className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors text-sm"
-                        >
-                            Add Note
-                        </button>
-                    </div>
-                )}
             </div>
         );
     };
@@ -406,7 +338,7 @@ const NotesOverview: React.FC<NotesOverviewProps> = ({
                         Site Notes
                     </h3>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-0.5">
                     {/* Search Icon/Bar */}
                     <div
                         className="relative flex items-center transition-all duration-300"
@@ -439,6 +371,22 @@ const NotesOverview: React.FC<NotesOverviewProps> = ({
                             <Search size={16} />
                         </button>
                     </div>
+                    {/* Delete Button */}
+                    <button
+                        onClick={() => setIsDeleteMode(!isDeleteMode)}
+                        className={`p-1 rounded transition-colors ${
+                            isDeleteMode
+                                ? isDarkMode
+                                    ? "bg-red-500 bg-opacity-20 text-red-400"
+                                    : "bg-red-50 text-red-600"
+                                : isDarkMode
+                                ? "text-white hover:bg-white hover:bg-opacity-10"
+                                : "text-gray-600 hover:text-gray-800 hover:bg-gray-100"
+                        }`}
+                        title={isDeleteMode ? "Cancel delete" : "Delete notes"}
+                    >
+                        <Trash2 size={16} />
+                    </button>
                     {/* New Note Button */}
                     <button
                         onClick={() => setIsAddingNote(true)}
@@ -485,9 +433,19 @@ const NotesOverview: React.FC<NotesOverviewProps> = ({
                 {displayedNotes.map((note, index) => (
                     <div key={note.domain}>
                         <div
-                            onClick={() => setSelectedNote(note)}
+                            onClick={() => {
+                                if (isDeleteMode) {
+                                    handleDeleteNote(note.domain);
+                                } else {
+                                    setSelectedNote(note);
+                                }
+                            }}
                             className={`py-1.5 cursor-pointer rounded-lg px-2 -mx-2 transition-colors ${
-                                isDarkMode
+                                isDeleteMode
+                                    ? isDarkMode
+                                        ? "hover:bg-red-500 hover:bg-opacity-20"
+                                        : "hover:bg-red-50"
+                                    : isDarkMode
                                     ? "hover:bg-white hover:bg-opacity-10"
                                     : "hover:bg-gray-50"
                             }`}
@@ -507,8 +465,16 @@ const NotesOverview: React.FC<NotesOverviewProps> = ({
                                             : "text-gray-500"
                                     }`}
                                 >
-                                    {formatLastModified(note.lastModified)}
-                                    <ChevronRight size={12} />
+                                    {isDeleteMode ? (
+                                        <X size={16} className="text-red-500" />
+                                    ) : (
+                                        <>
+                                            {formatLastModified(
+                                                note.lastModified,
+                                            )}
+                                            <ChevronRight size={12} />
+                                        </>
+                                    )}
                                 </div>
                             </div>
                             <div
@@ -546,21 +512,22 @@ const NotesOverview: React.FC<NotesOverviewProps> = ({
                     </div>
                 )}
             </div>
+
             {/* Note Editor Modal */}
             {selectedNote &&
                 renderNoteEditor(selectedNote, () => setSelectedNote(null))}
+
             {/* New Note Modal */}
             {isAddingNote &&
                 renderNoteEditor(
                     {
-                        domain: newNoteDomain,
+                        domain: getPreviewDomain(newNoteContent),
                         content: newNoteContent,
                         lastModified: Date.now(),
                         createdAt: Date.now(),
                     },
                     () => {
                         setIsAddingNote(false);
-                        setNewNoteDomain("");
                         setNewNoteContent("");
                     },
                     true,

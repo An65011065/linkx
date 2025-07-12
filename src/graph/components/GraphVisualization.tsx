@@ -2,7 +2,12 @@ import React, { useEffect, useRef, useCallback, useState } from "react";
 import * as d3 from "d3";
 import { useNetworkData } from "../hooks/useNetworkData";
 import { useEvolutionState } from "../hooks/useEvolutionState";
-import type { SimNetworkNode, SimNetworkLink } from "../types/network.types";
+import type {
+    SimNetworkNode,
+    SimNetworkLink,
+    NetworkNode,
+    NetworkLink,
+} from "../types/network.types";
 import { EvolutionPlayer } from "./EvolutionPlayer";
 import SearchComponent from "./SearchComponent";
 import { NetworkMetricsCalculator } from "../services/NetworkMetricsCalculator";
@@ -43,13 +48,15 @@ const GraphVisualization: React.FC = () => {
         null,
     );
     const metricsCalculatorRef = useRef<NetworkMetricsCalculator | null>(null);
+
     const networkData = useNetworkData();
     const { nodes, links, loading, error } = networkData;
+
     const [dimensions, setDimensions] = useState({
         width: window.innerWidth,
         height: window.innerHeight,
     });
-    const [isDragging, setIsDragging] = useState(false);
+    const [, setIsDragging] = useState(false);
     const [dragStartPos, setDragStartPos] = useState({ x: 0, y: 0 });
     const [isEvolutionMode, setIsEvolutionMode] = useState(false);
     const [selectedNode, setSelectedNode] = useState<string | null>(null);
@@ -57,7 +64,8 @@ const GraphVisualization: React.FC = () => {
     const [pathLinks, setPathLinks] = useState<Set<string>>(new Set());
     const [searchResults, setSearchResults] = useState<Set<string>>(new Set());
     const [pathOrder, setPathOrder] = useState<Map<string, number>>(new Map());
-    const [isDarkMode, setIsDarkMode] = useState(true); // Default to dark mode
+    const [isDarkMode, setIsDarkMode] = useState(true);
+
     const evolution = useEvolutionState(nodes || [], links || [], selectedNode);
 
     const formatTime = (timestamp: number) => {
@@ -108,6 +116,7 @@ const GraphVisualization: React.FC = () => {
             degree: 0,
             closeness: 0,
         };
+
         let titleDisplay = "";
         if (d.youtubeMetadata) {
             titleDisplay = `${
@@ -118,6 +127,7 @@ const GraphVisualization: React.FC = () => {
         } else {
             titleDisplay = isNewTabUrl(d.url) ? "New Tab" : d.url;
         }
+
         tooltip.innerHTML = `
             <div class="url">${titleDisplay}</div>
             <div class="time">Time spent: ${timeSpent}</div>
@@ -131,7 +141,7 @@ const GraphVisualization: React.FC = () => {
         `;
         tooltip.style.display = "block";
         tooltip.classList.add("show");
-        // Update tooltip colors based on theme
+
         tooltip.style.background = isDarkMode
             ? "rgba(0, 0, 0, 0.9)"
             : "rgba(255, 255, 255, 0.9)";
@@ -200,6 +210,7 @@ const GraphVisualization: React.FC = () => {
 
     useEffect(() => {
         if (!svgRef.current || !nodes || !links) return;
+
         const svg = d3.select(svgRef.current);
         const { width, height } = dimensions;
         const centerX = width / 2;
@@ -219,10 +230,7 @@ const GraphVisualization: React.FC = () => {
         svg.call(zoom).on("dblclick.zoom", null);
         zoomRef.current = zoom;
 
-        // Apply initial zoom transform - left-aligned but vertically centered
-        const initialTransform = d3.zoomIdentity
-            .translate(100, 0) // Start from left edge, no vertical offset
-            .scale(0.7);
+        const initialTransform = d3.zoomIdentity.translate(100, 0).scale(0.7);
         svg.call(zoom.transform, initialTransform);
 
         const arrowColor = isDarkMode ? "#999" : "#666";
@@ -242,27 +250,48 @@ const GraphVisualization: React.FC = () => {
             .attr("fill", arrowColor);
 
         // Horizontal BFS layout
-        const createTreeLayout = (nodes: any[], links: any[]) => {
+        const createTreeLayout = (
+            nodes: NetworkNode[],
+            links: NetworkLink[],
+        ) => {
             const adjacency = new Map<string, string[]>();
             const outgoingCount = new Map<string, number>();
+            const incomingCount = new Map<string, number>();
+
             nodes.forEach((node) => {
                 adjacency.set(node.id, []);
                 outgoingCount.set(node.id, 0);
+                incomingCount.set(node.id, 0);
             });
+
             links.forEach((link) => {
                 const sourceId =
                     typeof link.source === "string"
                         ? link.source
-                        : link.source.id;
+                        : (link.source as NetworkNode).id;
                 const targetId =
                     typeof link.target === "string"
                         ? link.target
-                        : link.target.id;
+                        : (link.target as NetworkNode).id;
                 adjacency.get(sourceId)?.push(targetId);
                 outgoingCount.set(
                     sourceId,
                     (outgoingCount.get(sourceId) || 0) + 1,
                 );
+                incomingCount.set(
+                    targetId,
+                    (incomingCount.get(targetId) || 0) + 1,
+                );
+            });
+
+            // Identify isolated nodes (no incoming or outgoing edges)
+            const isolatedNodes = new Set<string>();
+            nodes.forEach((node) => {
+                const outgoing = outgoingCount.get(node.id) || 0;
+                const incoming = incomingCount.get(node.id) || 0;
+                if (outgoing === 0 && incoming === 0) {
+                    isolatedNodes.add(node.id);
+                }
             });
 
             const sortedByOutgoing = [...nodes].sort((a, b) => {
@@ -275,8 +304,8 @@ const GraphVisualization: React.FC = () => {
                     (outgoingCount.get(a.id) || 0)
                 );
             });
-            const root = sortedByOutgoing[0];
 
+            const root = sortedByOutgoing[0];
             const levels = new Map<string, number>();
             const visited = new Set<string>();
             const queue: [string, number][] = [[root.id, 0]];
@@ -295,8 +324,9 @@ const GraphVisualization: React.FC = () => {
                 });
             }
 
+            // Handle remaining non-isolated nodes
             nodes.forEach((node) => {
-                if (!visited.has(node.id)) {
+                if (!visited.has(node.id) && !isolatedNodes.has(node.id)) {
                     const outgoing = outgoingCount.get(node.id) || 0;
                     if (outgoing >= 3) levels.set(node.id, 1);
                     else if (outgoing >= 1) levels.set(node.id, 2);
@@ -313,12 +343,13 @@ const GraphVisualization: React.FC = () => {
             });
 
             const positions = new Map<string, { x: number; y: number }>();
-            const levelWidth = 120; // Horizontal spacing between levels
-            const nodeSpacing = 80; // Vertical spacing between nodes in same level
-            const leftMargin = 50; // Small margin to prevent edge clipping
+            const levelWidth = 120;
+            const nodeSpacing = 80;
+            const leftMargin = 50;
 
+            // Position connected nodes in their levels
             levelGroups.forEach((nodeIds, level) => {
-                const x = leftMargin + level * levelWidth; // Start from small margin
+                const x = leftMargin + level * levelWidth;
                 const nodesInLevel = nodeIds.length;
                 if (nodesInLevel === 1) {
                     positions.set(nodeIds[0], { x, y: centerY });
@@ -331,6 +362,26 @@ const GraphVisualization: React.FC = () => {
                     });
                 }
             });
+
+            // Position isolated nodes in a compact area at the bottom right
+            if (isolatedNodes.size > 0) {
+                const isolatedNodesArray = Array.from(isolatedNodes);
+                const maxLevel = Math.max(...Array.from(levels.values())) || 0;
+                const isolatedStartX = leftMargin + (maxLevel + 1) * levelWidth;
+                const isolatedStartY = centerY + 100; // Below the main network
+                const isolatedSpacing = 60; // Tighter spacing for isolated nodes
+                const itemsPerRow = Math.ceil(
+                    Math.sqrt(isolatedNodesArray.length),
+                );
+
+                isolatedNodesArray.forEach((nodeId, index) => {
+                    const row = Math.floor(index / itemsPerRow);
+                    const col = index % itemsPerRow;
+                    const x = isolatedStartX + col * isolatedSpacing;
+                    const y = isolatedStartY + row * isolatedSpacing;
+                    positions.set(nodeId, { x, y });
+                });
+            }
 
             return positions;
         };
@@ -606,27 +657,32 @@ const GraphVisualization: React.FC = () => {
     const tracePathToNode = useCallback(
         (targetNodeId: string) => {
             if (!nodes || !links) return;
+
             const pathNodesSet = new Set<string>();
             const pathLinksSet = new Set<string>();
             const nodeOrder = new Map<string, number>();
-
             const path: string[] = [];
+
             let currentNodeId = targetNodeId;
             const visited = new Set<string>();
 
             while (currentNodeId && !visited.has(currentNodeId)) {
                 visited.add(currentNodeId);
                 path.unshift(currentNodeId);
+
                 const incomingLinks = links.filter(
                     (link) =>
                         (typeof link.target === "string"
                             ? link.target
-                            : link.target.id) === currentNodeId,
+                            : (link.target as SimNetworkNode).id) ===
+                        currentNodeId,
                 );
+
                 if (incomingLinks.length === 0) break;
 
                 let earliestLink = incomingLinks[0];
                 let earliestTime = Infinity;
+
                 incomingLinks.forEach((link) => {
                     const earliestTransition = link.transitions.reduce(
                         (earliest, t) =>
@@ -642,14 +698,14 @@ const GraphVisualization: React.FC = () => {
                 currentNodeId =
                     typeof earliestLink.source === "string"
                         ? earliestLink.source
-                        : earliestLink.source.id;
+                        : (earliestLink.source as SimNetworkNode).id;
 
                 if (!visited.has(currentNodeId)) {
                     pathLinksSet.add(
                         `${currentNodeId}->${
                             typeof earliestLink.target === "string"
                                 ? earliestLink.target
-                                : earliestLink.target.id
+                                : (earliestLink.target as SimNetworkNode).id
                         }`,
                     );
                 }
@@ -726,9 +782,12 @@ const GraphVisualization: React.FC = () => {
                 transition: "background 0.3s ease, color 0.3s ease",
             }}
         >
-            {!isEvolutionMode && (
-                <SearchComponent nodes={nodes || []} onSearch={handleSearch} />
-            )}
+            <SearchComponent
+                nodes={nodes || []}
+                onSearch={handleSearch}
+                isDarkMode={isDarkMode}
+            />
+
             {isEvolutionMode && (
                 <EvolutionPlayer
                     isPlaying={evolution.isPlaying}
@@ -750,6 +809,7 @@ const GraphVisualization: React.FC = () => {
                     }
                 />
             )}
+
             <div
                 style={{
                     position: "absolute",
@@ -828,6 +888,7 @@ const GraphVisualization: React.FC = () => {
                 >
                     <History size={16} />
                 </button>
+
                 <button
                     onClick={() => {
                         if (
@@ -865,6 +926,7 @@ const GraphVisualization: React.FC = () => {
                     <Trash2 size={16} />
                 </button>
             </div>
+
             <svg
                 ref={svgRef}
                 width="100%"

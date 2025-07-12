@@ -66,6 +66,9 @@ const WebsiteBlocker: React.FC<WebsiteBlockerProps> = ({
     const [selectedDomain, setSelectedDomain] = useState<string>("");
     const [isLocked, setIsLocked] = useState(false);
     const [isTrialMode, setIsTrialMode] = useState(freeTrial);
+    const [overriddenDomains, setOverriddenDomains] = useState<Set<string>>(
+        new Set(),
+    );
 
     useEffect(() => {
         const checkTrialStatus = () => {
@@ -83,18 +86,55 @@ const WebsiteBlocker: React.FC<WebsiteBlockerProps> = ({
 
     useEffect(() => {
         loadBlockedSites();
-        const interval = setInterval(loadBlockedSites, 60000);
+        // Check less frequently since we're using session storage
+        const interval = setInterval(loadBlockedSites, 2000); // Every 2 seconds
         const now = new Date();
         const later = new Date(now.getTime() + 60 * 60 * 1000);
         setStartTime(now.toTimeString().slice(0, 5));
         setEndTime(later.toTimeString().slice(0, 5));
-        return () => clearInterval(interval);
+
+        // Listen for session storage changes
+        const handleStorageChange = (changes: {
+            [key: string]: chrome.storage.StorageChange;
+        }) => {
+            const hasOverrideChange = Object.keys(changes).some((key) =>
+                key.startsWith("override_"),
+            );
+            if (hasOverrideChange) {
+                loadBlockedSites();
+            }
+        };
+
+        chrome.storage.session.onChanged.addListener(handleStorageChange);
+
+        return () => {
+            clearInterval(interval);
+            chrome.storage.session.onChanged.removeListener(
+                handleStorageChange,
+            );
+        };
     }, []);
 
     const loadBlockedSites = async () => {
         try {
             const sites = await websiteBlocker.getBlockedSites();
+            const newOverrides = new Set<string>();
+
+            // Check override status for all sites in parallel
+            await Promise.all(
+                sites.map(async (site) => {
+                    if (
+                        await websiteBlocker.isTemporarilyOverridden(
+                            site.domain,
+                        )
+                    ) {
+                        newOverrides.add(site.domain);
+                    }
+                }),
+            );
+
             setBlockedSites(sites);
+            setOverriddenDomains(newOverrides);
         } catch (err) {
             console.error("Error loading blocked sites:", err);
         }
@@ -261,6 +301,12 @@ const WebsiteBlocker: React.FC<WebsiteBlockerProps> = ({
 
     const getBlockStatus = (site: BlockedSite): string => {
         const now = Date.now();
+
+        // Check if temporarily overridden first
+        if (overriddenDomains.has(site.domain)) {
+            return "Overridden";
+        }
+
         if (site.endTime <= now) {
             return "Expired";
         } else if (site.startTime <= now) {
@@ -494,6 +540,10 @@ const WebsiteBlocker: React.FC<WebsiteBlockerProps> = ({
                                                 ? isDarkMode
                                                     ? "bg-blue-500 bg-opacity-10 border-blue-400 border-white border-opacity-10"
                                                     : "bg-blue-50 border-blue-400 border-blue-100"
+                                                : status === "Overridden"
+                                                ? isDarkMode
+                                                    ? "bg-orange-500 bg-opacity-10 border-orange-400 border-white border-opacity-10"
+                                                    : "bg-orange-50 border-orange-400 border-orange-100"
                                                 : isDarkMode
                                                 ? "bg-green-500 bg-opacity-10 border-green-400 border-white border-opacity-10"
                                                 : "bg-green-50 border-green-400 border-green-100"
@@ -517,6 +567,9 @@ const WebsiteBlocker: React.FC<WebsiteBlockerProps> = ({
                                                             : status ===
                                                               "Scheduled"
                                                             ? "bg-blue-500"
+                                                            : status ===
+                                                              "Overridden"
+                                                            ? "bg-orange-500"
                                                             : "bg-green-500"
                                                     }`}
                                                 >

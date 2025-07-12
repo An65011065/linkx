@@ -70,7 +70,7 @@ export function useNetworkData() {
                             activeTime: 0,
                             lastVisited: visit.startTime,
                             category: visit.category,
-                            categoryConfidence: visit.categoryConfidence,
+
                             originalUrls: new Set([visit.url]),
                             youtubeMetadata: null, // Add this field
                         });

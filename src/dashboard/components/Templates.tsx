@@ -7,7 +7,6 @@ import {
     Layout,
     Trash2,
     Circle,
-    AlertTriangle,
 } from "lucide-react";
 import { freeTrial } from "../../main/MainTab";
 
@@ -554,7 +553,6 @@ const Templates: React.FC<TemplatesProps> = ({ isDarkMode = false }) => {
     };
 
     const displayedTemplates = isTrialMode ? templates.slice(0, 2) : templates;
-    const hasHiddenTemplates = isTrialMode && templates.length > 2;
     const placeholdersNeeded = Math.max(0, 3 - displayedTemplates.length);
 
     return (

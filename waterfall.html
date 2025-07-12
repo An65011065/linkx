@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Site Blocked - Take a Break</title>
+        <style>
+            :root {
+                --sky-color-1: hsl(330, 51%, 37%); /* Hot Pink */
+                --sky-color-2: hsl(350, 85%, 75%); /* Bright Rose */
+                --sky-color-3: hsl(15, 90%, 78%); /* Peach */
+                --sky-color-4: hsl(45, 90%, 75%); /* Sunny Yellow */
+                --sky-color-5: hsl(30, 88%, 70%); /* Warm Orange */
+                --sky-color-6: hsl(0, 80%, 72%); /* Vibrant Red */
+                --wave-color-1: hsl(320, 70%, 62%); /* Magenta */
+                --wave-color-2: hsl(340, 75%, 65%); /* Deep Rose */
+                --wave-color-3: hsl(10, 80%, 68%); /* Coral Pink */
+                --wave-color-4: hsl(35, 80%, 65%); /* Golden */
+                --wave-color-5: hsl(25, 78%, 60%); /* Burnt Orange */
+                --wave-color-6: hsl(355, 75%, 62%); /* Crimson */
+            }
+            body {
+                align-items: center;
+                animation: skyCycle 24s infinite;
+                background-color: var(--sky-color-1);
+                display: flex;
+                height: 100svh;
+                justify-content: center;
+                margin: 0;
+                overflow: hidden;
+            }
+            .svg-container {
+                align-content: end;
+                display: grid;
+                height: 100svh;
+                position: relative;
+                width: 100%;
+            }
+            svg {
+                display: block;
+                grid-area: 1/-1;
+                height: 100%;
+                min-width: 37.5rem;
+                position: relative;
+                width: 200%;
+            }
+            .wave {
+                animation: waveMove 14s ease-in-out infinite,
+                    waveFill 24s linear infinite;
+                fill: var(--wave-color-1);
+                opacity: 0.4;
+                transform-origin: center bottom;
+                will-change: transform, fill;
+            }
+            .wave-1 {
+                --ty: 0;
+                animation-duration: 7s, 24s;
+                animation-name: waveMoveReverse, waveFill;
+            }
+            .wave-2 {
+                --ty: 2.5%;
+                animation-name: waveMove, waveFill;
+                width: 300%;
+            }
+            .wave-2,
+            .wave-3 {
+                animation-duration: 9s, 24s;
+            }
+            .wave-3 {
+                --ty: 5%;
+                animation-name: waveMoveReverse, waveFill;
+            }
+            .wave-4 {
+                --ty: 7.5%;
+                animation-duration: 7s, 24s;
+                animation-name: waveMove, waveFill;
+                width: 300%;
+            }
+            @keyframes skyCycle {
+                0% {
+                    background-color: var(--sky-color-1);
+                }
+                16.6% {
+                    background-color: var(--sky-color-2);
+                }
+                33.3% {
+                    background-color: var(--sky-color-3);
+                }
+                50% {
+                    background-color: var(--sky-color-4);
+                }
+                66.6% {
+                    background-color: var(--sky-color-5);
+                }
+                83.3% {
+                    background-color: var(--sky-color-6);
+                }
+                100% {
+                    background-color: var(--sky-color-1);
+                }
+            }
+            @keyframes waveMoveReverse {
+                0% {
+                    transform: translate3d(-50%, var(--ty), 0);
+                }
+                50% {
+                    transform: translate3d(0, var(--ty), 0);
+                }
+                100% {
+                    transform: translate3d(-50%, var(--ty), 0);
+                }
+            }
+            @keyframes waveMove {
+                0% {
+                    transform: translate3d(0, var(--ty), 0);
+                }
+                50% {
+                    transform: translate3d(-50%, var(--ty), 0);
+                }
+                100% {
+                    transform: translate3d(0, var(--ty), 0);
+                }
+            }
+            @keyframes waveFill {
+                0% {
+                    fill: var(--wave-color-1);
+                }
+                16.6% {
+                    fill: var(--wave-color-2);
+                }
+                33.3% {
+                    fill: var(--wave-color-3);
+                }
+                50% {
+                    fill: var(--wave-color-4);
+                }
+                66.6% {
+                    fill: var(--wave-color-5);
+                }
+                83.3% {
+                    fill: var(--wave-color-6);
+                }
+                100% {
+                    fill: var(--wave-color-1);
+                }
+            }
+            .message-overlay {
+                position: fixed;
+                top: 20%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: rgba(255, 255, 255, 0.25);
+                backdrop-filter: blur(15px);
+                padding: 2rem;
+                border-radius: 1rem;
+                text-align: center;
+                color: white;
+                font-family: system-ui, -apple-system, sans-serif;
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+                border: 1px solid rgba(255, 255, 255, 0.3);
+                max-width: 90%;
+                width: auto;
+                z-index: 1000;
+            }
+            .message-overlay h1 {
+                font-size: 2rem;
+                margin: 0 0 1rem;
+                font-weight: 600;
+            }
+            .message-overlay p {
+                font-size: 1.1rem;
+                margin: 0;
+                line-height: 1.5;
+                opacity: 0.9;
+            }
+            .message-overlay .time {
+                font-size: 0.9rem;
+                margin-top: 1rem;
+                opacity: 0.7;
+            }
+            .proceed-button {
+                position: fixed;
+                bottom: 2rem;
+                left: 50%;
+                transform: translateX(-50%);
+                background: rgba(255, 255, 255, 0.2);
+                border: 1px solid rgba(255, 255, 255, 0.4);
+                color: white;
+                padding: 0.75rem 1.5rem;
+                border-radius: 2rem;
+                font-family: system-ui, -apple-system, sans-serif;
+                font-size: 0.9rem;
+                cursor: pointer;
+                backdrop-filter: blur(10px);
+                transition: all 0.2s ease;
+                z-index: 2000;
+                opacity: 0;
+                animation: fadeIn 0.5s ease-in-out 2s forwards;
+            }
+            .proceed-button:hover {
+                background: rgba(255, 255, 255, 0.35);
+                transform: translateX(-50%) scale(1.05);
+                box-shadow: 0 4px 20px rgba(255, 255, 255, 0.3);
+            }
+            .proceed-button:active {
+                transform: translateX(-50%) scale(0.95);
+            }
+            @keyframes fadeIn {
+                from {
+                    opacity: 0;
+                    transform: translateX(-50%) translateY(20px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateX(-50%) translateY(0);
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="message-overlay">
+            <h1>Are you sure?</h1>
+            <p>This site is currently locked to help you stay focused.</p>
+            <p class="time">Blocked until <span id="endTime">...</span></p>
+        </div>
+        <div class="svg-container">
+            <svg
+                viewBox="0 0 1440 600"
+                xmlns="http://www.w3.org/2000/svg"
+                preserveAspectRatio="none"
+            >
+                <path
+                    class="wave wave-1"
+                    d="M0,400 C360,300 720,500 1080,400 C1440,300 1800,500 2160,400 L2160,600 L0,600 Z"
+                ></path>
+                <path
+                    class="wave wave-2"
+                    d="M0,450 C360,350 720,550 1080,450 C1440,350 1800,550 2160,450 L2160,600 L0,600 Z"
+                ></path>
+                <path
+                    class="wave wave-3"
+                    d="M0,500 C360,400 720,600 1080,500 C1440,400 1800,600 2160,500 L2160,600 L0,600 Z"
+                ></path>
+                <path
+                    class="wave wave-4"
+                    d="M0,350 C360,250 720,450 1080,350 C1440,250 1800,450 2160,350 L2160,600 L0,600 Z"
+                ></path>
+            </svg>
+        </div>
+        <button id="proceedButton" class="proceed-button">Take me there</button>
+        <script type="module">
+            // Import the websiteBlocker directly
+            import { websiteBlocker } from "./src/data/websiteBlocker";
+
+            let originalUrl = "";
+            let blockedDomain = "";
+
+            // Get the current tab to extract the intended URL
+            chrome.tabs.query(
+                { active: true, currentWindow: true },
+                function (tabs) {
+                    if (tabs[0]) {
+                        const currentTab = tabs[0];
+                        console.log("Current tab URL:", currentTab.url);
+
+                        // Since we're on the extension page, we need to get the domain from history or storage
+                        // For now, let's extract it from the URL if it contains the domain info
+                        // Or we can store it when blocking and retrieve it here
+
+                        // Alternative approach: Get the domain from the referrer or document.referrer
+                        if (document.referrer) {
+                            originalUrl = document.referrer;
+                            console.log(
+                                "Original URL from referrer:",
+                                originalUrl,
+                            );
+                        }
+                    }
+                },
+            );
+
+            // Store the blocked URL info when a site gets blocked
+            // We'll need to modify this approach - instead get it from sessionStorage or chrome.storage
+            chrome.storage.session.get(["lastBlockedUrl"], function (result) {
+                if (result.lastBlockedUrl) {
+                    originalUrl = result.lastBlockedUrl;
+                    console.log(
+                        "Original URL from session storage:",
+                        originalUrl,
+                    );
+
+                    // Clear it after use
+                    chrome.storage.session.remove(["lastBlockedUrl"]);
+                }
+            });
+
+            // Get the blocked site info from storage
+            chrome.storage.local.get("blocked_sites", function (data) {
+                const blockedSites = data.blocked_sites || [];
+
+                // Try to determine which site was blocked
+                if (originalUrl) {
+                    try {
+                        const urlObj = new URL(originalUrl);
+                        const currentDomain = urlObj.hostname.replace(
+                            /^www\./,
+                            "",
+                        );
+                        blockedDomain = currentDomain;
+
+                        const site = blockedSites.find(
+                            (s) => s.domain === currentDomain,
+                        );
+
+                        if (site) {
+                            const endTime = new Date(site.endTime);
+                            document.getElementById("endTime").textContent =
+                                endTime.toLocaleTimeString();
+                        } else {
+                            document.getElementById("endTime").textContent =
+                                "later";
+                        }
+                    } catch (error) {
+                        console.error("Error parsing original URL:", error);
+                        document.getElementById("endTime").textContent =
+                            "later";
+                    }
+                } else {
+                    // Fallback: show the most recently blocked site
+                    if (blockedSites.length > 0) {
+                        const latestSite =
+                            blockedSites[blockedSites.length - 1];
+                        blockedDomain = latestSite.domain;
+                        originalUrl = `https://${latestSite.domain}`;
+
+                        const endTime = new Date(latestSite.endTime);
+                        document.getElementById("endTime").textContent =
+                            endTime.toLocaleTimeString();
+                    } else {
+                        document.getElementById("endTime").textContent =
+                            "later";
+                    }
+                }
+            });
+
+            // Handle button click
+            document
+                .getElementById("proceedButton")
+                .addEventListener("click", async () => {
+                    console.log("Button clicked, original URL:", originalUrl);
+
+                    if (!originalUrl) {
+                        console.error("No original URL found");
+                        alert("Cannot redirect: No original URL found");
+                        return;
+                    }
+
+                    try {
+                        console.log("Calling allowTemporaryAccess...");
+                        const success =
+                            await websiteBlocker.allowTemporaryAccess(
+                                originalUrl,
+                            );
+
+                        if (success) {
+                            console.log(
+                                "Temporary access granted, redirecting...",
+                            );
+                            // Store the overridden URL in session storage
+                            chrome.storage.session.set({
+                                overridden_url: originalUrl,
+                                override_timestamp: Date.now(),
+                            });
+                            window.location.href = originalUrl;
+                        } else {
+                            console.error("Failed to grant temporary access");
+                            alert("Failed to allow access to the site");
+                        }
+                    } catch (error) {
+                        console.error(
+                            "Error allowing temporary access:",
+                            error,
+                        );
+                        alert("Error occurred while trying to access the site");
+                    }
+                });
+        </script>
+    </body>
+</html>

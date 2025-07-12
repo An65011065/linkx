@@ -121,14 +121,17 @@ class AIService {
                         );
 
                         // 🔥 TOP DOMAINS BY TIME (using ALL visits now)
-                        const domainTimes = {};
+                        const domainTimes: Record<string, number> = {};
                         visits.forEach((visit) => {
                             domainTimes[visit.domain] =
                                 (domainTimes[visit.domain] || 0) +
                                 visit.activeTimeMinutes;
                         });
                         const topDomains = Object.entries(domainTimes)
-                            .sort(([, a], [, b]) => b - a)
+                            .sort(
+                                ([, a], [, b]): number =>
+                                    (b as number) - (a as number),
+                            )
                             .slice(0, 5);
 
                         console.log("\n🏆 TOP 5 DOMAINS BY TIME (ALL VISITS):");
@@ -205,7 +208,11 @@ class AIService {
                         }
 
                         // 🔥 TIME DISTRIBUTION
-                        const hourlyBreakdown = {};
+                        interface HourlyData {
+                            count: number;
+                            activeTime: number;
+                        }
+                        const hourlyBreakdown: Record<number, HourlyData> = {};
                         visits.forEach((visit) => {
                             const hour = new Date(visit.startTime).getHours();
                             if (!hourlyBreakdown[hour])
@@ -222,8 +229,9 @@ class AIService {
                         Object.entries(hourlyBreakdown)
                             .sort(([a], [b]) => parseInt(a) - parseInt(b))
                             .forEach(([hour, data]) => {
+                                const hourData = data as HourlyData;
                                 console.log(
-                                    `${hour}:00 - ${data.count} visits, ${data.activeTime} active minutes`,
+                                    `${hour}:00 - ${hourData.count} visits, ${hourData.activeTime} active minutes`,
                                 );
                             });
                     }
@@ -368,8 +376,10 @@ class AIService {
             console.log("=".repeat(80));
             console.error("❌ ERROR in AI response:");
             console.error("Error details:", error);
-            console.error("Error message:", error.message);
-            console.error("Error stack:", error.stack);
+            if (error instanceof Error) {
+                console.error("Error message:", error.message);
+                console.error("Error stack:", error.stack);
+            }
             throw error;
         }
     }
@@ -445,10 +455,12 @@ class AIService {
             return context;
         } catch (error) {
             console.error("❌ Error creating browsing context:", error);
-            console.error("Error details:", {
-                message: error.message,
-                stack: error.stack,
-            });
+            if (error instanceof Error) {
+                console.error("Error details:", {
+                    message: error.message,
+                    stack: error.stack,
+                });
+            }
             return null;
         }
     }

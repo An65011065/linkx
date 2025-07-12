@@ -50,8 +50,8 @@ class BackgroundTracker {
     private focusedTabId?: number;
     private isUserActive: boolean;
     private userIdleThreshold: number;
-    private syncInterval?: NodeJS.Timeout;
-    private cleanupInterval?: NodeJS.Timeout;
+    private syncInterval?: ReturnType<typeof setTimeout>;
+    private cleanupInterval?: ReturnType<typeof setTimeout>;
     private isDestroyed: boolean;
 
     private constructor() {
@@ -108,11 +108,6 @@ class BackgroundTracker {
         // Context menu for selected text
         this.setupContextMenu();
 
-        // Listen for messages from content script
-        chrome.runtime.onMessage.addListener(
-            this.handleRuntimeMessage.bind(this),
-        );
-
         console.log("🚀 BackgroundTracker initialized with all listeners");
     }
 
@@ -122,7 +117,6 @@ class BackgroundTracker {
         if (this.syncInterval) {
             clearInterval(this.syncInterval);
         }
-
         this.syncInterval = setInterval(() => {
             if (!this.isDestroyed) {
                 this.syncAllVisits();
@@ -169,10 +163,7 @@ class BackgroundTracker {
     }
 
     // Categorize URL as work, social, or other based on domain
-    private categorizeUrl(
-        url: string,
-        domain: string,
-    ): "work" | "social" | "other" {
+    private categorizeUrl(domain: string): "work" | "social" | "other" {
         const workDomains = [
             "github.com",
             "gitlab.com",
@@ -280,7 +271,7 @@ class BackgroundTracker {
             tabId,
             windowId,
             isActive: this.isVisitActive(tabId, windowId),
-            category: this.categorizeUrl(url, domain),
+            category: this.categorizeUrl(domain),
             sourceInfo,
             creationMode,
         };
@@ -323,7 +314,7 @@ class BackgroundTracker {
             activeInfo.windowId,
         );
 
-        const { tabId, windowId } = activeInfo;
+        const { tabId } = activeInfo;
         this.focusedTabId = tabId;
 
         // Update active states for all tabs
@@ -434,6 +425,7 @@ class BackgroundTracker {
 
             state.previousUrl = tab.url;
             this.tabStates.set(tabId, state);
+
             console.log("💾 Saving visit to storage");
             await this.dataService.addUrlVisit(state.currentVisit);
             console.log("✅ Visit saved successfully");
@@ -520,7 +512,7 @@ class BackgroundTracker {
         // Only handle main frame navigation
         if (details.frameId !== 0) return;
 
-        const { tabId, url } = details;
+        const { tabId } = details;
         const state = this.tabStates.get(tabId);
 
         if (state?.currentVisit) {
@@ -530,7 +522,7 @@ class BackgroundTracker {
 
     // Periodically sync all active visits to prevent data loss
     private async syncAllVisits(): Promise<void> {
-        for (const [tabId, state] of this.tabStates) {
+        for (const [_, state] of this.tabStates) {
             if (state.currentVisit) {
                 this.updateActiveTime(state.currentVisit);
                 await this.dataService.addUrlVisit(state.currentVisit);
@@ -547,16 +539,26 @@ class BackgroundTracker {
     }
 
     // Set up context menu for selected text
+    // Update this method in your background.ts file
     private setupContextMenu(): void {
         chrome.contextMenus.removeAll(() => {
+            // Add to LyncX notes (existing)
             chrome.contextMenus.create({
                 id: "addToLyncX",
                 title: "Add to LyncX",
                 contexts: ["selection"],
             });
+
+            // Smart Bookmark (new)
+            chrome.contextMenus.create({
+                id: "smartBookmark",
+                title: "📚 Smart Bookmark",
+                contexts: ["page"],
+            });
         });
 
         chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+            // Existing LyncX notes functionality
             if (
                 info.menuItemId === "addToLyncX" &&
                 info.selectionText &&
@@ -615,33 +617,90 @@ class BackgroundTracker {
                     console.error("Error saving selected text:", error);
                 }
             }
-        });
-    }
 
-    // Handle messages from content scripts
-    private handleRuntimeMessage(
-        request: { action: string; [key: string]: unknown },
-        sender: chrome.runtime.MessageSender,
-        sendResponse: (response?: {
-            success: boolean;
-            [key: string]: unknown;
-        }) => void,
-    ): boolean {
-        if (request.action === "getSelectedText") {
-            // This could be used for future enhancements
-            sendResponse({ success: true });
-            return true;
-        }
-        return false;
+            // NEW: Smart Bookmark functionality
+            if (
+                info.menuItemId === "smartBookmark" &&
+                tab?.id &&
+                tab?.url &&
+                tab?.title
+            ) {
+                try {
+                    // Load existing bookmarks
+                    const result = await chrome.storage.local.get([
+                        "smartBookmarks",
+                    ]);
+                    let bookmarks = [];
+
+                    if (result.smartBookmarks) {
+                        bookmarks = JSON.parse(result.smartBookmarks);
+                    }
+
+                    // Check if already bookmarked
+                    const existingBookmark = bookmarks.find(
+                        (b: any) => b.url === tab.url && b.status === "active",
+                    );
+
+                    if (existingBookmark) {
+                        // Already bookmarked - show notification
+                        chrome.tabs
+                            .sendMessage(tab.id, {
+                                action: "showNotification",
+                                message: "Already in Smart Bookmarks!",
+                            })
+                            .catch(() => {
+                                // Ignore if content script isn't available
+                            });
+                        return;
+                    }
+
+                    // Add new bookmark
+                    const now = Date.now();
+                    const newBookmark = {
+                        id: `bookmark_${now}`,
+                        url: tab.url,
+                        title: tab.title,
+                        status: "active",
+                        openCount: 0,
+                        lastOpened: 0,
+                        createdAt: now,
+                        expiresAt: now + 3 * 24 * 60 * 60 * 1000, // 3 days from now
+                    };
+
+                    bookmarks.push(newBookmark);
+
+                    // Save updated bookmarks
+                    await chrome.storage.local.set({
+                        smartBookmarks: JSON.stringify(bookmarks),
+                    });
+
+                    console.log(`📚 Added Smart Bookmark: ${tab.title}`);
+
+                    // Send notification message to content script
+                    chrome.tabs
+                        .sendMessage(tab.id, {
+                            action: "showNotification",
+                            message: "Added to Smart Bookmarks!",
+                        })
+                        .catch(() => {
+                            // Ignore if content script isn't available
+                        });
+                } catch (error) {
+                    console.error("Error adding smart bookmark:", error);
+                }
+            }
+        });
     }
 
     // Clean up resources when tracker is destroyed
     public destroy(): void {
         this.isDestroyed = true;
+
         if (this.syncInterval) {
             clearInterval(this.syncInterval);
             this.syncInterval = undefined;
         }
+
         if (this.cleanupInterval) {
             clearInterval(this.cleanupInterval);
             this.cleanupInterval = undefined;
@@ -665,9 +724,6 @@ class BackgroundTracker {
         chrome.webNavigation.onCreatedNavigationTarget.removeListener(
             this.handleCreatedNavigationTarget.bind(this),
         );
-        chrome.runtime.onMessage.removeListener(
-            this.handleRuntimeMessage.bind(this),
-        );
 
         // Clean up context menu
         chrome.contextMenus.removeAll();
@@ -679,6 +735,57 @@ class BackgroundTracker {
         this.focusedTabId = undefined;
     }
 }
+
+// Global message handler for proceed to site functionality
+async function handleProceedToSite(url: string): Promise<boolean> {
+    try {
+        console.log(`Handling proceed to site request for: ${url}`);
+
+        // Use the websiteBlocker to allow temporary access
+        const success = await websiteBlocker.allowTemporaryAccess(url);
+
+        if (success) {
+            console.log(`Temporary access granted for: ${url}`);
+        } else {
+            console.log(`Failed to grant temporary access for: ${url}`);
+        }
+
+        return success;
+    } catch (error) {
+        console.error("Error in handleProceedToSite:", error);
+        return false;
+    }
+}
+
+// Centralized message listener
+chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
+    console.log("Background received message:", request);
+
+    if (request.action === "proceedToSite" && request.url) {
+        // Handle the proceed to site request
+        handleProceedToSite(request.url)
+            .then((success) => {
+                console.log("Proceed to site result:", success);
+                sendResponse({ success });
+            })
+            .catch((error) => {
+                console.error("Error in proceedToSite:", error);
+                sendResponse({ success: false, error: error.message });
+            });
+
+        // Return true to indicate we'll send a response asynchronously
+        return true;
+    }
+
+    if (request.action === "getSelectedText") {
+        // This could be used for future enhancements
+        sendResponse({ success: true });
+        return true;
+    }
+
+    // Handle other message types here if needed
+    return false;
+});
 
 // Initialize the background tracker
 let backgroundTracker = BackgroundTracker.getInstance();
@@ -693,13 +800,55 @@ chrome.runtime.onStartup.addListener(() => {
     backgroundTracker = BackgroundTracker.getInstance();
 });
 
-chrome.runtime.onInstalled.addListener(() => {
-    console.log("🟢 Extension installed");
-    // Ensure we have a fresh instance on install
+chrome.runtime.onInstalled.addListener(async () => {
+    console.log("🟢 Extension installed/updated");
+
+    // Ensure we have a fresh instance
     if (backgroundTracker) {
         backgroundTracker.destroy();
     }
     backgroundTracker = BackgroundTracker.getInstance();
+
+    try {
+        // Clear any existing dynamic rules first
+        const existingRules =
+            await chrome.declarativeNetRequest.getDynamicRules();
+        const ruleIdsToRemove = existingRules.map((rule) => rule.id);
+
+        if (ruleIdsToRemove.length > 0) {
+            await chrome.declarativeNetRequest.updateDynamicRules({
+                removeRuleIds: ruleIdsToRemove,
+            });
+        }
+
+        // Add test redirect rule for httpbin.org
+        await chrome.declarativeNetRequest.updateDynamicRules({
+            addRules: [
+                {
+                    id: 1,
+                    priority: 1,
+                    action: {
+                        type: "redirect",
+                        redirect: {
+                            extensionPath: "/waterfall.html",
+                        },
+                    },
+                    condition: {
+                        urlFilter: "*://httpbin.org/*",
+                        resourceTypes: ["main_frame"],
+                    },
+                },
+            ],
+        });
+
+        console.log("✅ Dynamic redirect rule added successfully!");
+
+        // Verify it was added
+        const newRules = await chrome.declarativeNetRequest.getDynamicRules();
+        console.log("📋 Active dynamic rules:", newRules);
+    } catch (error) {
+        console.error("❌ Failed to add dynamic rule:", error);
+    }
 });
 
 // Clean up when the extension is about to be terminated
@@ -707,6 +856,19 @@ chrome.runtime.onSuspend.addListener(() => {
     console.log("🔴 Extension suspending");
     if (backgroundTracker) {
         backgroundTracker.destroy();
+    }
+});
+
+// Alarm for periodic cleanup
+chrome.alarms.create("cleanupExpiredBlocks", { periodInMinutes: 5 });
+
+chrome.alarms.onAlarm.addListener(async (alarm) => {
+    if (alarm.name === "cleanupExpiredBlocks") {
+        try {
+            await websiteBlocker.cleanupExpiredBlocks();
+        } catch (error) {
+            console.error("Error cleaning up expired blocks:", error);
+        }
     }
 });
 

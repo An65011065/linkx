@@ -1,4 +1,3 @@
-import React from "react";
 import { createRoot } from "react-dom/client";
 import MainTab from "./MainTab";
 import "../shared/styles/index.css";

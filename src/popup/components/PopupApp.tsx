@@ -17,6 +17,7 @@ import NotepadView from "./NotepadView";
 import CrossTabSearch from "./CrosstabSearch";
 import ConsolidateTabs from "../../dashboard/components/ConsolidateTabs";
 import "../../shared/styles/fonts.css";
+import BookmarkButton from "./Mark";
 
 const PopupApp: React.FC = () => {
     const [isCapturing, setIsCapturing] = useState(false);
@@ -541,6 +542,7 @@ const PopupApp: React.FC = () => {
                     gap: "8px",
                 }}
             >
+                <BookmarkButton />
                 <CrossTabSearch>
                     <div
                         style={{

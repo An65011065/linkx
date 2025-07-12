@@ -32,12 +32,13 @@ const ConsolidateTabs: React.FC<ConsolidateTabsProps> = ({
                 if (!activeTab) return;
 
                 // Filter out the active tab and get URLs of other tabs
-                const nonActiveTabUrls = tabs
-                    .filter((tab) => !tab.active && tab.url)
-                    .map((tab) => ({
-                        url: tab.url!,
-                        title: tab.title || "Untitled",
-                    }));
+                const nonActiveTabs = tabs.filter(
+                    (tab) => !tab.active && tab.url,
+                );
+                const nonActiveTabUrls = nonActiveTabs.map((tab) => ({
+                    url: tab.url!,
+                    title: tab.title || "Untitled",
+                }));
 
                 if (nonActiveTabUrls.length === 0) return;
 
@@ -62,6 +63,13 @@ const ConsolidateTabs: React.FC<ConsolidateTabsProps> = ({
                 await chrome.storage.local.set({
                     consolidateSessions: updatedSessions,
                 });
+
+                // Close all non-active tabs
+                for (const tab of nonActiveTabs) {
+                    if (tab.id) {
+                        await chrome.tabs.remove(tab.id);
+                    }
+                }
             }
 
             // Get existing sessions from storage (either the just updated ones or current ones)

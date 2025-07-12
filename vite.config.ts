@@ -9,7 +9,14 @@ import dotenv from "dotenv";
 dotenv.config();
 
 export default defineConfig(({ mode }) => ({
-    plugins: [react(), crx({ manifest })],
+    plugins: [
+        react(),
+        crx({
+            manifest,
+            // Add this to help with service worker issues
+            browser: "chrome",
+        }),
+    ],
     resolve: {
         alias: {
             "@": resolve(__dirname, "src"),
@@ -27,12 +34,13 @@ export default defineConfig(({ mode }) => ({
         watch: mode === "development" ? {} : undefined,
         rollupOptions: {
             input: {
-                background: "src/data/background.ts",
+                // Remove background from here - let crx plugin handle it
                 contentScript: "src/services/contentScript.js",
                 popup: resolve(__dirname, "src/popup/popup.html"),
                 graph: resolve(__dirname, "src/graph/graph.html"),
                 dashboard: resolve(__dirname, "src/dashboard/dashboard.html"),
                 main: resolve(__dirname, "src/main/main.html"),
+                waterfall: resolve(__dirname, "waterfall.html"), // Add this
             },
         },
     },

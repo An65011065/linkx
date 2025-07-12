@@ -3,19 +3,28 @@ import type { BlockedSite } from "../shared/types/common.types";
 class WebsiteBlocker {
     private static readonly BLOCK_RULES_KEY = "blocked_sites";
     private static readonly BLOCK_RULE_ID_COUNTER_KEY = "block_rule_id_counter";
+    private static readonly OVERRIDE_LIST_KEY = "override_list";
     private currentRuleId = 1;
     private initPromise: Promise<void> | null = null;
+    private temporaryAllowList = new Set<string>(); // Track temporarily allowed URLs
 
     constructor() {
         this.initPromise = this.initialize();
     }
 
     private async initialize() {
-        const data = await chrome.storage.local.get(
-            WebsiteBlocker.BLOCK_RULE_ID_COUNTER_KEY,
-        );
+        const [counterData, overrideData] = await Promise.all([
+            chrome.storage.local.get(WebsiteBlocker.BLOCK_RULE_ID_COUNTER_KEY),
+            chrome.storage.local.get(WebsiteBlocker.OVERRIDE_LIST_KEY),
+        ]);
+
         this.currentRuleId =
-            data[WebsiteBlocker.BLOCK_RULE_ID_COUNTER_KEY] || 1;
+            counterData[WebsiteBlocker.BLOCK_RULE_ID_COUNTER_KEY] || 1;
+
+        // Initialize the temporaryAllowList from storage
+        const storedOverrides =
+            overrideData[WebsiteBlocker.OVERRIDE_LIST_KEY] || [];
+        this.temporaryAllowList = new Set(storedOverrides);
 
         // Clean up orphaned rules on startup
         await this.cleanupOrphanedRules();
@@ -41,134 +50,170 @@ class WebsiteBlocker {
         domain: string,
         ruleId: number,
     ): chrome.declarativeNetRequest.Rule[] {
-        // Clean the domain - remove protocol and www
         const cleanDomain = domain
             .replace(/^https?:\/\//, "")
             .replace(/^www\./, "")
             .split("/")[0];
 
         const rules: chrome.declarativeNetRequest.Rule[] = [];
-        const resourceTypes = [
-            "main_frame",
-            "sub_frame",
-            "stylesheet",
-            "script",
-            "image",
-            "font",
-            "object",
-            "xmlhttprequest",
-            "ping",
-            "csp_report",
-            "media",
-            "websocket",
-            "webtransport",
-            "webbundle",
-            "other",
-        ] as chrome.declarativeNetRequest.ResourceType[];
 
-        // Method 1: Block main domain with all resource types
+        // Create redirect rules for main domain and www version
         rules.push({
             id: ruleId,
             priority: 100,
-            action: { type: "block" },
+            action: {
+                type: "redirect",
+                redirect: {
+                    transform: {
+                        queryTransform: {
+                            addOrReplaceParams: [
+                                { key: "from", value: "{url}" },
+                            ],
+                        },
+                        scheme: "chrome-extension",
+                        host: chrome.runtime.id,
+                        path: "/waterfall.html",
+                    },
+                },
+            },
             condition: {
                 urlFilter: `||${cleanDomain}`,
-                resourceTypes: resourceTypes,
+                resourceTypes: ["main_frame"],
             },
         });
 
-        // Method 2: Block www version with all resource types
+        // Add rule for www version
         rules.push({
             id: ruleId + 1,
             priority: 100,
-            action: { type: "block" },
+            action: {
+                type: "redirect",
+                redirect: {
+                    transform: {
+                        queryTransform: {
+                            addOrReplaceParams: [
+                                { key: "from", value: "{url}" },
+                            ],
+                        },
+                        scheme: "chrome-extension",
+                        host: chrome.runtime.id,
+                        path: "/waterfall.html",
+                    },
+                },
+            },
             condition: {
                 urlFilter: `||www.${cleanDomain}`,
-                resourceTypes: resourceTypes,
+                resourceTypes: ["main_frame"],
             },
         });
 
-        // Method 3: Block using requestDomains (most reliable for main frames)
+        // Add rule for all subdomains
         rules.push({
             id: ruleId + 2,
             priority: 99,
-            action: { type: "block" },
-            condition: {
-                requestDomains: [cleanDomain, `www.${cleanDomain}`],
-                resourceTypes: ["main_frame", "sub_frame"],
+            action: {
+                type: "redirect",
+                redirect: {
+                    transform: {
+                        queryTransform: {
+                            addOrReplaceParams: [
+                                { key: "from", value: "{url}" },
+                            ],
+                        },
+                        scheme: "chrome-extension",
+                        host: chrome.runtime.id,
+                        path: "/waterfall.html",
+                    },
+                },
             },
-        });
-
-        // Method 4: Block using initiatorDomains as backup
-        rules.push({
-            id: ruleId + 3,
-            priority: 98,
-            action: { type: "block" },
-            condition: {
-                initiatorDomains: [cleanDomain, `www.${cleanDomain}`],
-                resourceTypes: ["main_frame", "sub_frame"],
-            },
-        });
-
-        // Method 5: Comprehensive regex for main domain and www
-        rules.push({
-            id: ruleId + 4,
-            priority: 97,
-            action: { type: "block" },
-            condition: {
-                regexFilter: `^https?://(www\\.)?${cleanDomain.replace(
-                    /\./g,
-                    "\\.",
-                )}(/.*)?$`,
-                resourceTypes: ["main_frame", "sub_frame"],
-            },
-        });
-
-        // Method 6: Block all subdomains
-        rules.push({
-            id: ruleId + 5,
-            priority: 96,
-            action: { type: "block" },
             condition: {
                 regexFilter: `^https?://.*\\.${cleanDomain.replace(
                     /\./g,
                     "\\.",
                 )}(/.*)?$`,
-                resourceTypes: ["main_frame", "sub_frame"],
-            },
-        });
-
-        // Method 7: Block HTTP and HTTPS explicitly
-        rules.push({
-            id: ruleId + 6,
-            priority: 95,
-            action: { type: "block" },
-            condition: {
-                regexFilter: `^http://(www\\.)?${cleanDomain.replace(
-                    /\./g,
-                    "\\.",
-                )}(/.*)?$`,
-                resourceTypes: resourceTypes,
-            },
-        });
-
-        rules.push({
-            id: ruleId + 7,
-            priority: 95,
-            action: { type: "block" },
-            condition: {
-                regexFilter: `^https://(www\\.)?${cleanDomain.replace(
-                    /\./g,
-                    "\\.",
-                )}(/.*)?$`,
-                resourceTypes: resourceTypes,
+                resourceTypes: ["main_frame"],
             },
         });
 
         return rules;
     }
 
-    // NEW: Clean up orphaned rules on startup
+    // Allow temporary access to a blocked site (permanently overrides until manually unlocked)
+    public async allowTemporaryAccess(url: string): Promise<boolean> {
+        try {
+            await this.ensureInitialized();
+
+            console.log(`Allowing permanent override access to: ${url}`);
+
+            // Parse the URL to get the domain
+            const urlObj = new URL(url);
+            const domain = urlObj.hostname.replace(/^www\./, "");
+
+            // Check if this domain is currently blocked
+            const blockedSites = await this.getBlockedSites();
+            const blockedSite = blockedSites.find(
+                (site) => site.domain === domain,
+            );
+
+            if (!blockedSite) {
+                console.log(`Domain ${domain} is not currently blocked`);
+                return true; // Not blocked, so allow access
+            }
+
+            // Add to temporary allow list and persist it
+            this.temporaryAllowList.add(url);
+            await chrome.storage.local.set({
+                [WebsiteBlocker.OVERRIDE_LIST_KEY]: Array.from(
+                    this.temporaryAllowList,
+                ),
+            });
+
+            // Remove the blocking rules permanently until manually unlocked
+            const ruleIdsToRemove = [
+                blockedSite.ruleId,
+                blockedSite.ruleId + 1,
+                blockedSite.ruleId + 2,
+            ];
+
+            console.log(
+                `Permanently removing rules until manual unlock: ${ruleIdsToRemove.join(
+                    ", ",
+                )}`,
+            );
+
+            await chrome.declarativeNetRequest.updateDynamicRules({
+                removeRuleIds: ruleIdsToRemove,
+                addRules: [],
+            });
+
+            console.log(`Domain ${domain} is now overridden and accessible`);
+            return true;
+        } catch (error) {
+            console.error("Error allowing temporary access:", error);
+            return false;
+        }
+    }
+
+    // Check if a domain is temporarily overridden
+    public isTemporarilyOverridden(domain: string): boolean {
+        // Check if any URL with this domain is in the temporary allow list
+        for (const url of this.temporaryAllowList) {
+            try {
+                const urlObj = new URL(url);
+                const urlDomain = urlObj.hostname.replace(/^www\./, "");
+                if (urlDomain === domain) {
+                    return true;
+                }
+            } catch (err) {
+                // Invalid URL, skip
+                console.debug(`Invalid URL format for ${url}:`, err);
+                continue;
+            }
+        }
+        return false;
+    }
+
+    // Clean up orphaned rules on startup
     private async cleanupOrphanedRules(): Promise<void> {
         try {
             const [currentRules, blockedSites] = await Promise.all([
@@ -179,7 +224,8 @@ class WebsiteBlocker {
             // Get all rule IDs that should exist based on stored sites
             const validRuleIds = new Set<number>();
             for (const site of blockedSites) {
-                for (let i = 0; i < 8; i++) {
+                // Each site now has 3 rules
+                for (let i = 0; i < 3; i++) {
                     validRuleIds.add(site.ruleId + i);
                 }
             }
@@ -312,16 +358,11 @@ class WebsiteBlocker {
                 throw new Error("This website is not blocked");
             }
 
-            // Remove all eight blocking rules
+            // Remove the three redirect rules
             const ruleIdsToRemove = [
                 siteToUnblock.ruleId,
                 siteToUnblock.ruleId + 1,
                 siteToUnblock.ruleId + 2,
-                siteToUnblock.ruleId + 3,
-                siteToUnblock.ruleId + 4,
-                siteToUnblock.ruleId + 5,
-                siteToUnblock.ruleId + 6,
-                siteToUnblock.ruleId + 7,
             ];
 
             console.log(`Removing rule IDs: ${ruleIdsToRemove.join(", ")}`);
@@ -329,6 +370,28 @@ class WebsiteBlocker {
             await chrome.declarativeNetRequest.updateDynamicRules({
                 removeRuleIds: ruleIdsToRemove,
                 addRules: [],
+            });
+
+            // Clear from temporary allow list if it exists and update storage
+            const updatedAllowList = new Set(this.temporaryAllowList);
+            for (const url of this.temporaryAllowList) {
+                try {
+                    const urlObj = new URL(url);
+                    const urlDomain = urlObj.hostname.replace(/^www\./, "");
+                    if (urlDomain === domain) {
+                        updatedAllowList.delete(url);
+                    }
+                } catch (err) {
+                    // Invalid URL, skip
+                    console.debug(`Invalid URL format for ${url}:`, err);
+                    continue;
+                }
+            }
+            this.temporaryAllowList = updatedAllowList;
+            await chrome.storage.local.set({
+                [WebsiteBlocker.OVERRIDE_LIST_KEY]: Array.from(
+                    this.temporaryAllowList,
+                ),
             });
 
             // Remove from storage
@@ -375,7 +438,7 @@ class WebsiteBlocker {
         }
     }
 
-    // NEW: Force cleanup of all orphaned rules
+    // Force cleanup of all orphaned rules
     public async forceCleanupOrphanedRules(): Promise<void> {
         await this.ensureInitialized();
         await this.cleanupOrphanedRules();

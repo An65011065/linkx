@@ -1,165 +1,71 @@
-import React, { useState, useEffect, useRef } from "react";
-import {
-    Timer,
-    Plus,
-    Circle,
-    X,
-    ArrowRight,
-    Trash2,
-    AlertTriangle,
-} from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Lock } from "lucide-react";
+import { websiteBlocker } from "../../data/websiteBlocker";
+import type { BlockedSite } from "../../shared/types/common.types";
+import UnblockMiniGame from "./UnblockMiniGame";
 import { freeTrial } from "../../main/MainTab";
 
-interface TimerItem {
-    id: string;
-    name: string;
-    endTime: number;
-    minutes: number;
-}
+// Common leisure/social media domains
+const LEISURE_DOMAINS = [
+    "facebook.com",
+    "instagram.com",
+    "twitter.com",
+    "tiktok.com",
+    "reddit.com",
+    "youtube.com",
+    "netflix.com",
+    "twitch.tv",
+    "pinterest.com",
+    "snapchat.com",
+];
 
-interface TimerModalProps {
-    onClose: () => void;
-    onSave: (domain: string, minutes: number) => void;
+// Common work/productivity domains
+const WORK_DOMAINS = [
+    "github.com",
+    "gitlab.com",
+    "atlassian.com",
+    "jira.com",
+    "confluence.com",
+    "slack.com",
+    "notion.so",
+    "trello.com",
+    "asana.com",
+    "linear.app",
+    "figma.com",
+    "miro.com",
+    "docs.google.com",
+    "drive.google.com",
+    "calendar.google.com",
+    "meet.google.com",
+    "mail.google.com",
+    "outlook.com",
+    "outlook.office.com",
+    "outlook.live.com",
+    "yahoo.com",
+    "mail.yahoo.com",
+    "proton.me",
+    "zoho.com",
+    "fastmail.com",
+    "mail.com",
+    "aol.com",
+    "icloud.com",
+];
+
+interface WebsiteBlockerProps {
     isDarkMode?: boolean;
 }
 
-const TimerModal: React.FC<TimerModalProps> = ({
-    onClose,
-    onSave,
+const WebsiteBlocker: React.FC<WebsiteBlockerProps> = ({
     isDarkMode = false,
 }) => {
     const [domain, setDomain] = useState("");
-    const [minutes, setMinutes] = useState("");
-
-    const handleSave = () => {
-        if (!domain.trim() || !minutes.trim()) return;
-        const minutesNum = parseInt(minutes);
-        if (isNaN(minutesNum) || minutesNum <= 0) return;
-
-        // Clean domain - remove protocol and www, keep only domain and path
-        let cleanDomain = domain.trim();
-        cleanDomain = cleanDomain.replace(/^https?:\/\//, "");
-        cleanDomain = cleanDomain.replace(/^www\./, "");
-
-        // If domain ends with just .com or .com/, apply to whole domain
-        if (cleanDomain.match(/\.(com|org|net|edu|gov)\/?\s*$/)) {
-            cleanDomain = cleanDomain.replace(/\/.*$/, "");
-        }
-
-        onSave(cleanDomain, minutesNum);
-        onClose();
-    };
-
-    return (
-        <div
-            className={`absolute inset-0 flex flex-col p-6 ${
-                isDarkMode
-                    ? "bg-black/80 border border-white/20 backdrop-blur-sm"
-                    : "bg-white border border-gray-200 shadow-2xl"
-            } rounded-2xl`}
-        >
-            {/* Header */}
-            <div
-                className={`flex items-center gap-3 mb-6 pb-4 border-b ${
-                    isDarkMode ? "border-white/10" : "border-gray-100"
-                }`}
-            >
-                {/* Search Bar Container */}
-                <div
-                    className={`
-                        flex-1 p-3 rounded-lg border relative flex items-center gap-2
-                        ${
-                            isDarkMode
-                                ? "bg-white/5 border-white/20 backdrop-blur-sm"
-                                : "bg-gray-50 border-gray-200"
-                        }
-                    `}
-                >
-                    <input
-                        type="text"
-                        placeholder="Link"
-                        value={domain}
-                        onChange={(e) => setDomain(e.target.value)}
-                        className={`
-                            w-3/5 p-0 border-none text-sm outline-none bg-transparent
-                            ${
-                                isDarkMode
-                                    ? "text-white placeholder-white/50"
-                                    : "text-gray-900 placeholder-gray-500"
-                            }
-                        `}
-                    />
-                    <div className="absolute right-10 flex gap-1 items-center">
-                        <input
-                            type="number"
-                            placeholder="mins"
-                            value={minutes}
-                            onChange={(e) => setMinutes(e.target.value)}
-                            className={`
-                                w-16 p-0 border-none border-l pl-2 text-sm outline-none 
-                                bg-transparent appearance-none
-                                [&::-webkit-outer-spin-button]:appearance-none
-                                [&::-webkit-inner-spin-button]:appearance-none
-                                [-moz-appearance:textfield]
-                                ${
-                                    isDarkMode
-                                        ? "border-white/20 text-white placeholder-white/50"
-                                        : "border-gray-200 text-gray-900 placeholder-gray-500"
-                                }
-                            `}
-                        />
-                    </div>
-                    <button
-                        onClick={handleSave}
-                        disabled={!domain.trim() || !minutes.trim()}
-                        className={`
-                            absolute right-2 top-1/2 transform -translate-y-1/2
-                            w-8 h-8 rounded-lg border-none cursor-pointer
-                            transition-all duration-300 flex items-center justify-center
-                            disabled:opacity-50 disabled:cursor-not-allowed
-                            ${
-                                isDarkMode
-                                    ? "text-white hover:bg-blue-500"
-                                    : "text-gray-600 hover:text-blue-600 hover:bg-blue-50"
-                            }
-                        `}
-                    >
-                        <ArrowRight size={16} />
-                    </button>
-                </div>
-
-                {/* Close Button */}
-                <button
-                    onClick={onClose}
-                    className="text-white hover:opacity-70 transition-opacity"
-                >
-                    <X size={20} />
-                </button>
-            </div>
-
-            {/* Help Text - only for light mode */}
-            {!isDarkMode && (
-                <div className="text-sm text-gray-600 leading-relaxed">
-                    <p className="mb-2">
-                        Set a timer for a specific website or domain.
-                    </p>
-                </div>
-            )}
-        </div>
-    );
-};
-
-interface TimersProps {
-    isDarkMode?: boolean;
-}
-
-const Timers: React.FC<TimersProps> = ({ isDarkMode = false }) => {
-    const [timers, setTimers] = useState<TimerItem[]>([]);
-    const [showModal, setShowModal] = useState(false);
-    const [isDeleteMode, setIsDeleteMode] = useState(false);
+    const [startTime, setStartTime] = useState("");
+    const [endTime, setEndTime] = useState("");
+    const [blockedSites, setBlockedSites] = useState<BlockedSite[]>([]);
+    const [showMiniGame, setShowMiniGame] = useState(false);
+    const [selectedDomain, setSelectedDomain] = useState<string>("");
+    const [isLocked, setIsLocked] = useState(false);
     const [isTrialMode, setIsTrialMode] = useState(freeTrial);
-    const containerRef = useRef<HTMLDivElement>(null);
-    const [isExpanded, setIsExpanded] = useState(false);
 
     useEffect(() => {
         const checkTrialStatus = () => {
@@ -176,433 +82,523 @@ const Timers: React.FC<TimersProps> = ({ isDarkMode = false }) => {
     }, []);
 
     useEffect(() => {
-        // Load all timers from localStorage
-        const loadTimers = () => {
-            const activeTimers: TimerItem[] = [];
-            for (let i = 0; i < localStorage.length; i++) {
-                const key = localStorage.key(i);
-                if (key?.startsWith("timer_")) {
-                    const domain = key.replace("timer_", "");
-                    const timerData = JSON.parse(
-                        localStorage.getItem(key) || "{}",
-                    );
-                    if (timerData.endTime > Date.now()) {
-                        activeTimers.push({
-                            id: domain,
-                            name: domain,
-                            endTime: timerData.endTime,
-                            minutes: timerData.minutes,
-                        });
-                    } else {
-                        // Clean up expired timer
-                        localStorage.removeItem(key);
-                    }
-                }
-            }
-            setTimers(activeTimers);
-        };
-
-        // Load initially
-        loadTimers();
-
-        // Set up interval to refresh timers and clean up expired ones
-        const interval = setInterval(loadTimers, 1000);
-
-        // Listen for timer updates from popup
-        const handleStorageChange = (e: StorageEvent) => {
-            if (e.key?.startsWith("timer_")) {
-                loadTimers();
-            }
-        };
-
-        window.addEventListener("storage", handleStorageChange);
-
-        return () => {
-            clearInterval(interval);
-            window.removeEventListener("storage", handleStorageChange);
-        };
+        loadBlockedSites();
+        // Check more frequently to catch overridden status
+        const interval = setInterval(loadBlockedSites, 1000); // Every 1 second instead of 60 seconds
+        const now = new Date();
+        const later = new Date(now.getTime() + 60 * 60 * 1000);
+        setStartTime(now.toTimeString().slice(0, 5));
+        setEndTime(later.toTimeString().slice(0, 5));
+        return () => clearInterval(interval);
     }, []);
 
-    // Handle expansion animation
-    useEffect(() => {
-        if (containerRef.current) {
-            if (isExpanded) {
-                const parentHeight =
-                    containerRef.current.parentElement?.offsetHeight || 0;
-                containerRef.current.style.height = `${parentHeight * 2}px`;
-                containerRef.current.style.zIndex = "100";
-            } else {
-                containerRef.current.style.height = "100%";
-                containerRef.current.style.zIndex = "1";
-            }
+    const loadBlockedSites = async () => {
+        try {
+            const sites = await websiteBlocker.getBlockedSites();
+            setBlockedSites(sites);
+        } catch (err) {
+            console.error("Error loading blocked sites:", err);
         }
-    }, [isExpanded]);
+    };
 
-    const handleSaveTimer = (domain: string, minutes: number) => {
-        if (isTrialMode && timers.length >= 1) {
+    const handleBlockLeisure = async () => {
+        if (freeTrial) {
             alert(
-                "Free trial allows only 1 timer at a time. Please remove the existing timer first.",
+                "Free trial allows blocking only 2 websites at a time. Please block sites individually.",
+            );
+            return;
+        }
+        try {
+            for (const domain of LEISURE_DOMAINS) {
+                await websiteBlocker.blockWebsite(domain, 1);
+            }
+            await loadBlockedSites();
+        } catch (error) {
+            console.error("Error blocking leisure sites:", error);
+        }
+    };
+
+    const handleBlockWork = async () => {
+        if (freeTrial) {
+            alert(
+                "Free trial allows blocking only 2 websites at a time. Please block sites individually.",
+            );
+            return;
+        }
+        try {
+            for (const domain of WORK_DOMAINS) {
+                await websiteBlocker.blockWebsite(domain, 1);
+            }
+            await loadBlockedSites();
+        } catch (error) {
+            console.error("Error blocking work sites:", error);
+        }
+    };
+
+    const handleBlock = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!domain.trim() || !startTime || !endTime) return;
+
+        if (freeTrial && blockedSites.length >= 2) {
+            alert(
+                "Free trial allows blocking only 2 websites at a time. Please unlock a website before blocking a new one.",
             );
             return;
         }
 
-        const endTime = Date.now() + minutes * 60 * 1000;
-        const timerData = {
-            endTime,
-            minutes,
-        };
+        setIsLocked(true);
+        try {
+            const cleanDomain = domain
+                .replace(/^(https?:\/\/)?(www\.)?/, "")
+                .split("/")[0];
 
-        // Save to localStorage
-        localStorage.setItem(`timer_${domain}`, JSON.stringify(timerData));
+            // Check if domain is already blocked
+            if (blockedSites.some((site) => site.domain === cleanDomain)) {
+                alert("This website is already blocked.");
+                setIsLocked(false);
+                return;
+            }
 
-        // Show notification when timer completes
-        setTimeout(() => {
-            // Check if timer still exists (wasn't cancelled)
-            const currentTimer = localStorage.getItem(`timer_${domain}`);
-            if (currentTimer) {
-                const data = JSON.parse(currentTimer);
-                if (data.endTime <= Date.now()) {
-                    // Timer completed naturally
-                    if ("chrome" in window && chrome.notifications) {
-                        chrome.notifications.create({
-                            type: "basic",
-                            iconUrl: "/src/assets/icons/icon128.png",
-                            title: "Timer Complete",
-                            message: `Your ${minutes} minute timer for ${domain} is complete!`,
-                            priority: 2,
-                        });
-                    }
-                    localStorage.removeItem(`timer_${domain}`);
+            const startMinutes =
+                parseInt(startTime.split(":")[0]) * 60 +
+                parseInt(startTime.split(":")[1]);
+            const endMinutes =
+                parseInt(endTime.split(":")[0]) * 60 +
+                parseInt(endTime.split(":")[1]);
+
+            if (startMinutes === endMinutes) {
+                alert("Start and end times cannot be the same");
+                setIsLocked(false);
+                return;
+            }
+
+            let hoursDiff = (endMinutes - startMinutes) / 60;
+            if (hoursDiff <= 0) {
+                hoursDiff += 24;
+            }
+
+            await websiteBlocker.blockWebsite(cleanDomain, hoursDiff);
+            await loadBlockedSites();
+            setDomain("");
+            setTimeout(() => {
+                setIsLocked(false);
+            }, 1000);
+        } catch (err) {
+            console.error("Block failed:", err);
+            alert(
+                `Failed to block website: ${
+                    err instanceof Error ? err.message : "Unknown error"
+                }`,
+            );
+            setIsLocked(false);
+        }
+    };
+
+    const handleUnblock = async (domain: string) => {
+        try {
+            await websiteBlocker.unlockWebsite(domain);
+            await loadBlockedSites();
+        } catch (err) {
+            console.error("Unlock failed:", err);
+        }
+    };
+
+    const handleUnblockClick = (domain: string) => {
+        setSelectedDomain(domain);
+        setShowMiniGame(true);
+    };
+
+    const handleMiniGameSuccess = async () => {
+        try {
+            if (selectedDomain === "*") {
+                const sites = await websiteBlocker.getBlockedSites();
+                for (const site of sites) {
+                    await websiteBlocker.unlockWebsite(site.domain);
                 }
+            } else {
+                await websiteBlocker.unlockWebsite(selectedDomain);
             }
-        }, minutes * 60 * 1000);
-
-        setShowModal(false);
+            await loadBlockedSites();
+        } catch (err) {
+            console.error("Operation failed:", err);
+        } finally {
+            setShowMiniGame(false);
+            setSelectedDomain("");
+        }
     };
 
-    const handleDeleteTimer = (domain: string) => {
-        localStorage.removeItem(`timer_${domain}`);
-        // Trigger a reload by dispatching a storage event
-        window.dispatchEvent(
-            new StorageEvent("storage", {
-                key: `timer_${domain}`,
-                newValue: null,
-                oldValue: "deleted",
-            }),
+    const handleMiniGameCancel = () => {
+        setShowMiniGame(false);
+        setSelectedDomain("");
+    };
+
+    const formatScheduledTime = (site: BlockedSite): string => {
+        if (!site.timezone) return "Unknown timezone";
+
+        const startFormatted = new Date(site.startTime).toLocaleString(
+            "en-US",
+            {
+                weekday: "short",
+                month: "short",
+                day: "numeric",
+                hour: "numeric",
+                minute: "2-digit",
+                hour12: true,
+                timeZone: site.timezone,
+            },
         );
+        const endFormatted = new Date(site.endTime).toLocaleString("en-US", {
+            hour: "numeric",
+            minute: "2-digit",
+            hour12: true,
+            timeZone: site.timezone,
+        });
+        return `${startFormatted} - ${endFormatted}`;
     };
 
-    const formatTimeRemaining = (endTime: number) => {
-        const remaining = endTime - Date.now();
-        if (remaining <= 0) return "Finished";
+    const isExpired = (endTime: number): boolean => {
+        return endTime - Date.now() <= 0;
+    };
 
-        const minutes = Math.floor(remaining / (1000 * 60));
-        const seconds = Math.floor((remaining % (1000 * 60)) / 1000);
+    const getBlockStatus = (site: BlockedSite): string => {
+        const now = Date.now();
 
-        if (minutes > 0) {
-            return `${minutes}m ${seconds}s`;
+        // Check if temporarily overridden first
+        if (websiteBlocker.isTemporarilyOverridden(site.domain)) {
+            return "Overridden";
         }
-        return `${seconds}s`;
-    };
 
-    const handleAddNewClick = () => {
-        if (isTrialMode && timers.length >= 1) {
-            alert(
-                "Free trial allows only 1 timer at a time. Please remove the existing timer first.",
-            );
-            return;
+        if (site.endTime <= now) {
+            return "Expired";
+        } else if (site.startTime <= now) {
+            return "Active";
+        } else if (site.scheduledStartTime) {
+            return "Scheduled";
+        } else {
+            return "Active";
         }
-        setIsExpanded(true);
-        setShowModal(true);
     };
 
-    const handleModalClose = () => {
-        setShowModal(false);
-        setIsExpanded(false);
-    };
-
-    const placeholdersNeeded = Math.max(0, 3 - timers.length);
-    const hasHiddenTimers = isTrialMode && timers.length > 1;
+    const containerClasses = `${
+        isDarkMode
+            ? "bg-white bg-opacity-5 border-white border-opacity-10"
+            : "bg-white border-gray-200"
+    } rounded-2xl border shadow-lg p-3 h-full flex flex-col gap-3 relative backdrop-blur-sm`;
 
     return (
-        <div
-            ref={containerRef}
-            className={`
-                h-full flex flex-col relative transition-all duration-300 p-3 gap-2
-                ${
-                    isDarkMode
-                        ? "bg-white/5 border border-white/10 backdrop-blur-sm"
-                        : "bg-white border border-gray-200 shadow-sm"
+        <>
+            <style>{`
+                @keyframes lockRotate {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(10deg); }
                 }
-                rounded-2xl
-            `}
-        >
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <Timer
-                        size={16}
-                        className={isDarkMode ? "text-white" : "text-gray-700"}
-                    />
-                    <div
-                        className={`
-                            text-sm font-medium
-                            ${isDarkMode ? "text-white" : "text-gray-900"}
-                        `}
-                    >
-                        Timers
-                    </div>
-                </div>
-
-                {/* Delete mode toggle */}
-                <button
-                    onClick={() => setIsDeleteMode(!isDeleteMode)}
-                    className={`
-                        p-1 rounded-lg transition-colors
-                        ${
-                            isDarkMode
-                                ? "hover:bg-white/10"
-                                : "hover:bg-gray-100"
-                        }
-                    `}
-                >
-                    <Trash2
-                        size={14}
-                        className={
-                            isDeleteMode
-                                ? "text-red-500"
-                                : isDarkMode
-                                ? "text-white/50"
-                                : "text-gray-400"
-                        }
-                    />
-                </button>
-            </div>
-
-            {/* Warning Message for Free Trial */}
-
-            {/* Timers Grid */}
-            <div className="overflow-x-auto overflow-y-hidden -mx-3 px-3">
-                <div
-                    className="grid gap-1"
-                    style={{
-                        gridTemplateColumns: `repeat(${Math.max(
-                            4,
-                            timers.length + 1,
-                        )}, 1fr)`,
-                        width: timers.length > 3 ? "fit-content" : "100%",
-                    }}
-                >
-                    {/* Add New Timer Button */}
-                    <div
-                        onClick={handleAddNewClick}
-                        className={`
-                            h-12 min-w-20 p-2 rounded-lg border cursor-pointer
-                            flex flex-col items-center justify-center gap-1
-                            transition-all
-                            ${
-                                isDarkMode
-                                    ? "bg-white/10 border-white/20 hover:bg-white/20"
-                                    : "bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-gray-300"
-                            }
-                            ${
-                                isTrialMode && timers.length >= 1
-                                    ? "opacity-50 cursor-not-allowed"
-                                    : ""
-                            }
-                        `}
-                    >
-                        <Plus
+                .lock-button {
+                    transition: all 0.3s ease;
+                }
+                .lock-button:hover {
+                    transform: scale(1.1);
+                }
+                .lock-button.locked {
+                    animation: lockRotate 0.3s ease;
+                }
+                .lock-icon {
+                    transition: all 0.3s ease;
+                }
+                .lock-icon.locked {
+                    transform: scale(0.9);
+                }
+                input[type="time"]::-webkit-calendar-picker-indicator {
+                    background: none;
+                    display: none;
+                }
+                ::-webkit-scrollbar {
+                    display: none;
+                }
+                * {
+                    -ms-overflow-style: none;
+                    scrollbar-width: none;
+                }
+            `}</style>
+            <div className={containerClasses}>
+                <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                        <Lock
                             size={16}
                             className={
-                                isDarkMode ? "text-white/70" : "text-gray-600"
+                                isDarkMode ? "text-white" : "text-gray-700"
                             }
                         />
-                        <div
-                            className={`
-                                text-xs font-medium text-center
-                                ${
-                                    isDarkMode
-                                        ? "text-white/70"
-                                        : "text-gray-600"
-                                }
-                            `}
+                        <h2
+                            className={`text-sm font-medium ${
+                                isDarkMode ? "text-white" : "text-gray-900"
+                            }`}
                         >
-                            Add Timer
-                        </div>
+                            Locking in
+                        </h2>
                     </div>
-
-                    {/* Timer Items - only show first timer in trial mode */}
-                    {(isTrialMode ? timers.slice(0, 1) : timers).map(
-                        (timer) => {
-                            const isExpired = timer.endTime <= Date.now();
-                            return (
-                                <div key={timer.id} className="relative">
-                                    {isDeleteMode && (
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleDeleteTimer(timer.id);
-                                            }}
-                                            className={`
-                                            absolute top-1 right-1 z-10 p-1 rounded-full border
-                                            transition-colors
-                                            ${
-                                                isDarkMode
-                                                    ? "bg-black/80 border-white/20 hover:bg-black/90"
-                                                    : "bg-white border-gray-200 hover:bg-red-50 hover:border-red-200"
-                                            }
-                                        `}
-                                        >
-                                            <X
-                                                size={8}
-                                                className="text-white"
-                                            />
-                                        </button>
-                                    )}
-                                    <div
-                                        className={`
-                                        h-12 min-w-20 p-2 rounded-lg border
-                                        flex flex-col items-center justify-center gap-1
-                                        transition-all
-                                        ${
-                                            !isDeleteMode
-                                                ? "cursor-pointer"
-                                                : "cursor-default"
-                                        }
-                                        ${
-                                            isDarkMode
-                                                ? "border-white/20"
-                                                : isExpired
-                                                ? "bg-green-50 border-green-200"
-                                                : "bg-orange-50 border-orange-200"
-                                        }
-                                    `}
-                                        style={
-                                            isDarkMode
-                                                ? {
-                                                      background: isExpired
-                                                          ? "rgba(34, 197, 94, 0.2)"
-                                                          : "rgba(249, 115, 22, 0.2)",
-                                                  }
-                                                : {}
-                                        }
-                                        onMouseEnter={(e) => {
-                                            if (!isDeleteMode) {
-                                                if (isDarkMode) {
-                                                    e.currentTarget.style.background =
-                                                        isExpired
-                                                            ? "rgba(34, 197, 94, 0.3)"
-                                                            : "rgba(249, 115, 22, 0.3)";
-                                                } else if (!isExpired) {
-                                                    e.currentTarget.style.backgroundColor =
-                                                        "#fed7aa40";
-                                                    e.currentTarget.style.boxShadow =
-                                                        "0 4px 12px rgba(0, 0, 0, 0.1)";
-                                                }
-                                            }
-                                        }}
-                                        onMouseLeave={(e) => {
-                                            if (!isDeleteMode) {
-                                                if (isDarkMode) {
-                                                    e.currentTarget.style.background =
-                                                        isExpired
-                                                            ? "rgba(34, 197, 94, 0.2)"
-                                                            : "rgba(249, 115, 22, 0.2)";
-                                                } else if (!isExpired) {
-                                                    e.currentTarget.style.backgroundColor =
-                                                        "#fff7ed";
-                                                    e.currentTarget.style.boxShadow =
-                                                        "none";
-                                                }
-                                            }
-                                        }}
-                                    >
-                                        <div
-                                            className={`
-                                            text-xs font-medium text-center break-words leading-tight
-                                            ${
-                                                isDarkMode
-                                                    ? "text-white"
-                                                    : isExpired
-                                                    ? "text-green-700"
-                                                    : "text-orange-700"
-                                            }
-                                        `}
-                                        >
-                                            {timer.name}
-                                        </div>
-                                        <div
-                                            className={`
-                                            text-xs text-center font-medium
-                                            ${
-                                                isDarkMode
-                                                    ? "text-white/50"
-                                                    : isExpired
-                                                    ? "text-green-600"
-                                                    : "text-orange-600"
-                                            }
-                                        `}
-                                        >
-                                            {formatTimeRemaining(timer.endTime)}
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        },
-                    )}
-
-                    {/* Placeholder Timers */}
-                    {Array.from({ length: placeholdersNeeded }).map(
-                        (_, index) => (
-                            <div
-                                key={`placeholder-${index}`}
-                                className={`
-                                h-12 min-w-20 p-2 rounded-lg border
-                                flex flex-col items-center justify-center gap-1
-                                ${
-                                    isDarkMode
-                                        ? "bg-white/5 border-white/10"
-                                        : "bg-gray-25 border-gray-100"
-                                }
-                            `}
-                            >
-                                <Circle
-                                    size={16}
-                                    className={
+                    <div className="flex gap-2">
+                        {!isTrialMode && (
+                            <>
+                                <button
+                                    onClick={handleBlockLeisure}
+                                    className={`rounded-lg px-2 py-1 cursor-pointer transition-all duration-200 text-xs font-medium ${
                                         isDarkMode
-                                            ? "text-white/30"
-                                            : "text-gray-300"
-                                    }
-                                />
-                                <div
-                                    className={`
-                                    text-xs text-center
-                                    ${
-                                        isDarkMode
-                                            ? "text-white/30"
-                                            : "text-gray-400"
-                                    }
-                                `}
+                                            ? "bg-red-500 bg-opacity-20 border-red-500 border-opacity-30 text-white text-opacity-90 hover:bg-opacity-30"
+                                            : "bg-red-100 hover:bg-red-200 border-red-200 text-red-700"
+                                    } border`}
+                                    title="Block leisure sites for 1 hour"
                                 >
-                                    Add Timer
-                                </div>
-                            </div>
-                        ),
+                                    Lock Leisure
+                                </button>
+                                <button
+                                    onClick={handleBlockWork}
+                                    className={`rounded-lg px-2 py-1 cursor-pointer transition-all duration-200 text-xs font-medium ${
+                                        isDarkMode
+                                            ? "bg-blue-500 bg-opacity-20 border-blue-500 border-opacity-30 text-white text-opacity-90 hover:bg-opacity-30"
+                                            : "bg-blue-100 hover:bg-blue-200 border-blue-200 text-blue-700"
+                                    } border`}
+                                    title="Block work sites for 1 hour"
+                                >
+                                    Lock Work
+                                </button>
+                            </>
+                        )}
+                        <button
+                            onClick={() => {
+                                setSelectedDomain("*");
+                                setShowMiniGame(true);
+                            }}
+                            className={`rounded-lg px-2 py-1 cursor-pointer transition-all duration-200 text-xs font-medium ${
+                                isDarkMode
+                                    ? "bg-red-500 bg-opacity-20 border-red-500 border-opacity-30 text-white text-opacity-90 hover:bg-opacity-30"
+                                    : "bg-red-100 hover:bg-red-200 border-red-200 text-red-700"
+                            } border`}
+                            title="Delete all blocked sites"
+                        >
+                            Unlock All
+                        </button>
+                    </div>
+                </div>
+
+                <form onSubmit={handleBlock}>
+                    <div
+                        className={`p-3 rounded-lg border relative flex items-center gap-2 ${
+                            isDarkMode
+                                ? "bg-white bg-opacity-5 border-white border-opacity-20"
+                                : "bg-gray-50 border-gray-200"
+                        } backdrop-blur-sm`}
+                    >
+                        <input
+                            type="text"
+                            value={domain}
+                            onChange={(e) => setDomain(e.target.value)}
+                            placeholder="Domain"
+                            className={`w-2/5 p-0 border-none text-sm outline-none bg-transparent ${
+                                isDarkMode
+                                    ? "text-white placeholder-gray-400"
+                                    : "text-black placeholder-gray-500"
+                            }`}
+                        />
+                        <div className="absolute right-12 flex gap-1 items-center">
+                            <input
+                                type="time"
+                                value={startTime}
+                                onChange={(e) => setStartTime(e.target.value)}
+                                className={`w-20 p-0 border-none pl-2 text-sm outline-none bg-transparent ${
+                                    isDarkMode
+                                        ? "text-white border-white border-opacity-20"
+                                        : "text-black border-gray-200"
+                                } border-l`}
+                            />
+                            <input
+                                type="time"
+                                value={endTime}
+                                onChange={(e) => setEndTime(e.target.value)}
+                                className={`w-20 p-0 border-none pl-2 text-sm outline-none bg-transparent ${
+                                    isDarkMode
+                                        ? "text-white border-white border-opacity-20"
+                                        : "text-black border-gray-200"
+                                } border-l`}
+                            />
+                        </div>
+                        <button
+                            type="submit"
+                            className={`lock-button ${
+                                isLocked ? "locked" : ""
+                            } absolute right-2 top-1/2 transform -translate-y-1/2 w-8 h-8 border-none rounded-lg cursor-pointer transition-all duration-300 flex items-center justify-center ${
+                                isDarkMode
+                                    ? "text-white hover:bg-blue-500 hover:bg-opacity-30"
+                                    : "text-gray-600 hover:text-blue-600 hover:bg-blue-50"
+                            }`}
+                        >
+                            <svg
+                                className={`lock-icon ${
+                                    isLocked ? "locked" : ""
+                                }`}
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            >
+                                {isLocked ? (
+                                    <>
+                                        <rect
+                                            x="3"
+                                            y="11"
+                                            width="18"
+                                            height="11"
+                                            rx="2"
+                                            ry="2"
+                                        />
+                                        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                                    </>
+                                ) : (
+                                    <>
+                                        <rect
+                                            x="3"
+                                            y="11"
+                                            width="18"
+                                            height="11"
+                                            rx="2"
+                                            ry="2"
+                                        />
+                                        <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+                                    </>
+                                )}
+                            </svg>
+                        </button>
+                    </div>
+                </form>
+
+                <div className="flex-1 overflow-y-auto flex flex-col gap-3 -mr-2 pr-2">
+                    {blockedSites.length > 0 && (
+                        <>
+                            <h3
+                                className={`text-sm font-medium mb-2 ${
+                                    isDarkMode
+                                        ? "text-white text-opacity-70"
+                                        : "text-gray-600"
+                                }`}
+                            >
+                                Active Locks ({blockedSites.length})
+                            </h3>
+                            {blockedSites.map((site) => {
+                                const expired = isExpired(site.endTime);
+                                const status = getBlockStatus(site);
+                                return (
+                                    <div
+                                        key={site.domain}
+                                        className={`flex justify-between items-start p-3 rounded-lg border-l-4 border backdrop-blur-sm ${
+                                            expired
+                                                ? isDarkMode
+                                                    ? "bg-red-500 bg-opacity-10 border-red-400 border-white border-opacity-10"
+                                                    : "bg-red-50 border-red-400 border-red-100"
+                                                : status === "Scheduled"
+                                                ? isDarkMode
+                                                    ? "bg-blue-500 bg-opacity-10 border-blue-400 border-white border-opacity-10"
+                                                    : "bg-blue-50 border-blue-400 border-blue-100"
+                                                : status === "Overridden"
+                                                ? isDarkMode
+                                                    ? "bg-orange-500 bg-opacity-10 border-orange-400 border-white border-opacity-10"
+                                                    : "bg-orange-50 border-orange-400 border-orange-100"
+                                                : isDarkMode
+                                                ? "bg-green-500 bg-opacity-10 border-green-400 border-white border-opacity-10"
+                                                : "bg-green-50 border-green-400 border-green-100"
+                                        }`}
+                                    >
+                                        <div className="flex-1">
+                                            <div
+                                                className={`text-sm font-semibold mb-1 ${
+                                                    isDarkMode
+                                                        ? expired
+                                                            ? "text-gray-400"
+                                                            : "text-white"
+                                                        : "text-black"
+                                                }`}
+                                            >
+                                                {site.domain}
+                                                <span
+                                                    className={`ml-2 text-xs px-2 py-1 rounded font-medium text-white uppercase tracking-wide ${
+                                                        expired
+                                                            ? "bg-red-500"
+                                                            : status ===
+                                                              "Scheduled"
+                                                            ? "bg-blue-500"
+                                                            : status ===
+                                                              "Overridden"
+                                                            ? "bg-orange-500"
+                                                            : "bg-green-500"
+                                                    }`}
+                                                >
+                                                    {status}
+                                                </span>
+                                            </div>
+                                            {site.timezone && (
+                                                <div
+                                                    className={`text-xs leading-relaxed ${
+                                                        isDarkMode
+                                                            ? expired
+                                                                ? "text-gray-600"
+                                                                : "text-gray-400"
+                                                            : expired
+                                                            ? "text-gray-500"
+                                                            : "text-gray-600"
+                                                    }`}
+                                                >
+                                                    {formatScheduledTime(site)}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <button
+                                            onClick={() =>
+                                                expired
+                                                    ? handleUnblock(site.domain)
+                                                    : handleUnblockClick(
+                                                          site.domain,
+                                                      )
+                                            }
+                                            className={`px-3 py-1 rounded-lg text-xs font-medium uppercase tracking-wide transition-all duration-200 ${
+                                                isDarkMode
+                                                    ? expired
+                                                        ? "bg-white bg-opacity-10 text-gray-400 border-white border-opacity-20 hover:bg-opacity-20"
+                                                        : "bg-white bg-opacity-10 text-white border-white border-opacity-30 hover:bg-opacity-20"
+                                                    : expired
+                                                    ? "bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200"
+                                                    : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+                                            } border`}
+                                        >
+                                            {expired ? "Remove" : "Unlock"}
+                                        </button>
+                                    </div>
+                                );
+                            })}
+                        </>
+                    )}
+                    {blockedSites.length === 0 && (
+                        <div
+                            className={`p-5 text-center text-sm rounded-lg border ${
+                                isDarkMode
+                                    ? "text-gray-400 bg-white bg-opacity-5 border-white border-opacity-10"
+                                    : "text-gray-500 bg-gray-50 border-gray-100"
+                            } backdrop-blur-sm`}
+                        >
+                            No websites currently locked
+                        </div>
                     )}
                 </div>
             </div>
-
-            {/* Timer Modal */}
-            {showModal && (
-                <TimerModal
-                    onClose={handleModalClose}
-                    onSave={handleSaveTimer}
-                    isDarkMode={isDarkMode}
+            {showMiniGame && (
+                <UnblockMiniGame
+                    onSuccess={handleMiniGameSuccess}
+                    onCancel={handleMiniGameCancel}
                 />
             )}
-        </div>
+        </>
     );
 };
 
-export default Timers;
+export default WebsiteBlocker;

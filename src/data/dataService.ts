@@ -51,7 +51,7 @@ class DataService {
 
         try {
             const result = await chrome.storage.local.get(key);
-            const session = result[key] as BrowsingSession;
+            const session = result[key] as BrowsingSession | undefined;
 
             if (session) {
                 // Ensure uniqueUrls exists in stats for backward compatibility
@@ -60,7 +60,8 @@ class DataService {
                         (ts) => ts.urlVisits,
                     );
                     const uniqueUrls = new Set(allVisits.map((v) => v.url));
-                    session.stats.uniqueUrls = uniqueUrls.size;
+                    (session.stats as SessionStats).uniqueUrls =
+                        uniqueUrls.size;
                     await this.saveSession(session);
                 }
                 return session;

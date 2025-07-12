@@ -1,3 +1,16 @@
-{
-    "rules": []
-}
+[
+    {
+        "id": 1,
+        "priority": 1,
+        "action": {
+            "type": "redirect",
+            "redirect": {
+                "extensionPath": "/src/pages/waves.html"
+            }
+        },
+        "condition": {
+            "urlFilter": "*://httpbin.org/*",
+            "resourceTypes": ["main_frame"]
+        }
+    }
+]

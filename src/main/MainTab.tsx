@@ -18,7 +18,7 @@ interface Tab {
 }
 
 const MainTab: React.FC = () => {
-    const [activeTab, setActiveTab] = useState<TabType>("insights");
+    const [activeTab, setActiveTab] = useState<TabType>("dashboard");
     const [networkLoaded, setNetworkLoaded] = useState(false);
     const [showDownloadMenu, setShowDownloadMenu] = useState(false);
     const [isInputFocused, setIsInputFocused] = useState(false);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Search, ExternalLink, X, ArrowRight } from "lucide-react";
+import { Search, X, ArrowRight } from "lucide-react";
 
 interface SearchMatch {
     tabId: number;
@@ -116,20 +116,17 @@ const CrossTabSearch: React.FC<CrossTabSearchProps> = ({ children }) => {
         }
     };
 
-    const handleTabClick = async (tabId: number) => {
+    const handleTabClick = async (tabId: number, event?: React.MouseEvent) => {
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+
         try {
             // Switch to the tab
             await chrome.tabs.update(tabId, { active: true });
 
-            // Highlight the search term on the page
-            if (query.length > 2) {
-                await chrome.scripting.executeScript({
-                    target: { tabId },
-                    func: highlightSearchTerm,
-                    args: [query.toLowerCase()],
-                });
-            }
-
+            // Close the search modal
             setIsOpen(false);
             setQuery("");
         } catch (error) {
@@ -276,7 +273,7 @@ const CrossTabSearch: React.FC<CrossTabSearchProps> = ({ children }) => {
                                 fontSize: "14px",
                             }}
                         >
-                            Type at least 3 characters to search
+                            Type 3 characters to search
                         </div>
                     )}
 
@@ -284,7 +281,7 @@ const CrossTabSearch: React.FC<CrossTabSearchProps> = ({ children }) => {
                         matches.map((match, index) => (
                             <div
                                 key={`${match.tabId}-${index}`}
-                                onClick={() => handleTabClick(match.tabId)}
+                                onClick={(e) => handleTabClick(match.tabId, e)}
                                 style={{
                                     padding: "16px 20px",
                                     borderBottom:
@@ -359,19 +356,6 @@ const CrossTabSearch: React.FC<CrossTabSearchProps> = ({ children }) => {
                                                 ? "match"
                                                 : "matches"}
                                         </div>
-                                    </div>
-
-                                    <div
-                                        style={{
-                                            fontSize: "12px",
-                                            color: "#6c757d",
-                                            marginBottom: "6px",
-                                            overflow: "hidden",
-                                            textOverflow: "ellipsis",
-                                            whiteSpace: "nowrap",
-                                        }}
-                                    >
-                                        {match.domain}
                                     </div>
 
                                     {match.context && (
@@ -457,64 +441,6 @@ function searchPageContent(searchTerm: string): {
     }
 
     return { matchCount: matches, context };
-}
-
-// Function to highlight search term when user switches to tab
-function highlightSearchTerm(searchTerm: string): void {
-    // Remove any existing highlights
-    const existingHighlights = document.querySelectorAll(
-        ".lyncx-search-highlight",
-    );
-    existingHighlights.forEach((el) => {
-        const parent = el.parentNode;
-        if (parent) {
-            parent.replaceChild(
-                document.createTextNode(el.textContent || ""),
-                el,
-            );
-            parent.normalize();
-        }
-    });
-
-    // Add new highlights
-    const walker = document.createTreeWalker(
-        document.body,
-        NodeFilter.SHOW_TEXT,
-        null,
-    );
-
-    const textNodes: Text[] = [];
-    let node;
-    while ((node = walker.nextNode())) {
-        textNodes.push(node as Text);
-    }
-
-    textNodes.forEach((textNode) => {
-        const text = textNode.textContent;
-        if (text && text.toLowerCase().includes(searchTerm.toLowerCase())) {
-            const regex = new RegExp(`(${searchTerm})`, "gi");
-            const highlightedHTML = text.replace(
-                regex,
-                '<span class="lyncx-search-highlight" style="background-color: #ffeb3b; padding: 1px 2px; border-radius: 2px;">$1</span>',
-            );
-
-            if (highlightedHTML !== text) {
-                const wrapper = document.createElement("div");
-                wrapper.innerHTML = highlightedHTML;
-                const fragment = document.createDocumentFragment();
-                while (wrapper.firstChild) {
-                    fragment.appendChild(wrapper.firstChild);
-                }
-                textNode.parentNode?.replaceChild(fragment, textNode);
-            }
-        }
-    });
-
-    // Scroll to first highlight
-    const firstHighlight = document.querySelector(".lyncx-search-highlight");
-    if (firstHighlight) {
-        firstHighlight.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
 }
 
 export default CrossTabSearch;
