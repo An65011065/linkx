@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
+import { getAuth, connectAuthEmulator } from "firebase/auth";
 
 // Firebase configuration
 const firebaseConfig = {
@@ -14,4 +14,8 @@ const firebaseConfig = {
 
 // Initialize Firebase
 export const app = initializeApp(firebaseConfig);
-export const analytics = getAnalytics(app);
+
+// Initialize Auth
+export const auth = getAuth(app);
+
+// Remove analytics initialization as it's not supported in extensions

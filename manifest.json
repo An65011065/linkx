@@ -2,6 +2,7 @@
     "manifest_version": 3,
     "name": "LINKx",
     "version": "1.0.0",
+    "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAjb3EmHEJGGFkN+CFIRDFxHHv4Yv0D1eWMP7ejP6sK5y/ron/rx7qf3UsYDPW1U+lIRyB/ZB3c8oN+wfPw9PmLamkv5+voLkgzNH2Mwoy3fnl8N7FAvWitZ7hbYduj11b0p+z3N+Pxt4abrirBMBX8lBkLr+KD5/fjH4+CSxRCXJoF/JRimLuEYNZAvtsyYFMd9+BWTW01ELbdgzXzm2rx+QdS2bqgwEILoGAHeYCR4WmBR5m2nd97OIQo9mSongH7L47Evt0pKaXdzxfv4Rb+LhDoqTcnXcziPjA2pusuT1pXbDTMN/di8lEdl0QTMfGDfI8nm/0iLtqudTyKAPB8wIDAQAB",
     "description": "See Your History Like Never Before",
     "permissions": [
         "tabs",
@@ -18,7 +19,7 @@
     ],
     "host_permissions": ["<all_urls>"],
     "content_security_policy": {
-        "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+        "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'; connect-src 'self' https://*.firebaseapp.com https://*.firebase.com https://www.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://*.cloudfunctions.net https://firebase.googleapis.com https://accounts.google.com;"
     },
     "action": {
         "default_popup": "src/popup/popup.html"
