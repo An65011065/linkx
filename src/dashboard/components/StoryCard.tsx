@@ -1,9 +1,10 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import DataService from "../../data/dataService";
-import type { BrowsingSession, TabSession } from "../../data/dataService";
+import type { BrowsingSession, TabSession, Task } from "../../data/dataService";
 import type { UrlVisit } from "../../data/background";
 import Activity from "./Activity";
 import { freeTrial } from "../../main/MainTab";
+import TodoList from "./TodoList";
 
 // Secure blur component that can't be bypassed with CSS
 const SecureBlur: React.FC<{
@@ -45,10 +46,6 @@ interface StoryCardProps {
         | "focus"
         | "breaks"
         | "score";
-    isAutoPlaying?: boolean;
-    onToggleAutoPlay?: () => void;
-    currentIndex?: number;
-    totalCards?: number;
     isDarkMode?: boolean;
 }
 
@@ -64,22 +61,112 @@ interface FocusStreak {
     urls: string[];
 }
 
+const getNextUpcomingTask = (tasks: Task[]): Task | null => {
+    const now = new Date();
+    const currentTimeInMinutes = now.getHours() * 60 + now.getMinutes();
+
+    // Helper function to convert time string to minutes
+    const timeToMinutes = (timeStr: string): number => {
+        // Handle formats like "4:15pm", "4pm", "4:15 PM", etc.
+        const cleanTime = timeStr.toLowerCase().trim();
+        const isPM = cleanTime.includes("pm");
+        const isAM = cleanTime.includes("am");
+
+        // Extract the time part (remove am/pm)
+        const timeOnly = cleanTime.replace(/[ap]m/g, "").trim();
+
+        let hours: number;
+        let minutes: number = 0;
+
+        if (timeOnly.includes(":")) {
+            const [hoursStr, minutesStr] = timeOnly.split(":");
+            hours = parseInt(hoursStr);
+            minutes = parseInt(minutesStr);
+        } else {
+            hours = parseInt(timeOnly);
+        }
+
+        // Convert to 24-hour format
+        if (isPM && hours !== 12) {
+            hours += 12;
+        } else if (isAM && hours === 12) {
+            hours = 0;
+        }
+
+        return hours * 60 + minutes;
+    };
+
+    // Get active tasks with times that haven't passed yet
+    const upcomingTasks = tasks
+        .filter(
+            (task) =>
+                task.status === "active" &&
+                task.time &&
+                timeToMinutes(task.time) > currentTimeInMinutes,
+        )
+        .sort((a, b) => {
+            const timeA = timeToMinutes(a.time!);
+            const timeB = timeToMinutes(b.time!);
+            return timeA - timeB;
+        });
+
+    // Return the earliest upcoming task, or null if none found
+    return upcomingTasks.length > 0 ? upcomingTasks[0] : null;
+};
+
 export const StoryCard: React.FC<StoryCardProps> = ({
     currentSession,
     cardType,
-    isAutoPlaying,
-    onToggleAutoPlay,
-    currentIndex = 0,
-    totalCards = 6,
     isDarkMode = false,
 }) => {
+    const [showTodoList, setShowTodoList] = useState(false);
+    const [tasks, setTasks] = useState<Task[]>([]);
+    const dataService = DataService.getInstance();
+
+    // Load tasks on mount
+    useEffect(() => {
+        const loadTasks = async () => {
+            const loadedTasks = await dataService.getTasks();
+            // Filter out deleted tasks to match TodoList behavior
+            const visibleTasks = loadedTasks.filter(
+                (task) => task.status !== "deleted",
+            );
+            setTasks(visibleTasks);
+        };
+        loadTasks();
+    }, []);
+
     if (!currentSession) return null;
+
+    // If showing todo list and we're on the overview card, show the TodoList component
+    if (showTodoList && cardType === "overview") {
+        return (
+            <div
+                className={`rounded-2xl relative overflow-hidden w-full h-full font-sans flex flex-col ${
+                    isDarkMode
+                        ? "bg-black backdrop-blur-xl border border-white/10"
+                        : "bg-white shadow-2xl border border-gray-200"
+                }`}
+            >
+                <button
+                    onClick={() => setShowTodoList(false)}
+                    className={`absolute top-6 right-6 px-4 py-2 rounded-lg z-30 transition-all ${
+                        isDarkMode
+                            ? "bg-white/10 hover:bg-white/20 text-white"
+                            : "bg-gray-100 hover:bg-gray-200 text-gray-800"
+                    }`}
+                >
+                    Back to Dashboards
+                </button>
+                <TodoList isDarkMode={isDarkMode} onTasksChange={setTasks} />
+            </div>
+        );
+    }
 
     const stats = currentSession.stats;
     const productiveTime = stats.workTime + stats.otherTime;
     const leisureTime = stats.socialTime;
     const totalTime = stats.totalTime;
-    const dataService = DataService.getInstance();
 
     const formatTimeOfDay = (timestamp: number): string => {
         return new Date(timestamp).toLocaleTimeString("en-US", {
@@ -541,72 +628,33 @@ export const StoryCard: React.FC<StoryCardProps> = ({
                                 </div>
                             </SecureBlur>
                         </div>
-                        {onToggleAutoPlay && (
-                            <button
-                                onClick={onToggleAutoPlay}
-                                className={`absolute bottom-6 right-6 h-10 pl-3 pr-4 rounded-full flex items-center gap-3 transition-colors shadow-lg ${
-                                    isDarkMode
-                                        ? "bg-black/80 hover:bg-black/90 backdrop-blur-sm border border-white/10"
-                                        : "bg-white border border-gray-200 hover:bg-gray-50"
-                                }`}
-                            >
-                                <div className="w-6 h-6 flex items-center justify-center">
-                                    {isAutoPlaying ? (
-                                        <svg
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            width="16"
-                                            height="16"
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke={
-                                                isDarkMode ? "white" : "#6c757d"
-                                            }
-                                            strokeWidth="2.5"
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                        >
-                                            <rect
-                                                x="6"
-                                                y="4"
-                                                width="4"
-                                                height="16"
-                                            ></rect>
-                                            <rect
-                                                x="14"
-                                                y="4"
-                                                width="4"
-                                                height="16"
-                                            ></rect>
-                                        </svg>
-                                    ) : (
-                                        <svg
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            width="16"
-                                            height="16"
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke={
-                                                isDarkMode ? "white" : "#6c757d"
-                                            }
-                                            strokeWidth="2.5"
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                        >
-                                            <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                                        </svg>
-                                    )}
-                                </div>
-                                <div
-                                    className={`text-sm font-medium ${
-                                        isDarkMode
-                                            ? "text-white"
-                                            : "text-gray-600"
-                                    }`}
-                                >
-                                    {currentIndex + 1}/{totalCards}
-                                </div>
-                            </button>
-                        )}
+                        {/* Add the Up Next button with task preview */}
+                        <button
+                            onClick={() => setShowTodoList(true)}
+                            className={`absolute bottom-6 right-6 px-4 py-2 rounded-lg transition-all ${
+                                isDarkMode
+                                    ? "bg-black/80 hover:bg-black/90 backdrop-blur-sm border border-white/10 text-white"
+                                    : "bg-white border border-gray-200 hover:bg-gray-50 text-gray-800"
+                            }`}
+                        >
+                            Up Next:{" "}
+                            {(() => {
+                                const nextTask = getNextUpcomingTask(tasks);
+                                if (nextTask) {
+                                    return `${nextTask.text} | ${nextTask.time}`;
+                                }
+
+                                // Fallback to any active task if no upcoming timed tasks
+                                const activeTasks = tasks.filter(
+                                    (t) => t.status === "active",
+                                );
+                                if (activeTasks.length > 0) {
+                                    return activeTasks[0].text;
+                                }
+
+                                return "Plan your day";
+                            })()}
+                        </button>
                     </div>
                 );
 
@@ -657,72 +705,7 @@ export const StoryCard: React.FC<StoryCardProps> = ({
                                 <Activity isDarkMode={isDarkMode} />
                             </SecureBlur>
                         </div>
-                        {onToggleAutoPlay && (
-                            <button
-                                onClick={onToggleAutoPlay}
-                                className={`absolute bottom-6 right-6 h-10 pl-3 pr-4 rounded-full flex items-center gap-3 transition-colors shadow-lg ${
-                                    isDarkMode
-                                        ? "bg-black/80 hover:bg-black/90 backdrop-blur-sm border border-white/10"
-                                        : "bg-white border border-gray-200 hover:bg-gray-50"
-                                }`}
-                            >
-                                <div className="w-6 h-6 flex items-center justify-center">
-                                    {isAutoPlaying ? (
-                                        <svg
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            width="16"
-                                            height="16"
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke={
-                                                isDarkMode ? "white" : "#6c757d"
-                                            }
-                                            strokeWidth="2.5"
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                        >
-                                            <rect
-                                                x="6"
-                                                y="4"
-                                                width="4"
-                                                height="16"
-                                            ></rect>
-                                            <rect
-                                                x="14"
-                                                y="4"
-                                                width="4"
-                                                height="16"
-                                            ></rect>
-                                        </svg>
-                                    ) : (
-                                        <svg
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            width="16"
-                                            height="16"
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke={
-                                                isDarkMode ? "white" : "#6c757d"
-                                            }
-                                            strokeWidth="2.5"
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                        >
-                                            <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                                        </svg>
-                                    )}
-                                </div>
-                                <div
-                                    className={`text-sm font-medium ${
-                                        isDarkMode
-                                            ? "text-white"
-                                            : "text-gray-600"
-                                    }`}
-                                >
-                                    {currentIndex + 1}/{totalCards}
-                                </div>
-                            </button>
-                        )}
+                        {/* Remove autoplay button */}
                     </div>
                 );
             }
@@ -830,72 +813,7 @@ export const StoryCard: React.FC<StoryCardProps> = ({
                                 </SecureBlur>
                             </div>
                         </div>
-                        {onToggleAutoPlay && (
-                            <button
-                                onClick={onToggleAutoPlay}
-                                className={`absolute bottom-6 right-6 h-10 pl-3 pr-4 rounded-full flex items-center gap-3 transition-colors shadow-lg ${
-                                    isDarkMode
-                                        ? "bg-black/80 hover:bg-black/90 backdrop-blur-sm border border-white/10"
-                                        : "bg-white border border-gray-200 hover:bg-gray-50"
-                                }`}
-                            >
-                                <div className="w-6 h-6 flex items-center justify-center">
-                                    {isAutoPlaying ? (
-                                        <svg
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            width="16"
-                                            height="16"
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke={
-                                                isDarkMode ? "white" : "#6c757d"
-                                            }
-                                            strokeWidth="2.5"
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                        >
-                                            <rect
-                                                x="6"
-                                                y="4"
-                                                width="4"
-                                                height="16"
-                                            ></rect>
-                                            <rect
-                                                x="14"
-                                                y="4"
-                                                width="4"
-                                                height="16"
-                                            ></rect>
-                                        </svg>
-                                    ) : (
-                                        <svg
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            width="16"
-                                            height="16"
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke={
-                                                isDarkMode ? "white" : "#6c757d"
-                                            }
-                                            strokeWidth="2.5"
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                        >
-                                            <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                                        </svg>
-                                    )}
-                                </div>
-                                <div
-                                    className={`text-sm font-medium ${
-                                        isDarkMode
-                                            ? "text-white"
-                                            : "text-gray-600"
-                                    }`}
-                                >
-                                    {currentIndex + 1}/{totalCards}
-                                </div>
-                            </button>
-                        )}
+                        {/* Remove autoplay button */}
                     </div>
                 );
             }
@@ -1146,72 +1064,6 @@ export const StoryCard: React.FC<StoryCardProps> = ({
                                 </div>
                             </SecureBlur>
                         </div>
-                        {onToggleAutoPlay && (
-                            <button
-                                onClick={onToggleAutoPlay}
-                                className={`absolute bottom-6 right-6 h-10 pl-3 pr-4 rounded-full flex items-center gap-3 transition-colors shadow-lg ${
-                                    isDarkMode
-                                        ? "bg-black/80 hover:bg-black/90 backdrop-blur-sm border border-white/10"
-                                        : "bg-white border border-gray-200 hover:bg-gray-50"
-                                }`}
-                            >
-                                <div className="w-6 h-6 flex items-center justify-center">
-                                    {isAutoPlaying ? (
-                                        <svg
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            width="16"
-                                            height="16"
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke={
-                                                isDarkMode ? "white" : "#6c757d"
-                                            }
-                                            strokeWidth="2.5"
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                        >
-                                            <rect
-                                                x="6"
-                                                y="4"
-                                                width="4"
-                                                height="16"
-                                            ></rect>
-                                            <rect
-                                                x="14"
-                                                y="4"
-                                                width="4"
-                                                height="16"
-                                            ></rect>
-                                        </svg>
-                                    ) : (
-                                        <svg
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            width="16"
-                                            height="16"
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke={
-                                                isDarkMode ? "white" : "#6c757d"
-                                            }
-                                            strokeWidth="2.5"
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                        >
-                                            <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                                        </svg>
-                                    )}
-                                </div>
-                                <div
-                                    className={`text-sm font-medium ${
-                                        isDarkMode
-                                            ? "text-white"
-                                            : "text-gray-600"
-                                    }`}
-                                >
-                                    {currentIndex + 1}/{totalCards}
-                                </div>
-                            </button>
-                        )}
                     </div>
                 );
             }

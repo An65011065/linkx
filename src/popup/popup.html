@@ -1,9 +1,10 @@
+<!-- src/popup/popup.html - Add basic debugging -->
 <!DOCTYPE html>
 <html lang="en">
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>LINKx Popup</title>
+        <title>LynkX Popup</title>
         <style>
             * {
                 -webkit-font-smoothing: antialiased;
@@ -21,10 +22,37 @@
             #root {
                 overflow: hidden;
             }
+
+            /* DEBUG: Add visible fallback */
+            .debug-fallback {
+                width: 340px;
+                height: 330px;
+                background: yellow;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-family: Arial, sans-serif;
+                font-size: 14px;
+                text-align: center;
+                padding: 20px;
+                box-sizing: border-box;
+            }
         </style>
     </head>
     <body>
-        <div id="root"></div>
+        <div id="root">
+            <!-- DEBUG: Fallback content that's always visible -->
+            <div class="debug-fallback">
+                <div>
+                    <h3>DEBUG: HTML Loaded</h3>
+                    <p>
+                        If you see this, HTML is working but React may not be
+                        loading.
+                    </p>
+                    <p>Check console for errors.</p>
+                </div>
+            </div>
+        </div>
         <script type="module" src="./popup.tsx"></script>
     </body>
 </html>

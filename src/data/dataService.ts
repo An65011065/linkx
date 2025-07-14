@@ -31,6 +31,15 @@ export interface BrowsingSession {
     stats: SessionStats;
 }
 
+export interface Task {
+    id: string;
+    text: string;
+    time?: string;
+    createdAt: number;
+    completed?: boolean;
+    status?: "active" | "completed" | "deleted"; // Add status field
+}
+
 class DataService {
     private static instance: DataService;
 
@@ -767,6 +776,64 @@ class DataService {
         }
 
         return longestStreak;
+    }
+
+    // Get all tasks
+    async getTasks(): Promise<Task[]> {
+        try {
+            const result = await chrome.storage.local.get("tasks");
+            return result.tasks || [];
+        } catch (error) {
+            console.error("Error loading tasks:", error);
+            return [];
+        }
+    }
+
+    // Update task status
+    async updateTaskStatus(
+        taskId: string,
+        status: "active" | "completed" | "deleted",
+    ): Promise<void> {
+        const tasks = await this.getTasks();
+        const task = tasks.find((t) => t.id === taskId);
+        if (task) {
+            task.status = status;
+            await chrome.storage.local.set({ tasks });
+        }
+    }
+
+    // Add a new task
+    async addTask(text: string, time?: string): Promise<Task> {
+        const tasks = await this.getTasks();
+        const newTask: Task = {
+            id: crypto.randomUUID(),
+            text,
+            time: time || undefined,
+            createdAt: Date.now(),
+            status: "active", // Set default status
+        };
+
+        tasks.push(newTask);
+        await chrome.storage.local.set({ tasks });
+        return newTask;
+    }
+
+    // Toggle task completion
+    async toggleTask(taskId: string): Promise<void> {
+        const tasks = await this.getTasks();
+        const task = tasks.find((t) => t.id === taskId);
+        if (task) {
+            task.completed = !task.completed;
+            task.status = task.completed ? "completed" : "active"; // Update status when toggling
+            await chrome.storage.local.set({ tasks });
+        }
+    }
+
+    // Delete a task
+    async deleteTask(taskId: string): Promise<void> {
+        const tasks = await this.getTasks();
+        const filteredTasks = tasks.filter((t) => t.id !== taskId);
+        await chrome.storage.local.set({ tasks: filteredTasks });
     }
 }
 

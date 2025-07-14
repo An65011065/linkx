@@ -56,185 +56,7 @@ class AIService {
                         "📈 Total Visits:",
                         browsingContext.today?.allVisits?.length,
                     );
-
-                    // 🔥 DETAILED STATS BREAKDOWN
-                    if (browsingContext.today?.stats) {
-                        console.log("\n📊 DETAILED STATS:");
-                        console.log(
-                            "- Work Time:",
-                            Math.round(
-                                browsingContext.today.stats.workTime /
-                                    (1000 * 60),
-                            ),
-                            "minutes",
-                        );
-                        console.log(
-                            "- Social Time:",
-                            Math.round(
-                                browsingContext.today.stats.socialTime /
-                                    (1000 * 60),
-                            ),
-                            "minutes",
-                        );
-                        console.log(
-                            "- Other Time:",
-                            Math.round(
-                                browsingContext.today.stats.otherTime /
-                                    (1000 * 60),
-                            ),
-                            "minutes",
-                        );
-                        console.log(
-                            "- Total Time:",
-                            Math.round(
-                                browsingContext.today.stats.totalTime /
-                                    (1000 * 60),
-                            ),
-                            "minutes",
-                        );
-                        console.log(
-                            "- Total URLs:",
-                            browsingContext.today.stats.totalUrls,
-                        );
-                        console.log(
-                            "- Unique Domains:",
-                            browsingContext.today.stats.uniqueDomains,
-                        );
-                    }
-
-                    // 🔥 VISIT DATA ANALYSIS
-                    if (browsingContext.today?.allVisits) {
-                        const visits = browsingContext.today.allVisits;
-                        const visitsWithActiveTime = visits.filter(
-                            (v) => v.activeTimeMinutes > 0,
-                        );
-
-                        console.log("\n🔍 VISIT ANALYSIS:");
-                        console.log("- Total visits:", visits.length);
-                        console.log(
-                            "- Visits with active time:",
-                            visitsWithActiveTime.length,
-                        );
-                        console.log(
-                            "- Zero-minute visits:",
-                            visits.length - visitsWithActiveTime.length,
-                        );
-
-                        // 🔥 TOP DOMAINS BY TIME (using ALL visits now)
-                        const domainTimes: Record<string, number> = {};
-                        visits.forEach((visit) => {
-                            domainTimes[visit.domain] =
-                                (domainTimes[visit.domain] || 0) +
-                                visit.activeTimeMinutes;
-                        });
-                        const topDomains = Object.entries(domainTimes)
-                            .sort(
-                                ([, a], [, b]): number =>
-                                    (b as number) - (a as number),
-                            )
-                            .slice(0, 5);
-
-                        console.log("\n🏆 TOP 5 DOMAINS BY TIME (ALL VISITS):");
-                        topDomains.forEach(([domain, minutes]) => {
-                            console.log(`- ${domain}: ${minutes} minutes`);
-                        });
-
-                        // 🔥 FIRST AND LAST VISITS
-                        console.log("\n⏰ CHRONOLOGICAL VISIT ANALYSIS:");
-                        console.log("🔸 FIRST 3 VISITS:");
-                        visits.slice(0, 3).forEach((visit, i) => {
-                            const time = new Date(visit.startTime);
-                            console.log(
-                                `${i + 1}. ${visit.domain} (${
-                                    visit.activeTimeMinutes
-                                }min) at ${time.getHours()}:${time
-                                    .getMinutes()
-                                    .toString()
-                                    .padStart(2, "0")}`,
-                            );
-                            console.log(
-                                `   Title: ${
-                                    visit.title?.substring(0, 80) || "No title"
-                                }`,
-                            );
-                            console.log(
-                                `   URL: ${visit.url?.substring(0, 100)}...`,
-                            );
-                        });
-
-                        console.log("\n🔸 LAST 3 VISITS:");
-                        visits.slice(-3).forEach((visit, i) => {
-                            const time = new Date(visit.startTime);
-                            console.log(
-                                `${i + 1}. ${visit.domain} (${
-                                    visit.activeTimeMinutes
-                                }min) at ${time.getHours()}:${time
-                                    .getMinutes()
-                                    .toString()
-                                    .padStart(2, "0")}`,
-                            );
-                            console.log(
-                                `   Title: ${
-                                    visit.title?.substring(0, 80) || "No title"
-                                }`,
-                            );
-                            console.log(
-                                `   URL: ${visit.url?.substring(0, 100)}...`,
-                            );
-                        });
-
-                        // 🔥 VISITS WITH ACTIVE TIME BREAKDOWN
-                        if (visitsWithActiveTime.length > 0) {
-                            console.log(
-                                "\n🎯 VISITS WITH ACTIVE TIME (>0 minutes):",
-                            );
-                            visitsWithActiveTime.forEach((visit, i) => {
-                                const time = new Date(visit.startTime);
-                                console.log(
-                                    `${i + 1}. ${visit.domain}: ${
-                                        visit.activeTimeMinutes
-                                    }min at ${time.getHours()}:${time
-                                        .getMinutes()
-                                        .toString()
-                                        .padStart(2, "0")}`,
-                                );
-                                console.log(
-                                    `   "${
-                                        visit.title?.substring(0, 60) ||
-                                        "No title"
-                                    }"`,
-                                );
-                            });
-                        }
-
-                        // 🔥 TIME DISTRIBUTION
-                        interface HourlyData {
-                            count: number;
-                            activeTime: number;
-                        }
-                        const hourlyBreakdown: Record<number, HourlyData> = {};
-                        visits.forEach((visit) => {
-                            const hour = new Date(visit.startTime).getHours();
-                            if (!hourlyBreakdown[hour])
-                                hourlyBreakdown[hour] = {
-                                    count: 0,
-                                    activeTime: 0,
-                                };
-                            hourlyBreakdown[hour].count++;
-                            hourlyBreakdown[hour].activeTime +=
-                                visit.activeTimeMinutes;
-                        });
-
-                        console.log("\n⏰ HOURLY BREAKDOWN:");
-                        Object.entries(hourlyBreakdown)
-                            .sort(([a], [b]) => parseInt(a) - parseInt(b))
-                            .forEach(([hour, data]) => {
-                                const hourData = data as HourlyData;
-                                console.log(
-                                    `${hour}:00 - ${hourData.count} visits, ${hourData.activeTime} active minutes`,
-                                );
-                            });
-                    }
+                    console.log("📋 Summary:", browsingContext.today?.summary);
                 } else {
                     console.log("❌ No browsing context created!");
                 }
@@ -245,13 +67,14 @@ class AIService {
                 );
             }
 
-            // 🔥 COMPLETE REQUEST PAYLOAD LOGGING
+            // 🔥 COMPLETE REQUEST PAYLOAD
             const requestPayload = {
                 userMessage: message,
-                browsingData: browsingContext,
+                browsingData: browsingContext, // ← SEND THE ACTUAL DATA NOW
                 threadId: this.currentThreadId,
                 systemContext:
                     "You are an AI assistant inside a browser extension that tracks browsing habits. The user has live browsing data from today. The visits are sorted chronologically with MOST RECENT FIRST. Pay close attention to the 'readableTime' field which shows the correct local time (like '5:54 PM'). When the user asks for recent pages, use the first entries in the list as they are the most recent. You should analyze their browsing patterns and provide insights about their digital habits. Never mention uploaded files or JSON - this is live data from their browser extension.",
+                assistantType: "browsing",
             };
 
             console.log("\n" + "=".repeat(60));
@@ -286,6 +109,10 @@ class AIService {
                     "- Tab Sessions:",
                     requestPayload.browsingData.today?.tabSessions,
                 );
+                console.log(
+                    "- Has Summary:",
+                    !!requestPayload.browsingData.today?.summary,
+                );
 
                 // Calculate payload size estimate
                 const payloadSize = JSON.stringify(requestPayload).length;
@@ -298,6 +125,8 @@ class AIService {
                     console.log(
                         "⚠️ LARGE PAYLOAD WARNING: May trigger CSV upload fallback",
                     );
+                } else {
+                    console.log("✅ Payload size looks good");
                 }
             }
 
@@ -309,58 +138,10 @@ class AIService {
             const endTime = Date.now();
             console.log(`✅ RESPONSE RECEIVED (${endTime - startTime}ms)`);
 
-            // 🔥 DETAILED RESPONSE LOGGING
-            console.log("\n" + "=".repeat(60));
-            console.log("📥 FIREBASE FUNCTION RESPONSE");
-            console.log("=".repeat(60));
-            console.log("✅ Response Status: SUCCESS");
-            console.log(
-                "📝 Output Text Length:",
-                response.data?.output_text?.length || 0,
-            );
-            console.log(
-                "🔗 Thread ID Returned:",
-                response.data?.threadId || "NONE",
-            );
-
-            if (response.data?.output_text) {
-                console.log("\n📄 RESPONSE PREVIEW (first 300 chars):");
-                console.log(
-                    response.data.output_text.substring(0, 300) + "...",
-                );
-
-                // Check for suspicious patterns in response
-                const suspiciousPatterns = [
-                    "fibrosis",
-                    "bathmatics",
-                    "enfr WOR",
-                    "transcription",
-                    "quarry options",
-                    "Alt fibrosis",
-                    "pcubra",
-                    "slaughter",
-                    "Artik-tests",
-                    "mundane",
-                ];
-                const foundSuspicious = suspiciousPatterns.filter((pattern) =>
-                    response.data.output_text
-                        .toLowerCase()
-                        .includes(pattern.toLowerCase()),
-                );
-                if (foundSuspicious.length > 0) {
-                    console.log(
-                        "🚨 HALLUCINATION DETECTED! Suspicious words found:",
-                    );
-                    console.log(foundSuspicious);
-                }
-            }
-
             // Store thread ID for future messages
             if (response.data?.threadId) {
                 this.currentThreadId = response.data.threadId;
                 console.log("💾 Updated thread ID:", this.currentThreadId);
-            } else {
-                console.log("⚠️ No thread ID in response");
             }
 
             console.log("\n" + "=".repeat(80));
@@ -376,10 +157,6 @@ class AIService {
             console.log("=".repeat(80));
             console.error("❌ ERROR in AI response:");
             console.error("Error details:", error);
-            if (error instanceof Error) {
-                console.error("Error message:", error.message);
-                console.error("Error stack:", error.stack);
-            }
             throw error;
         }
     }
@@ -394,20 +171,12 @@ class AIService {
     private async getAllBrowsingData() {
         console.log("📊 Getting browsing data from DataService...");
         const dataService = DataService.getInstance();
-        try {
-            console.log("📋 Fetching current session...");
-            const currentSession = await dataService.getCurrentSession();
-            console.log("✅ Current session retrieved:", {
-                date: currentSession.date,
-                tabSessionsCount: currentSession.tabSessions?.length,
-                statsPresent: !!currentSession.stats,
-            });
 
-            // Include ALL data
+        try {
+            const currentSession = await dataService.getCurrentSession();
             const allVisits = currentSession.tabSessions.flatMap(
                 (ts) => ts.urlVisits,
             );
-            console.log("📈 Total visits extracted:", allVisits.length);
 
             // Sort visits chronologically to ensure proper order
             allVisits.sort((a, b) => b.startTime - a.startTime); // Most recent first
@@ -420,47 +189,70 @@ class AIService {
                         currentSession.stats.totalTime / (1000 * 60),
                     ),
                     tabSessions: currentSession.tabSessions.length,
-                    // Include ALL visits with better time formatting
-                    allVisits: allVisits.map((visit) => {
-                        const visitDate = new Date(visit.startTime);
-                        const timeString = visitDate.toLocaleTimeString(
-                            "en-US",
-                            {
-                                hour: "numeric",
-                                minute: "2-digit",
-                                hour12: true,
-                            },
-                        );
-                        return {
-                            url: visit.url,
-                            domain: visit.domain,
-                            title: visit.title,
-                            startTime: visit.startTime,
-                            readableTime: timeString,
-                            activeTimeMinutes: Math.round(
-                                visit.activeTime / (1000 * 60),
-                            ),
-                        };
-                    }),
+                    // CLEAN visits data - NO SUMMARY ROWS
+                    allVisits: allVisits
+                        .filter((visit) => {
+                            // REMOVE any summary/weird rows
+                            return (
+                                visit.domain &&
+                                visit.domain !== "SUMMARY_DATA" &&
+                                typeof visit.domain === "string" &&
+                                visit.domain.length > 0 &&
+                                !visit.domain.includes("Total visits") &&
+                                !visit.domain.includes("Summary")
+                            );
+                        })
+                        .slice(0, 50) // Limit to 50 visits
+                        .map((visit) => {
+                            const visitDate = new Date(visit.startTime);
+                            return {
+                                domain: String(visit.domain).trim(),
+                                title: String(visit.title || "")
+                                    .trim()
+                                    .substring(0, 100),
+                                startTime: visit.startTime,
+                                readableTime: visitDate.toLocaleTimeString(
+                                    "en-US",
+                                    {
+                                        hour: "numeric",
+                                        minute: "2-digit",
+                                        hour12: true,
+                                    },
+                                ),
+                                activeTimeMinutes: Math.round(
+                                    visit.activeTime / (1000 * 60),
+                                ),
+                            };
+                        }),
+                    // Put summary data SEPARATELY, not mixed with visits
+                    summary: {
+                        totalVisits: allVisits.length,
+                        totalActiveMinutes: Math.round(
+                            currentSession.stats.totalTime / (1000 * 60),
+                        ),
+                        tabSessions: currentSession.tabSessions.length,
+                        workTime: Math.round(
+                            currentSession.stats.workTime / (1000 * 60),
+                        ),
+                        socialTime: Math.round(
+                            currentSession.stats.socialTime / (1000 * 60),
+                        ),
+                        otherTime: Math.round(
+                            currentSession.stats.otherTime / (1000 * 60),
+                        ),
+                    },
                 },
             };
 
-            console.log("✅ Browsing context created successfully:", {
-                totalVisits: context.today.allVisits.length,
-                totalActiveMinutes: context.today.totalActiveMinutes,
+            console.log("✅ Clean context created:", {
+                visits: context.today.allVisits.length,
                 date: context.today.date,
-                tabSessions: context.today.tabSessions,
+                summary: context.today.summary,
             });
 
             return context;
         } catch (error) {
             console.error("❌ Error creating browsing context:", error);
-            if (error instanceof Error) {
-                console.error("Error details:", {
-                    message: error.message,
-                    stack: error.stack,
-                });
-            }
             return null;
         }
     }

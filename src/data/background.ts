@@ -1,5 +1,6 @@
 import DataService from "./dataService";
 import { websiteBlocker } from "./websiteBlocker";
+import AuthService from "../services/authService";
 
 // Navigation source information for linking pages
 export interface SourceInfo {
@@ -538,87 +539,148 @@ class BackgroundTracker {
         }
     }
 
-    // Set up context menu for selected text
-    // Update this method in your background.ts file
+    // Set up context menu for selected text - ROBUST VERSION
     private setupContextMenu(): void {
         chrome.contextMenus.removeAll(() => {
-            // Add to LyncX notes (existing)
+            // Add to LyncX notes
             chrome.contextMenus.create({
                 id: "addToLyncX",
-                title: "Add to LyncX",
+                title: "Add to Notes",
                 contexts: ["selection"],
             });
 
-            // Smart Bookmark (new)
+            // Smart Bookmark
             chrome.contextMenus.create({
                 id: "smartBookmark",
-                title: "📚 Smart Bookmark",
+                title: "Bookmark Page",
                 contexts: ["page"],
+            });
+
+            // Add Summarize option
+            chrome.contextMenus.create({
+                id: "summarize-selection",
+                title: "Summarize Selection",
+                contexts: ["selection"],
             });
         });
 
         chrome.contextMenus.onClicked.addListener(async (info, tab) => {
-            // Existing LyncX notes functionality
+            // Handle summarize selection
+            if (info.menuItemId === "summarize-selection" && tab?.id) {
+                // Store the selected text temporarily
+                await chrome.storage.local.set({
+                    pendingSummarizeText: info.selectionText,
+                    pendingSummarizeType: "selection",
+                });
+
+                // Open the popup programmatically
+                await chrome.action.openPopup();
+
+                // Send message to notify the popup
+                chrome.runtime.sendMessage({
+                    action: "summarize-selection",
+                    text: info.selectionText,
+                });
+                return;
+            }
+
+            // ROBUST: Direct backend save for LyncX notes
             if (
                 info.menuItemId === "addToLyncX" &&
                 info.selectionText &&
-                tab?.id
+                tab?.id &&
+                tab?.url
             ) {
                 try {
-                    // Get current tab URL to extract domain
-                    const domain = this.extractDomain(tab.url || "");
-
-                    // Prepare the content with timestamp and URL
+                    const domain = this.extractDomain(tab.url);
                     const timestamp = new Date().toLocaleString();
                     const selectedContent = `--- ${timestamp} ---\nFrom: ${tab.url}\n\n${info.selectionText}`;
 
-                    // Get existing note for this domain
-                    const existingNote = await chrome.storage.local.get(
-                        `note_${domain}`,
+                    console.log(
+                        `📝 Saving selected text directly to backend for ${domain}`,
                     );
-                    const currentContent = existingNote[`note_${domain}`] || "";
+
+                    // Get AuthService instance
+                    const authService = AuthService.getInstance();
+
+                    // First, try to load existing note
+                    let existingContent = "";
+                    try {
+                        const response = await authService.makeApiCall(
+                            "GET",
+                            `/notes/${encodeURIComponent(domain)}`,
+                        );
+                        if (response.ok) {
+                            const noteData = await response.json();
+                            existingContent = noteData.content || "";
+                        }
+                    } catch (err) {
+                        console.log("No existing note found, creating new one");
+                    }
 
                     // Append new content to existing note
-                    const updatedContent = currentContent
-                        ? `${currentContent}\n\n${selectedContent}`
-                        : selectedContent;
+                    const separator = existingContent.trim() ? "\n\n" : "";
+                    const updatedContent =
+                        existingContent + separator + selectedContent;
 
-                    // Save to storage
-                    const timestampKey = `note_timestamp_${domain}`;
-                    const createdKey = `note_created_${domain}`;
-                    const now = Date.now();
-
-                    // Get existing creation timestamp or use current time
-                    const existingCreated = await chrome.storage.local.get(
-                        createdKey,
-                    );
-                    const createdAt = existingCreated[createdKey] || now;
-
-                    await chrome.storage.local.set({
-                        [`note_${domain}`]: updatedContent,
-                        [timestampKey]: now,
-                        [createdKey]: createdAt,
-                    });
-
-                    console.log(
-                        `📝 Added selected text to note for domain: ${domain}`,
+                    // Save to backend
+                    const saveResponse = await authService.makeApiCall(
+                        "POST",
+                        "/notes",
+                        {
+                            domain,
+                            content: updatedContent,
+                        },
                     );
 
-                    // Send notification message to content script
+                    if (saveResponse.ok) {
+                        console.log(
+                            `✅ Selected text saved to backend for ${domain}`,
+                        );
+
+                        // Show success notification on the page
+                        chrome.tabs
+                            .sendMessage(tab.id, {
+                                action: "showNotification",
+                                message: "Added to Notes!",
+                                type: "success",
+                            })
+                            .catch(() => {
+                                // Fallback: Chrome notification if content script unavailable
+                                chrome.notifications.create({
+                                    type: "basic",
+                                    iconUrl: "/src/assets/icons/icon128.png",
+                                    title: "LyncX",
+                                    message: `Added selected text to ${domain} notes`,
+                                    priority: 1,
+                                });
+                            });
+                    } else {
+                        throw new Error("Failed to save to backend");
+                    }
+                } catch (error) {
+                    console.error("❌ Error saving selected text:", error);
+
+                    // Show error notification
                     chrome.tabs
                         .sendMessage(tab.id, {
                             action: "showNotification",
-                            message: "Added to LyncX notes!",
+                            message: "Failed to save note",
+                            type: "error",
                         })
                         .catch(() => {
-                            // Ignore if content script isn't available
+                            chrome.notifications.create({
+                                type: "basic",
+                                iconUrl: "/src/assets/icons/icon128.png",
+                                title: "LyncX Error",
+                                message: "Failed to save selected text",
+                                priority: 1,
+                            });
                         });
-                } catch (error) {
-                    console.error("Error saving selected text:", error);
                 }
             }
 
-            // NEW: Smart Bookmark functionality
+            // Smart Bookmark functionality remains unchanged
             if (
                 info.menuItemId === "smartBookmark" &&
                 tab?.id &&
@@ -757,12 +819,249 @@ async function handleProceedToSite(url: string): Promise<boolean> {
     }
 }
 
-// Centralized message listener
+// ===============================
+// TIMER FUNCTIONALITY (UNIFIED)
+// ===============================
+
+// Single peaceful timer completion modal - define before use
+function showPeacefulTimerComplete(minutes: number, domain: string) {
+    // Only show if not already showing
+    if (document.getElementById("lyncx-peaceful-timer")) return;
+
+    // Create overlay backdrop
+    const backdrop = document.createElement("div");
+    backdrop.id = "lyncx-peaceful-timer";
+    backdrop.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.4);
+        backdrop-filter: blur(8px);
+        z-index: 999999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        animation: fadeIn 0.4s ease-out;
+    `;
+
+    // Create the modal
+    const modal = document.createElement("div");
+    modal.style.cssText = `
+        background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+        padding: 40px 50px;
+        border-radius: 20px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+        text-align: center;
+        max-width: 400px;
+        min-width: 320px;
+        animation: slideUp 0.4s ease-out;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    `;
+
+    modal.innerHTML = `
+        <div style="
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            color: #2d3748;
+            line-height: 1.6;
+        ">
+            <div style="
+                font-size: 28px;
+                font-weight: 300;
+                margin-bottom: 16px;
+                letter-spacing: -0.5px;
+            ">
+                Your timer has ended
+            </div>
+            <div style="
+                font-size: 16px;
+                color: #4a5568;
+                margin-bottom: 30px;
+                font-weight: 400;
+            ">
+                ${minutes} minute${minutes === 1 ? "" : "s"} for ${domain}
+            </div>
+        </div>
+    `;
+
+    // Add CSS animations
+    const style = document.createElement("style");
+    style.textContent = `
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes slideUp {
+            from {
+                transform: translateY(30px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+    `;
+    document.head.appendChild(style);
+
+    backdrop.appendChild(modal);
+    document.body.appendChild(backdrop);
+
+    // Click backdrop to close
+    backdrop.addEventListener("click", (e) => {
+        if (e.target === backdrop) {
+            backdrop.remove();
+        }
+    });
+
+    // Auto-remove after 15 seconds if user doesn't interact
+    setTimeout(() => {
+        if (backdrop.parentElement) {
+            backdrop.style.animation = "fadeIn 0.3s ease-out reverse";
+            setTimeout(() => backdrop.remove(), 300);
+        }
+    }, 15000);
+}
+
+// Create a new timer
+async function handleCreateTimer(
+    request: any,
+    sendResponse: (response?: any) => void,
+) {
+    try {
+        const { domain, minutes } = request;
+        const alarmName = `timer_${domain}`;
+
+        console.log(`Creating timer: ${alarmName} for ${minutes} minutes`);
+
+        // Clear any existing alarm for this domain
+        await chrome.alarms.clear(alarmName);
+
+        // Create new chrome alarm
+        await chrome.alarms.create(alarmName, {
+            delayInMinutes: minutes,
+        });
+
+        // Store timer info for persistence
+        const timerData = {
+            domain: domain,
+            minutes: minutes,
+            startTime: Date.now(),
+            endTime: Date.now() + minutes * 60 * 1000,
+        };
+
+        await chrome.storage.local.set({
+            [alarmName]: timerData,
+        });
+
+        console.log("Timer created successfully:", timerData);
+        sendResponse({ success: true });
+    } catch (error) {
+        console.error("Failed to create timer:", error);
+        sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : "Unknown error",
+        });
+    }
+}
+
+// Cancel an existing timer
+async function handleCancelTimer(
+    request: any,
+    sendResponse: (response?: any) => void,
+) {
+    try {
+        const { domain } = request;
+        const alarmName = `timer_${domain}`;
+
+        console.log(`Canceling timer: ${alarmName}`);
+
+        // Clear chrome alarm
+        const wasCleared = await chrome.alarms.clear(alarmName);
+
+        // Remove from storage
+        await chrome.storage.local.remove(alarmName);
+
+        console.log(
+            `Timer canceled successfully. Alarm was active: ${wasCleared}`,
+        );
+        sendResponse({ success: true });
+    } catch (error) {
+        console.error("Failed to cancel timer:", error);
+        sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : "Unknown error",
+        });
+    }
+}
+
+// Get all active timers
+async function handleGetActiveTimers(sendResponse: (response?: any) => void) {
+    try {
+        const items = await chrome.storage.local.get(null);
+        const activeTimers: { [key: string]: any } = {};
+        const currentTime = Date.now();
+        const expiredTimers: string[] = [];
+
+        // Filter for timer items and check if they're still active
+        Object.keys(items).forEach((key) => {
+            if (key.startsWith("timer_")) {
+                const timerData = items[key];
+                if (timerData && timerData.endTime > currentTime) {
+                    activeTimers[key] = timerData;
+                } else {
+                    // Mark expired timers for cleanup
+                    expiredTimers.push(key);
+                }
+            }
+        });
+
+        // Clean up expired timers
+        if (expiredTimers.length > 0) {
+            await chrome.storage.local.remove(expiredTimers);
+            // Also clear any associated alarms
+            for (const expiredKey of expiredTimers) {
+                await chrome.alarms.clear(expiredKey);
+            }
+        }
+
+        sendResponse({ timers: activeTimers });
+    } catch (error) {
+        console.error("Failed to get active timers:", error);
+        sendResponse({
+            timers: {},
+            error: error instanceof Error ? error.message : "Unknown error",
+        });
+    }
+}
+
+// ===============================
+// UNIFIED MESSAGE HANDLER
+// ===============================
+
+// Centralized message listener - handles ALL messages
 chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
     console.log("Background received message:", request);
 
+    // Timer messages
+    if (request.action === "createTimer") {
+        handleCreateTimer(request, sendResponse);
+        return true;
+    }
+
+    if (request.action === "cancelTimer") {
+        handleCancelTimer(request, sendResponse);
+        return true;
+    }
+
+    if (request.action === "getActiveTimers") {
+        handleGetActiveTimers(sendResponse);
+        return true;
+    }
+
+    // Website blocker messages
     if (request.action === "proceedToSite" && request.url) {
-        // Handle the proceed to site request
         handleProceedToSite(request.url)
             .then((success) => {
                 console.log("Proceed to site result:", success);
@@ -772,32 +1071,220 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
                 console.error("Error in proceedToSite:", error);
                 sendResponse({ success: false, error: error.message });
             });
-
-        // Return true to indicate we'll send a response asynchronously
         return true;
     }
 
+    // Other messages
     if (request.action === "getSelectedText") {
-        // This could be used for future enhancements
         sendResponse({ success: true });
         return true;
     }
 
-    // Handle other message types here if needed
+    // Return false for unhandled messages
     return false;
 });
+
+// ===============================
+// TIMER ALARM HANDLERS
+// ===============================
+
+// Handle timer completion
+chrome.alarms.onAlarm.addListener(async (alarm) => {
+    if (alarm.name.startsWith("timer_")) {
+        const domain = alarm.name.replace("timer_", "");
+
+        console.log(`Timer completed for domain: ${domain}`);
+
+        try {
+            // Get timer data
+            const items = await chrome.storage.local.get(alarm.name);
+            const timerData = items[alarm.name];
+
+            if (timerData) {
+                // Only show a simple, peaceful centered modal - no other notifications
+                const tabs = await chrome.tabs.query({
+                    active: true,
+                    currentWindow: true,
+                });
+
+                if (tabs[0] && tabs[0].id) {
+                    try {
+                        await chrome.scripting.executeScript({
+                            target: { tabId: tabs[0].id },
+                            func: showPeacefulTimerComplete,
+                            args: [timerData.minutes, domain],
+                        });
+                        console.log("✅ Peaceful timer completion modal shown");
+                    } catch (injectionError) {
+                        console.log(
+                            "Could not inject completion modal:",
+                            injectionError,
+                        );
+                    }
+                }
+
+                // Store completion info for later display
+                await chrome.storage.local.set({
+                    [`completed_timer_${domain}`]: {
+                        completedAt: Date.now(),
+                        minutes: timerData.minutes,
+                        showAlert: true,
+                    },
+                });
+
+                // Clean up the timer
+                await chrome.storage.local.remove(alarm.name);
+
+                console.log("Timer completion handled successfully");
+            } else {
+                console.log(
+                    "Timer data not found for completed alarm:",
+                    alarm.name,
+                );
+            }
+        } catch (error) {
+            console.error("Error handling timer completion:", error);
+        }
+    }
+
+    // Handle periodic cleanup alarm
+    if (alarm.name === "cleanupExpiredBlocks") {
+        try {
+            await websiteBlocker.cleanupExpiredBlocks();
+        } catch (error) {
+            console.error("Error cleaning up expired blocks:", error);
+        }
+    }
+});
+
+// Handle notification button clicks
+chrome.notifications.onButtonClicked.addListener(
+    async (notificationId, buttonIndex) => {
+        if (notificationId.startsWith("timer_complete_")) {
+            if (buttonIndex === 0) {
+                // Dismiss button
+                await chrome.notifications.clear(notificationId);
+            } else if (buttonIndex === 1) {
+                // Add Another Timer button
+                await chrome.notifications.clear(notificationId);
+                try {
+                    await chrome.action.openPopup();
+                } catch (error) {
+                    console.log("Could not open popup automatically");
+                }
+            }
+        }
+    },
+);
+
+// Handle notification clicks (dismiss)
+chrome.notifications.onClicked.addListener(async (notificationId) => {
+    await chrome.notifications.clear(notificationId);
+});
+
+// Check for completed timers when user visits a page
+chrome.webNavigation.onCompleted.addListener(async (details) => {
+    if (details.frameId === 0) {
+        try {
+            const url = new URL(details.url);
+            const domain = url.hostname.replace(/^www\./, "");
+
+            // Check if there's a completed timer for this domain
+            const items = await chrome.storage.local.get(
+                `completed_timer_${domain}`,
+            );
+            const completedTimer = items[`completed_timer_${domain}`];
+
+            if (completedTimer && completedTimer.showAlert) {
+                try {
+                    await chrome.scripting.executeScript({
+                        target: { tabId: details.tabId },
+                        func: showTimerCompleteOverlay,
+                        args: [completedTimer.minutes, domain],
+                    });
+
+                    // Mark as shown
+                    await chrome.storage.local.set({
+                        [`completed_timer_${domain}`]: {
+                            ...completedTimer,
+                            showAlert: false,
+                        },
+                    });
+
+                    // Clean up after 1 hour
+                    setTimeout(async () => {
+                        await chrome.storage.local.remove(
+                            `completed_timer_${domain}`,
+                        );
+                    }, 60 * 60 * 1000);
+                } catch (injectionError) {
+                    console.log(
+                        "Could not inject completion overlay:",
+                        injectionError,
+                    );
+                }
+            }
+        } catch (error) {
+            console.log(
+                "Error processing page navigation for timer alerts:",
+                error,
+            );
+        }
+    }
+});
+
+// ===============================
+// EXTENSION LIFECYCLE
+// ===============================
 
 // Initialize the background tracker
 let backgroundTracker = BackgroundTracker.getInstance();
 
 // Handle extension lifecycle events
-chrome.runtime.onStartup.addListener(() => {
+chrome.runtime.onStartup.addListener(async () => {
     console.log("🟢 Extension startup");
+
     // Ensure we have a fresh instance on startup
     if (backgroundTracker) {
         backgroundTracker.destroy();
     }
     backgroundTracker = BackgroundTracker.getInstance();
+
+    // Timer cleanup on startup
+    try {
+        const allAlarms = await chrome.alarms.getAll();
+        const timerAlarms = allAlarms.filter((alarm) =>
+            alarm.name.startsWith("timer_"),
+        );
+
+        const storageItems = await chrome.storage.local.get(null);
+        const storedTimers = Object.keys(storageItems).filter((key) =>
+            key.startsWith("timer_"),
+        );
+
+        console.log(
+            `Found ${timerAlarms.length} alarms and ${storedTimers.length} stored timers`,
+        );
+
+        // Clean up any orphaned data
+        for (const alarm of timerAlarms) {
+            if (!storageItems[alarm.name]) {
+                await chrome.alarms.clear(alarm.name);
+                console.log("Cleared orphaned alarm:", alarm.name);
+            }
+        }
+
+        for (const timerKey of storedTimers) {
+            const timerData = storageItems[timerKey];
+            if (timerData.endTime <= Date.now()) {
+                await chrome.storage.local.remove(timerKey);
+                await chrome.alarms.clear(timerKey);
+                console.log("Cleaned up expired timer:", timerKey);
+            }
+        }
+    } catch (error) {
+        console.error("Error during startup cleanup:", error);
+    }
 });
 
 chrome.runtime.onInstalled.addListener(async () => {
@@ -808,6 +1295,16 @@ chrome.runtime.onInstalled.addListener(async () => {
         backgroundTracker.destroy();
     }
     backgroundTracker = BackgroundTracker.getInstance();
+
+    // Clean up any existing timers on install
+    chrome.storage.local.get(null, (items) => {
+        const timerKeys = Object.keys(items).filter((key) =>
+            key.startsWith("timer_"),
+        );
+        if (timerKeys.length > 0) {
+            chrome.storage.local.remove(timerKeys);
+        }
+    });
 
     try {
         // Clear any existing dynamic rules first
@@ -849,6 +1346,9 @@ chrome.runtime.onInstalled.addListener(async () => {
     } catch (error) {
         console.error("❌ Failed to add dynamic rule:", error);
     }
+
+    // Set up periodic cleanup alarm
+    chrome.alarms.create("cleanupExpiredBlocks", { periodInMinutes: 5 });
 });
 
 // Clean up when the extension is about to be terminated
@@ -856,19 +1356,6 @@ chrome.runtime.onSuspend.addListener(() => {
     console.log("🔴 Extension suspending");
     if (backgroundTracker) {
         backgroundTracker.destroy();
-    }
-});
-
-// Alarm for periodic cleanup
-chrome.alarms.create("cleanupExpiredBlocks", { periodInMinutes: 5 });
-
-chrome.alarms.onAlarm.addListener(async (alarm) => {
-    if (alarm.name === "cleanupExpiredBlocks") {
-        try {
-            await websiteBlocker.cleanupExpiredBlocks();
-        } catch (error) {
-            console.error("Error cleaning up expired blocks:", error);
-        }
     }
 });
 

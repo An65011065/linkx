@@ -60,11 +60,32 @@ function createCleanCSV(data) {
 // Create text summary with all visits (no URLs)
 function createCompactDataSummary(data) {
     const visits = data.today.allVisits || [];
+    const summary = data.today.summary || {};
+
+    console.log("📊 Processing clean data:", {
+        visits: visits.length,
+        hasSummary: !!summary,
+    });
+
+    // Ensure all visits have consistent structure
+    const cleanVisits = visits.filter((visit) => {
+        return (
+            visit &&
+            visit.domain &&
+            typeof visit.domain === "string" &&
+            visit.domain !== "SUMMARY_DATA" &&
+            !visit.domain.includes("Total visits")
+        );
+    });
+
+    console.log("✅ Filtered to", cleanVisits.length, "clean visits");
 
     // Sort visits chronologically (most recent first)
-    const sortedVisits = [...visits].sort((a, b) => b.startTime - a.startTime);
+    const sortedVisits = [...cleanVisits].sort(
+        (a, b) => b.startTime - a.startTime,
+    );
 
-    // Get top domains by time (include ALL visits now)
+    // Get top domains by time
     const domainTimes = {};
     sortedVisits.forEach((visit) => {
         domainTimes[visit.domain] =
@@ -76,55 +97,53 @@ function createCompactDataSummary(data) {
         .slice(0, 10)
         .map(([domain, minutes]) => `${domain}: ${minutes}min`);
 
-    // Include ALL visits with domain + title only
+    // Create visit list with consistent format
     const allVisitsCompact = sortedVisits
+        .slice(0, 30) // Top 30 visits only
         .map((visit) => {
-            // Use readable time if available, otherwise format timestamp
-            const timeDisplay =
-                visit.readableTime ||
-                (() => {
-                    const date = new Date(visit.startTime);
-                    return date.toLocaleTimeString("en-US", {
-                        hour: "numeric",
-                        minute: "2-digit",
-                        hour12: true,
-                    });
-                })();
+            const timeDisplay = visit.readableTime || "Unknown time";
+            const cleanTitle = (visit.title || "No title").substring(0, 60);
 
-            return `${visit.domain} (${
-                visit.activeTimeMinutes
-            }min) at ${timeDisplay} - ${
-                visit.title?.substring(0, 80) || "No title"
-            }`;
+            return `${visit.domain} (${visit.activeTimeMinutes}min) at ${timeDisplay} - ${cleanTitle}`;
         })
         .join("\n");
 
-    // Count visits with active time for stats
     const visitsWithActiveTime = sortedVisits.filter(
         (visit) => visit.activeTimeMinutes > 0,
     );
 
-    const summary = `BROWSING DATA for ${data.today.date}:
+    // Use summary data if available, otherwise calculate
+    const totalVisits = summary.totalVisits || sortedVisits.length;
+    const totalActiveMinutes =
+        summary.totalActiveMinutes || data.today.totalActiveMinutes;
+    const tabSessions = summary.tabSessions || data.today.tabSessions;
+    const workTime =
+        summary.workTime || Math.round(data.today.stats.workTime / (1000 * 60));
+    const socialTime =
+        summary.socialTime ||
+        Math.round(data.today.stats.socialTime / (1000 * 60));
+    const otherTime =
+        summary.otherTime ||
+        Math.round(data.today.stats.otherTime / (1000 * 60));
+
+    const finalSummary = `BROWSING DATA for ${data.today.date}:
 
 STATS:
-- Total visits: ${sortedVisits.length} (${
+- Total visits: ${totalVisits} (showing top ${sortedVisits.length}, ${
         visitsWithActiveTime.length
     } with active time)
-- Total active time: ${data.today.totalActiveMinutes} minutes  
-- Tab sessions: ${data.today.tabSessions}
-- Work: ${Math.round(
-        data.today.stats.workTime / (1000 * 60),
-    )}min, Social: ${Math.round(
-        data.today.stats.socialTime / (1000 * 60),
-    )}min, Other: ${Math.round(data.today.stats.otherTime / (1000 * 60))}min
+- Total active time: ${totalActiveMinutes} minutes  
+- Tab sessions: ${tabSessions}
+- Work: ${workTime}min, Social: ${socialTime}min, Other: ${otherTime}min
 
 TOP DOMAINS BY TIME:
 ${topDomains.join("\n")}
 
-ALL VISITS (MOST RECENT FIRST - chronological order):
+RECENT VISITS (MOST RECENT FIRST):
 ${allVisitsCompact}`;
 
-    return summary;
+    console.log("📄 Generated clean summary length:", finalSummary.length);
+    return finalSummary;
 }
 
 exports.chatWithOpenAI = onCall(
@@ -155,6 +174,7 @@ exports.chatWithOpenAI = onCall(
         const assistantIds = {
             browsing: "asst_oGJq9HXdbQ5VoLRuE8JdgvRQ",
             summarise: "asst_y1LZY5JHQX3YZiAXyVs1Iiif",
+            asst_YxsrXIl2Ro9POndtudAi1GUk: "asst_YxsrXIl2Ro9POndtudAi1GUk",
         };
 
         const assistantId = assistantIds[assistantType];

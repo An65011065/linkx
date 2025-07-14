@@ -11,6 +11,13 @@ interface RemindersProps {
     onTimerClear?: () => void;
 }
 
+interface TimerData {
+    domain: string;
+    minutes: number;
+    startTime: number;
+    endTime: number;
+}
+
 const Reminders: React.FC<RemindersProps> = ({
     currentDomain,
     children,
@@ -25,98 +32,95 @@ const Reminders: React.FC<RemindersProps> = ({
     const [isProcessing, setIsProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<"timer" | "block">("timer");
-    const [activeTimers, setActiveTimers] = useState<{ [key: string]: number }>(
-        {},
-    );
+    const [activeTimers, setActiveTimers] = useState<{
+        [key: string]: TimerData;
+    }>({});
 
+    // Load active timers from background script
     useEffect(() => {
-        // Cleanup timers on unmount
-        return () => {
-            Object.values(activeTimers).forEach((timer) => clearTimeout(timer));
+        const loadActiveTimers = async () => {
+            try {
+                const response = await chrome.runtime.sendMessage({
+                    action: "getActiveTimers",
+                });
+
+                if (response && response.timers) {
+                    setActiveTimers(response.timers);
+                }
+            } catch (err) {
+                console.error("Failed to load active timers:", err);
+            }
         };
+
+        loadActiveTimers();
+
+        // Refresh timers every second to update countdown
+        const interval = setInterval(loadActiveTimers, 1000);
+
+        return () => clearInterval(interval);
     }, []);
 
-    const handleTimerStart = (minutes: number) => {
+    const handleTimerStart = async (minutes: number) => {
         try {
-            // If free trial is active, remove all existing timers first
-            if (freeTrial) {
-                // Get all timer keys from localStorage
-                const timerKeys = [];
-                for (let i = 0; i < localStorage.length; i++) {
-                    const key = localStorage.key(i);
-                    if (key?.startsWith("timer_")) {
-                        timerKeys.push(key);
-                    }
-                }
+            setIsProcessing(true);
+            setError(null);
 
-                // Remove all existing timers
-                timerKeys.forEach((key) => {
-                    localStorage.removeItem(key);
+            // If free trial is active, cancel existing timer first
+            if (freeTrial && Object.keys(activeTimers).length > 0) {
+                const existingTimerKey = Object.keys(activeTimers)[0];
+                const existingTimer = activeTimers[existingTimerKey];
+
+                await chrome.runtime.sendMessage({
+                    action: "cancelTimer",
+                    domain: existingTimer.domain,
                 });
-
-                // Clear all active timers in state
-                Object.values(activeTimers).forEach((timer) =>
-                    clearTimeout(timer),
-                );
-                setActiveTimers({});
-            } else {
-                // For non-trial mode, clear any existing timer for this domain
-                if (activeTimers[currentDomain]) {
-                    clearTimeout(activeTimers[currentDomain]);
-                }
             }
 
-            // Set up the new timer
-            const timer = setTimeout(() => {
-                // Show notification when timer is up
-                chrome.notifications.create({
-                    type: "basic",
-                    iconUrl: "/src/assets/icons/icon128.png",
-                    title: "Timer Complete",
-                    message: `Your ${minutes} minute timer for ${currentDomain} is complete!`,
-                    priority: 2,
-                });
+            // Create new timer via background script
+            const response = await chrome.runtime.sendMessage({
+                action: "createTimer",
+                domain: currentDomain,
+                minutes: minutes,
+            });
 
-                // Remove the timer from active timers
-                setActiveTimers((prev) => {
-                    const newTimers = { ...prev };
-                    delete newTimers[currentDomain];
-                    return newTimers;
-                });
-
-                // Remove from localStorage
-                localStorage.removeItem(`timer_${currentDomain}`);
-
-                // Call the clear callback
-                onTimerClear?.();
-            }, minutes * 60 * 1000);
-
-            // Store in localStorage for persistence
-            const timerData = {
-                endTime: Date.now() + minutes * 60 * 1000,
-                minutes,
-            };
-            localStorage.setItem(
-                `timer_${currentDomain}`,
-                JSON.stringify(timerData),
-            );
-
-            // Add to active timers
-            setActiveTimers((prev) => ({
-                ...prev,
-                [currentDomain]: timer,
-            }));
-
-            // Call the timer set callback
-            onTimerSet?.(minutes);
-
-            setIsOpen(false);
-            setShowCustomTimer(false);
-            setError(null);
+            if (response && response.success) {
+                onTimerSet?.(minutes);
+                setIsOpen(false);
+                setShowCustomTimer(false);
+                setCustomTimerMinutes("");
+                setError(null);
+            } else {
+                throw new Error("Failed to create timer");
+            }
         } catch (err) {
             setError(
                 err instanceof Error ? err.message : "Failed to set timer",
             );
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    const handleTimerCancel = async (domain: string) => {
+        try {
+            setIsProcessing(true);
+            const response = await chrome.runtime.sendMessage({
+                action: "cancelTimer",
+                domain: domain,
+            });
+
+            if (response && response.success) {
+                onTimerClear?.();
+                setError(null);
+            } else {
+                throw new Error("Failed to cancel timer");
+            }
+        } catch (err) {
+            setError(
+                err instanceof Error ? err.message : "Failed to cancel timer",
+            );
+        } finally {
+            setIsProcessing(false);
         }
     };
 
@@ -127,8 +131,12 @@ const Reminders: React.FC<RemindersProps> = ({
             setError("Please enter a valid number of minutes");
             return;
         }
+        if (minutes > 1440) {
+            // 24 hours max
+            setError("Timer cannot exceed 24 hours (1440 minutes)");
+            return;
+        }
         handleTimerStart(minutes);
-        setCustomTimerMinutes("");
     };
 
     const handleBlockClick = async (hours: number) => {
@@ -138,6 +146,7 @@ const Reminders: React.FC<RemindersProps> = ({
             await websiteBlocker.blockWebsite(currentDomain, hours);
             setIsOpen(false);
             setShowCustomBlock(false);
+            setCustomBlockHours("");
         } catch (err) {
             setError(
                 err instanceof Error ? err.message : "Failed to block website",
@@ -154,9 +163,36 @@ const Reminders: React.FC<RemindersProps> = ({
             setError("Please enter a valid number of hours");
             return;
         }
+        if (hours > 168) {
+            // 1 week max
+            setError("Block duration cannot exceed 168 hours (1 week)");
+            return;
+        }
         handleBlockClick(hours);
-        setCustomBlockHours("");
     };
+
+    const formatTimeRemaining = (endTime: number) => {
+        const remaining = endTime - Date.now();
+        if (remaining <= 0) return "Finished";
+
+        const hours = Math.floor(remaining / (1000 * 60 * 60));
+        const minutes = Math.floor(
+            (remaining % (1000 * 60 * 60)) / (1000 * 60),
+        );
+        const seconds = Math.floor((remaining % (1000 * 60)) / 1000);
+
+        if (hours > 0) {
+            return `${hours}h ${minutes}m ${seconds}s`;
+        } else if (minutes > 0) {
+            return `${minutes}m ${seconds}s`;
+        }
+        return `${seconds}s`;
+    };
+
+    const currentDomainTimer = activeTimers[`timer_${currentDomain}`];
+    const hasActiveTimer =
+        !!currentDomainTimer && currentDomainTimer.endTime > Date.now();
+    const totalActiveTimers = Object.keys(activeTimers).length;
 
     const buttonStyle = {
         padding: "8px 12px",
@@ -170,6 +206,7 @@ const Reminders: React.FC<RemindersProps> = ({
         gap: "4px",
         fontSize: "13px",
         transition: "all 0.2s ease",
+        opacity: isProcessing ? 0.6 : 1,
     };
 
     const tabStyle = (isActive: boolean) => ({
@@ -211,7 +248,7 @@ const Reminders: React.FC<RemindersProps> = ({
                         />
                     </button>
                 )}
-                {Object.keys(activeTimers).length > 0 && (
+                {totalActiveTimers > 0 && (
                     <div
                         style={{
                             position: "absolute",
@@ -226,7 +263,7 @@ const Reminders: React.FC<RemindersProps> = ({
                 )}
             </div>
 
-            {/* FIXED: Full overlay popup */}
+            {/* Modal Overlay */}
             {isOpen && (
                 <div
                     style={{
@@ -243,7 +280,6 @@ const Reminders: React.FC<RemindersProps> = ({
                         padding: "24px",
                     }}
                     onClick={(e) => {
-                        // Close when clicking the overlay (but not the modal content)
                         if (e.target === e.currentTarget) {
                             setIsOpen(false);
                         }
@@ -255,7 +291,7 @@ const Reminders: React.FC<RemindersProps> = ({
                             borderRadius: "20px",
                             boxShadow: "0 20px 60px rgba(0, 0, 0, 0.3)",
                             padding: "24px",
-                            minWidth: "300px",
+                            minWidth: "320px",
                             maxWidth: "90vw",
                             maxHeight: "80vh",
                             overflowY: "auto",
@@ -326,6 +362,27 @@ const Reminders: React.FC<RemindersProps> = ({
                             </p>
                         </div>
 
+                        {/* Free Trial Warning */}
+                        {freeTrial &&
+                            totalActiveTimers >= 1 &&
+                            !hasActiveTimer && (
+                                <div
+                                    style={{
+                                        marginBottom: "16px",
+                                        padding: "12px",
+                                        backgroundColor: "#fff7ed",
+                                        color: "#c2410c",
+                                        borderRadius: "8px",
+                                        fontSize: "13px",
+                                        fontFamily: "Nunito-Regular",
+                                        border: "1px solid #fed7aa",
+                                    }}
+                                >
+                                    Free trial allows only 1 timer at a time.
+                                    Cancel the existing timer to set a new one.
+                                </div>
+                            )}
+
                         {/* Tab Switcher */}
                         <div
                             style={{
@@ -383,9 +440,22 @@ const Reminders: React.FC<RemindersProps> = ({
                                 >
                                     <button
                                         onClick={() => handleTimerStart(10)}
+                                        disabled={
+                                            isProcessing ||
+                                            (freeTrial &&
+                                                totalActiveTimers >= 1 &&
+                                                !hasActiveTimer)
+                                        }
                                         style={{
                                             ...buttonStyle,
                                             justifyContent: "center",
+                                            cursor:
+                                                isProcessing ||
+                                                (freeTrial &&
+                                                    totalActiveTimers >= 1 &&
+                                                    !hasActiveTimer)
+                                                    ? "not-allowed"
+                                                    : "pointer",
                                         }}
                                     >
                                         <Clock size={16} />
@@ -393,9 +463,22 @@ const Reminders: React.FC<RemindersProps> = ({
                                     </button>
                                     <button
                                         onClick={() => handleTimerStart(30)}
+                                        disabled={
+                                            isProcessing ||
+                                            (freeTrial &&
+                                                totalActiveTimers >= 1 &&
+                                                !hasActiveTimer)
+                                        }
                                         style={{
                                             ...buttonStyle,
                                             justifyContent: "center",
+                                            cursor:
+                                                isProcessing ||
+                                                (freeTrial &&
+                                                    totalActiveTimers >= 1 &&
+                                                    !hasActiveTimer)
+                                                    ? "not-allowed"
+                                                    : "pointer",
                                         }}
                                     >
                                         <Clock size={16} />
@@ -405,9 +488,13 @@ const Reminders: React.FC<RemindersProps> = ({
                                         onClick={() =>
                                             setShowCustomTimer(!showCustomTimer)
                                         }
+                                        disabled={isProcessing}
                                         style={{
                                             ...buttonStyle,
                                             justifyContent: "center",
+                                            backgroundColor: showCustomTimer
+                                                ? "#e2e8f0"
+                                                : "#edf2f7",
                                         }}
                                     >
                                         <Plus size={16} />
@@ -436,6 +523,15 @@ const Reminders: React.FC<RemindersProps> = ({
                                                     )
                                                 }
                                                 placeholder="Enter minutes"
+                                                min="1"
+                                                max="1440"
+                                                disabled={
+                                                    isProcessing ||
+                                                    (freeTrial &&
+                                                        totalActiveTimers >=
+                                                            1 &&
+                                                        !hasActiveTimer)
+                                                }
                                                 style={{
                                                     flex: 1,
                                                     padding: "8px 12px",
@@ -445,10 +541,26 @@ const Reminders: React.FC<RemindersProps> = ({
                                                     fontFamily:
                                                         "Nunito-Regular",
                                                     outline: "none",
+                                                    opacity:
+                                                        isProcessing ||
+                                                        (freeTrial &&
+                                                            totalActiveTimers >=
+                                                                1 &&
+                                                            !hasActiveTimer)
+                                                            ? 0.6
+                                                            : 1,
                                                 }}
                                             />
                                             <button
                                                 type="submit"
+                                                disabled={
+                                                    isProcessing ||
+                                                    !customTimerMinutes.trim() ||
+                                                    (freeTrial &&
+                                                        totalActiveTimers >=
+                                                            1 &&
+                                                        !hasActiveTimer)
+                                                }
                                                 style={{
                                                     padding: "8px",
                                                     backgroundColor: "#4299e1",
@@ -461,6 +573,15 @@ const Reminders: React.FC<RemindersProps> = ({
                                                     justifyContent: "center",
                                                     width: "36px",
                                                     height: "36px",
+                                                    opacity:
+                                                        isProcessing ||
+                                                        !customTimerMinutes.trim() ||
+                                                        (freeTrial &&
+                                                            totalActiveTimers >=
+                                                                1 &&
+                                                            !hasActiveTimer)
+                                                            ? 0.5
+                                                            : 1,
                                                 }}
                                             >
                                                 <ArrowRight size={18} />
@@ -469,7 +590,7 @@ const Reminders: React.FC<RemindersProps> = ({
                                     </form>
                                 )}
 
-                                {activeTimers[currentDomain] && (
+                                {hasActiveTimer && (
                                     <div
                                         style={{
                                             marginTop: "12px",
@@ -478,41 +599,54 @@ const Reminders: React.FC<RemindersProps> = ({
                                             color: "#2b6cb0",
                                             borderRadius: "8px",
                                             fontSize: "14px",
-                                            display: "flex",
-                                            alignItems: "center",
-                                            justifyContent: "space-between",
+                                            border: "1px solid #bfdbfe",
                                         }}
                                     >
-                                        <span>Timer active for this site</span>
-                                        <button
-                                            onClick={() => {
-                                                clearTimeout(
-                                                    activeTimers[currentDomain],
-                                                );
-                                                setActiveTimers((prev) => {
-                                                    const newTimers = {
-                                                        ...prev,
-                                                    };
-                                                    delete newTimers[
-                                                        currentDomain
-                                                    ];
-                                                    return newTimers;
-                                                });
-                                                // Call the clear callback
-                                                onTimerClear?.();
-                                            }}
+                                        <div
                                             style={{
-                                                background: "none",
-                                                border: "none",
-                                                color: "#2b6cb0",
-                                                cursor: "pointer",
-                                                padding: "0",
-                                                fontSize: "14px",
-                                                textDecoration: "underline",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "space-between",
+                                                marginBottom: "4px",
                                             }}
                                         >
-                                            Cancel
-                                        </button>
+                                            <span style={{ fontWeight: 600 }}>
+                                                Timer Active
+                                            </span>
+                                            <button
+                                                onClick={() =>
+                                                    handleTimerCancel(
+                                                        currentDomain,
+                                                    )
+                                                }
+                                                disabled={isProcessing}
+                                                style={{
+                                                    background: "none",
+                                                    border: "none",
+                                                    color: "#2b6cb0",
+                                                    cursor: "pointer",
+                                                    padding: "0",
+                                                    fontSize: "14px",
+                                                    textDecoration: "underline",
+                                                    opacity: isProcessing
+                                                        ? 0.6
+                                                        : 1,
+                                                }}
+                                            >
+                                                Cancel
+                                            </button>
+                                        </div>
+                                        <div
+                                            style={{
+                                                fontSize: "13px",
+                                                opacity: 0.9,
+                                            }}
+                                        >
+                                            {formatTimeRemaining(
+                                                currentDomainTimer.endTime,
+                                            )}{" "}
+                                            remaining
+                                        </div>
                                     </div>
                                 )}
                             </div>
@@ -559,6 +693,9 @@ const Reminders: React.FC<RemindersProps> = ({
                                         style={{
                                             ...buttonStyle,
                                             justifyContent: "center",
+                                            backgroundColor: showCustomBlock
+                                                ? "#e2e8f0"
+                                                : "#edf2f7",
                                         }}
                                     >
                                         <Plus size={16} />
@@ -588,6 +725,9 @@ const Reminders: React.FC<RemindersProps> = ({
                                                 }
                                                 placeholder="Enter hours"
                                                 step="0.5"
+                                                min="0.5"
+                                                max="168"
+                                                disabled={isProcessing}
                                                 style={{
                                                     flex: 1,
                                                     padding: "8px 12px",
@@ -597,11 +737,17 @@ const Reminders: React.FC<RemindersProps> = ({
                                                     fontFamily:
                                                         "Nunito-Regular",
                                                     outline: "none",
+                                                    opacity: isProcessing
+                                                        ? 0.6
+                                                        : 1,
                                                 }}
                                             />
                                             <button
                                                 type="submit"
-                                                disabled={isProcessing}
+                                                disabled={
+                                                    isProcessing ||
+                                                    !customBlockHours.trim()
+                                                }
                                                 style={{
                                                     padding: "8px",
                                                     backgroundColor: "#4299e1",
@@ -614,6 +760,11 @@ const Reminders: React.FC<RemindersProps> = ({
                                                     justifyContent: "center",
                                                     width: "36px",
                                                     height: "36px",
+                                                    opacity:
+                                                        isProcessing ||
+                                                        !customBlockHours.trim()
+                                                            ? 0.5
+                                                            : 1,
                                                 }}
                                             >
                                                 <ArrowRight size={18} />
@@ -624,6 +775,7 @@ const Reminders: React.FC<RemindersProps> = ({
                             </div>
                         )}
 
+                        {/* Error Display */}
                         {error && (
                             <div
                                 style={{
@@ -634,9 +786,29 @@ const Reminders: React.FC<RemindersProps> = ({
                                     borderRadius: "8px",
                                     fontSize: "14px",
                                     fontFamily: "Nunito-Regular",
+                                    border: "1px solid #fed7d7",
                                 }}
                             >
                                 {error}
+                            </div>
+                        )}
+
+                        {/* Processing Indicator */}
+                        {isProcessing && (
+                            <div
+                                style={{
+                                    marginTop: "16px",
+                                    padding: "12px",
+                                    backgroundColor: "#f7fafc",
+                                    color: "#4a5568",
+                                    borderRadius: "8px",
+                                    fontSize: "14px",
+                                    fontFamily: "Nunito-Regular",
+                                    textAlign: "center",
+                                    border: "1px solid #e2e8f0",
+                                }}
+                            >
+                                Processing...
                             </div>
                         )}
                     </div>

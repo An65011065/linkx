@@ -8,9 +8,10 @@ import {
     Trash2,
     Circle,
 } from "lucide-react";
-import { freeTrial } from "../../main/MainTab";
+import AuthService from "../../services/authService";
 
 interface Template {
+    id?: string; // Backend ID
     name: string;
     urls: string[];
     backgroundColor?: string;
@@ -69,7 +70,7 @@ const TemplateModal: React.FC<TemplateModalProps> = ({
         }
     }, [mode]);
 
-    const handleSave = () => {
+    const handleSave = async () => {
         const templateUrls =
             mode === "current"
                 ? currentTabs.filter((tab) => tab.checked).map((tab) => tab.url)
@@ -79,26 +80,8 @@ const TemplateModal: React.FC<TemplateModalProps> = ({
 
         let templateName = name.trim();
         if (!templateName) {
-            chrome.storage.local.get("templates", (result) => {
-                const existingTemplates = result.templates || [];
-                let tempNumber = 1;
-                while (
-                    existingTemplates.some(
-                        (t: Template) => t.name === `temp${tempNumber}`,
-                    )
-                ) {
-                    tempNumber++;
-                }
-                templateName = `temp${tempNumber}`;
-
-                onSave({
-                    name: templateName,
-                    urls: templateUrls,
-                    backgroundColor: selectedColor,
-                });
-                onClose();
-            });
-            return;
+            // Generate a default name
+            templateName = `Template ${Date.now()}`;
         }
 
         onSave({
@@ -453,26 +436,16 @@ const Templates: React.FC<TemplatesProps> = ({ isDarkMode = false }) => {
     const [modalMode, setModalMode] = useState<"current" | "new">("current");
     const [isExpanded, setIsExpanded] = useState(false);
     const [isDeleteMode, setIsDeleteMode] = useState(false);
-    const [isTrialMode, setIsTrialMode] = useState(freeTrial);
+    const [isTrialMode, setIsTrialMode] = useState(false);
+    const [templateLimits, setTemplateLimits] = useState<any>(null);
+    const [loading, setLoading] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
     const [showModeSelector, setShowModeSelector] = useState(false);
+    const authService = AuthService.getInstance();
 
     useEffect(() => {
         loadTemplates();
-    }, []);
-
-    useEffect(() => {
-        const checkTrialStatus = () => {
-            setIsTrialMode(freeTrial);
-        };
-
-        // Check immediately
-        checkTrialStatus();
-
-        // Set up an interval to check frequently
-        const interval = setInterval(checkTrialStatus, 100);
-
-        return () => clearInterval(interval);
+        loadTemplateLimits();
     }, []);
 
     // Handle expansion animation
@@ -490,27 +463,92 @@ const Templates: React.FC<TemplatesProps> = ({ isDarkMode = false }) => {
         }
     }, [isExpanded]);
 
-    const loadTemplates = () => {
-        chrome.storage.local.get("templates", (result) => {
-            if (result.templates) {
-                setTemplates(result.templates);
+    const loadTemplateLimits = async () => {
+        try {
+            const response = await authService.apiCall(
+                "GET",
+                "/templates/info/limits",
+            );
+            if (response.ok) {
+                const limits = await response.json();
+                setTemplateLimits(limits);
+                setIsTrialMode(
+                    limits.planType === "free" || limits.planType === "trial",
+                );
             }
-        });
+        } catch (err) {
+            console.error("Error loading template limits:", err);
+        }
     };
 
-    const handleSaveTemplate = (template: Template) => {
-        if (isTrialMode && templates.length >= 2) {
-            alert(
-                "Free trial allows only 2 templates at a time. Please delete an existing template first.",
-            );
-            return;
-        }
+    const loadTemplates = async () => {
+        try {
+            setLoading(true);
+            console.log("🔄 Loading templates from API...");
 
-        const newTemplates = [...templates, template];
-        setTemplates(newTemplates);
-        chrome.storage.local.set({ templates: newTemplates }, () => {
-            loadTemplates();
-        });
+            const response = await authService.apiCall("GET", "/templates");
+
+            if (response.ok) {
+                const data = await response.json();
+                console.log("✅ Templates API response:", data);
+
+                // Convert API response to component format
+                const templateEntries: Template[] = (data.templates || []).map(
+                    (template: any) => {
+                        console.log("📄 Processing template:", template);
+                        return {
+                            id: template.id,
+                            name: template.name || "Untitled",
+                            urls: Array.isArray(template.urls)
+                                ? template.urls
+                                : [],
+                            backgroundColor:
+                                template.backgroundColor || undefined,
+                        };
+                    },
+                );
+
+                console.log("✅ Processed templates:", templateEntries);
+                setTemplates(templateEntries);
+            } else {
+                console.error("❌ Failed to load templates:", response.status);
+                const errorData = await response.json().catch(() => ({}));
+                console.error("Error details:", errorData);
+                // Set empty array on error
+                setTemplates([]);
+            }
+        } catch (err) {
+            console.error("❌ Error loading templates:", err);
+            // Set empty array on error
+            setTemplates([]);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSaveTemplate = async (template: Template) => {
+        try {
+            console.log("💾 Saving template:", template);
+
+            const response = await authService.apiCall("POST", "/templates", {
+                name: template.name,
+                urls: template.urls,
+                backgroundColor: template.backgroundColor,
+            });
+
+            if (response.ok) {
+                console.log("✅ Template saved successfully");
+                await loadTemplates();
+                await loadTemplateLimits(); // Refresh limits
+            } else {
+                const errorData = await response.json();
+                console.error("Failed to save template:", errorData.error);
+                alert(errorData.error || "Failed to save template");
+            }
+        } catch (err) {
+            console.error("Error saving template:", err);
+            alert("Failed to save template");
+        }
     };
 
     const handleOpenTemplate = (template: Template) => {
@@ -521,9 +559,9 @@ const Templates: React.FC<TemplatesProps> = ({ isDarkMode = false }) => {
     };
 
     const handleAddNewClick = () => {
-        if (isTrialMode && templates.length >= 2) {
+        if (templateLimits && templateLimits.isAtLimit) {
             alert(
-                "Free trial allows only 2 templates at a time. Please delete an existing template first.",
+                `Template limit reached. ${templateLimits.planType} plans are limited to ${templateLimits.maxTemplates} templates.`,
             );
             return;
         }
@@ -544,16 +582,63 @@ const Templates: React.FC<TemplatesProps> = ({ isDarkMode = false }) => {
         setIsExpanded(false);
     };
 
-    const handleDeleteTemplate = async (templateName: string) => {
-        const updatedTemplates = templates.filter(
-            (t) => t.name !== templateName,
-        );
-        setTemplates(updatedTemplates);
-        await chrome.storage.local.set({ templates: updatedTemplates });
+    const handleDeleteTemplate = async (template: Template) => {
+        if (!template.id) return;
+
+        try {
+            console.log("🗑️ Deleting template:", template.name);
+
+            const response = await authService.apiCall(
+                "DELETE",
+                `/templates/${template.id}`,
+            );
+
+            if (response.ok) {
+                console.log("✅ Template deleted successfully");
+                await loadTemplates();
+                await loadTemplateLimits(); // Refresh limits
+            } else {
+                const errorData = await response.json();
+                console.error("Failed to delete template:", errorData.error);
+            }
+        } catch (err) {
+            console.error("Error deleting template:", err);
+        }
     };
 
     const displayedTemplates = isTrialMode ? templates.slice(0, 2) : templates;
     const placeholdersNeeded = Math.max(0, 3 - displayedTemplates.length);
+
+    if (loading) {
+        return (
+            <div
+                className={`
+                    h-full flex flex-col relative transition-all duration-300 p-3 gap-2
+                    ${
+                        isDarkMode
+                            ? "bg-white/5 border border-white/10 backdrop-blur-sm"
+                            : "bg-white border border-gray-200 shadow-sm"
+                    }
+                    rounded-2xl items-center justify-center
+                `}
+            >
+                <div
+                    className={`
+                        w-6 h-6 border-2 border-t-transparent rounded-full animate-spin
+                        ${isDarkMode ? "border-white/30" : "border-gray-300"}
+                    `}
+                />
+                <div
+                    className={`
+                        text-sm
+                        ${isDarkMode ? "text-white/50" : "text-gray-500"}
+                    `}
+                >
+                    Loading templates...
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div
@@ -582,6 +667,21 @@ const Templates: React.FC<TemplatesProps> = ({ isDarkMode = false }) => {
                         `}
                     >
                         Templates
+                        {templateLimits && (
+                            <span
+                                className={`ml-2 text-xs ${
+                                    isDarkMode
+                                        ? "text-white text-opacity-50"
+                                        : "text-gray-500"
+                                }`}
+                            >
+                                ({templateLimits.currentCount}
+                                {templateLimits.maxTemplates === -1
+                                    ? ""
+                                    : `/${templateLimits.maxTemplates}`}
+                                )
+                            </span>
+                        )}
                     </div>
                 </div>
 
@@ -609,8 +709,6 @@ const Templates: React.FC<TemplatesProps> = ({ isDarkMode = false }) => {
                     />
                 </button>
             </div>
-
-            {/* Warning Message for Free Trial */}
 
             {/* Templates Grid */}
             <div className="overflow-x-auto overflow-y-hidden -mx-3 px-3">
@@ -640,7 +738,7 @@ const Templates: React.FC<TemplatesProps> = ({ isDarkMode = false }) => {
                                     : "bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-gray-300"
                             }
                             ${
-                                isTrialMode && templates.length >= 2
+                                templateLimits && templateLimits.isAtLimit
                                     ? "opacity-50 cursor-not-allowed"
                                     : ""
                             }
@@ -668,12 +766,12 @@ const Templates: React.FC<TemplatesProps> = ({ isDarkMode = false }) => {
 
                     {/* Template Items - only show first 2 in trial mode */}
                     {displayedTemplates.map((template, index) => (
-                        <div key={index} className="relative">
+                        <div key={template.id || index} className="relative">
                             {isDeleteMode && (
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        handleDeleteTemplate(template.name);
+                                        handleDeleteTemplate(template);
                                     }}
                                     className={`
                                         absolute top-1 right-1 z-10 p-1 rounded-full border

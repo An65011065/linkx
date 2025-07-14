@@ -4,6 +4,8 @@ import DashboardTab from "../dashboard/components/DashboardTab";
 import GraphVisualization from "../graph/components/GraphVisualization";
 import { downloadSessionData } from "../data/useExtensionData";
 import { Download, Sun, Moon } from "lucide-react";
+import AuthService from "../services/authService";
+import type { AuthUser } from "../services/authService";
 import "./styles/sunlit-window.css";
 
 // Global variable for free trial state
@@ -25,13 +27,45 @@ const MainTab: React.FC = () => {
     const [windowWidth, setWindowWidth] = useState(window.innerWidth);
     const [isDarkMode, setIsDarkMode] = useState(true);
 
-    // Add free trial state
+    // Add auth state and trial toggle
+    const [user, setUser] = useState<AuthUser | null>(null);
     const [isFreeTrial, setIsFreeTrial] = useState(false);
 
     // Update global variable when state changes
     useEffect(() => {
         freeTrial = isFreeTrial;
     }, [isFreeTrial]);
+
+    // Load user and set initial trial state
+    useEffect(() => {
+        const authService = AuthService.getInstance();
+
+        const loadUser = async () => {
+            await authService.waitForAuthReady();
+            const currentUser = authService.getCurrentUser();
+            setUser(currentUser);
+
+            // Set trial toggle based on plan
+            if (currentUser?.plan) {
+                const planType = currentUser.plan.type;
+                // Turn toggle ON only for free plan, OFF for trial/pro/plus
+                setIsFreeTrial(planType === "free");
+            }
+        };
+
+        loadUser();
+
+        // Listen for auth changes
+        const unsubscribe = authService.onAuthStateChanged((authUser) => {
+            setUser(authUser);
+            if (authUser?.plan) {
+                const planType = authUser.plan.type;
+                setIsFreeTrial(planType === "free");
+            }
+        });
+
+        return () => unsubscribe();
+    }, []);
 
     const tabs: Tab[] = [
         { id: "insights", label: "Insights" },
@@ -42,6 +76,52 @@ const MainTab: React.FC = () => {
     // Function to handle input focus state from Insights component
     const handleInputFocusChange = (focused: boolean) => {
         setIsInputFocused(focused);
+    };
+
+    // Handle trial toggle - only allow toggle for free plan
+    const handleTrialToggle = (checked: boolean) => {
+        if (user?.plan?.type === "free") {
+            setIsFreeTrial(checked);
+        }
+        // For other plans, don't allow toggle (they're locked to OFF)
+    };
+
+    // Get plan display text
+    const getPlanDisplayText = () => {
+        if (!user?.plan) return "Loading...";
+
+        const planType = user.plan.type;
+        const status = user.plan.status;
+
+        // Capitalize first letter and add status if needed
+        const displayName =
+            planType.charAt(0).toUpperCase() + planType.slice(1);
+
+        if (status === "expired") {
+            return `${displayName} (Expired)`;
+        } else if (status === "canceled") {
+            return `${displayName} (Canceled)`;
+        }
+
+        return displayName;
+    };
+
+    // Get plan color
+    const getPlanColor = () => {
+        if (!user?.plan) return "#636e72";
+
+        switch (user.plan.type) {
+            case "free":
+                return "#636e72";
+            case "trial":
+                return "#00b894";
+            case "pro":
+                return "#0984e3";
+            case "plus":
+                return "#6c5ce7";
+            default:
+                return "#636e72";
+        }
     };
 
     // Handle window resize for responsive behavior
@@ -208,7 +288,8 @@ const MainTab: React.FC = () => {
                     flex-direction: column;
                     align-items: center;
                     backgroundColor: transparent;
-                    fontFamily: "Nunito-Regular, Arial, sans-serif";
+                    fontFamily: "system-ui, -apple-system, sans-serif";
+                    fontWeight: 600;
                     z-index: 5;
                 }
                 
@@ -238,14 +319,18 @@ const MainTab: React.FC = () => {
                     0% { transform: rotate(0deg); }
                     100% { transform: rotate(360deg); }
                 }
-                .free-trial-switch {
+                .trial-control {
                     position: fixed;
                     top: 20px;
                     left: 20px;
                     z-index: 1000;
                     display: flex;
                     align-items: center;
-                    gap: 8px;
+                    gap: 12px;
+                    background: rgba(255, 255, 255, 0.9);
+                    padding: 8px 12px;
+                    border-radius: 8px;
+                    backdrop-filter: blur(8px);
                 }
                 .switch {
                     position: relative;
@@ -286,27 +371,61 @@ const MainTab: React.FC = () => {
                 input:checked + .slider:before {
                     transform: translateX(20px);
                 }
+                .slider.disabled {
+                    cursor: not-allowed;
+                    opacity: 0.6;
+                }
             `}</style>
             <div className="main-tab-container">
-                {/* Free Trial Switch */}
-                <div className="free-trial-switch">
+                {/* Trial Control with Plan Display */}
+                <div className="trial-control">
                     <label className="switch">
                         <input
                             type="checkbox"
                             checked={isFreeTrial}
-                            onChange={(e) => setIsFreeTrial(e.target.checked)}
+                            onChange={(e) =>
+                                handleTrialToggle(e.target.checked)
+                            }
+                            disabled={user?.plan?.type !== "free"}
                         />
-                        <span className="slider"></span>
+                        <span
+                            className={`slider ${
+                                user?.plan?.type !== "free" ? "disabled" : ""
+                            }`}
+                        ></span>
                     </label>
-                    <span
+                    <div
                         style={{
-                            color: "#2d3436",
-                            fontFamily: "Nunito-Regular, Arial, sans-serif",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "2px",
                         }}
                     >
-                        Free Trial
-                    </span>
+                        <span
+                            style={{
+                                color: "#2d3436",
+                                fontFamily:
+                                    "system-ui, -apple-system, sans-serif",
+                                fontSize: "1rem",
+                                fontWeight: "600",
+                            }}
+                        >
+                            Free Trial
+                        </span>
+                        <span
+                            style={{
+                                color: getPlanColor(),
+                                fontFamily:
+                                    "system-ui, -apple-system, sans-serif",
+                                fontSize: "12px",
+                                fontWeight: "700",
+                            }}
+                        >
+                            {getPlanDisplayText()}
+                        </span>
+                    </div>
                 </div>
+
                 {/* Animation Background Layer */}
                 <div
                     className={`animation-background animation-container ${
@@ -423,7 +542,8 @@ const MainTab: React.FC = () => {
                                         className="bg-transparent border-none px-4 py-2 text-lg cursor-pointer transition-colors duration-200 outline-none"
                                         style={{
                                             fontFamily:
-                                                "Nunito-Bold, Arial, sans-serif",
+                                                "system-ui, -apple-system, sans-serif",
+                                            fontWeight: "600",
                                             color:
                                                 activeTab === tab.id
                                                     ? "#2d3436"
@@ -460,7 +580,8 @@ const MainTab: React.FC = () => {
                                         className="mt-4 text-[#666] text-sm"
                                         style={{
                                             fontFamily:
-                                                "Nunito-Regular, Arial, sans-serif",
+                                                "system-ui, -apple-system, sans-serif",
+                                            fontWeight: "600",
                                         }}
                                     >
                                         Loading network visualization...
@@ -547,7 +668,8 @@ const MainTab: React.FC = () => {
                                         className="px-4 py-2 text-sm text-[#2d3436] cursor-pointer transition-colors duration-200 whitespace-nowrap hover:bg-[#f8f9fa]"
                                         style={{
                                             fontFamily:
-                                                "Nunito-Regular, Arial, sans-serif",
+                                                "system-ui, -apple-system, sans-serif",
+                                            fontWeight: "600",
                                         }}
                                         onClick={() => {
                                             downloadSessionData("json");
@@ -560,7 +682,8 @@ const MainTab: React.FC = () => {
                                         className="px-4 py-2 text-sm text-[#2d3436] cursor-pointer transition-colors duration-200 whitespace-nowrap hover:bg-[#f8f9fa]"
                                         style={{
                                             fontFamily:
-                                                "Nunito-Regular, Arial, sans-serif",
+                                                "system-ui, -apple-system, sans-serif",
+                                            fontWeight: "600",
                                         }}
                                         onClick={() => {
                                             downloadSessionData("csv");

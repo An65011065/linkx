@@ -230,7 +230,7 @@ const ConsolidateTabs: React.FC<ConsolidateTabsProps> = ({
 
     return (
         <div className={className} onClick={handleConsolidateTabs}>
-            <Combine size={24} color="#28a745" strokeWidth={2} />
+            <Combine size={20} color="#28a745" strokeWidth={2} />
             {children}
         </div>
     );

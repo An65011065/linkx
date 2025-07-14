@@ -1,178 +1,393 @@
-// src/popup/components/PopupApp.tsx
+// src/popup/components/PopupApp.tsx - Fixed auth state listening
 import React, { useState, useEffect } from "react";
 import AuthService from "../../services/authService";
 import type { AuthUser } from "../../services/authService";
 import LoginScreen from "./LoginScreen";
 import MainContent from "./MainContent";
-import "../../shared/styles/fonts.css";
 
 const PopupApp: React.FC = () => {
-    const [isSignedIn, setIsSignedIn] = useState<boolean>(false);
     const [user, setUser] = useState<AuthUser | null>(null);
-    const [loading, setLoading] = useState<boolean>(true);
-    const [error, setError] = useState<string | null>(null);
+    const [isReady, setIsReady] = useState(false);
+    const [showDebug, setShowDebug] = useState(false);
+    const [debugLog, setDebugLog] = useState<string[]>([]);
+
+    // Load debug log from storage and add new entries
+    const addDebugEntry = async (message: string) => {
+        const timestamp = new Date().toLocaleTimeString();
+        const entry = `${timestamp}: ${message}`;
+
+        // Get existing log
+        const result = await chrome.storage.local.get(["debugLog"]);
+        const existingLog = result.debugLog || [];
+
+        // Add new entry and keep last 10
+        const newLog = [...existingLog, entry].slice(-10);
+
+        // Save back to storage
+        await chrome.storage.local.set({ debugLog: newLog });
+
+        // Update local state
+        setDebugLog(newLog);
+
+        console.log(`🔍 [PopupApp] ${entry}`);
+    };
+
+    // Load debug log on mount
+    useEffect(() => {
+        const loadDebugLog = async () => {
+            const result = await chrome.storage.local.get(["debugLog"]);
+            setDebugLog(result.debugLog || []);
+        };
+        loadDebugLog();
+    }, []);
 
     useEffect(() => {
         let unsubscribe: (() => void) | null = null;
 
         const initAuth = async () => {
             try {
+                await addDebugEntry("Starting auth initialization");
                 const authService = AuthService.getInstance();
-                console.log("🔍 [PopupApp] Starting auth initialization...");
 
-                // Wait for Firebase Auth to finish loading
-                await authService.waitForAuthReady();
-                console.log("✅ [PopupApp] Auth ready");
+                // CRITICAL: Set up listener FIRST, before checking cached user
+                unsubscribe = authService.onAuthStateChanged(
+                    async (authUser) => {
+                        await addDebugEntry(
+                            `🔄 Auth state changed: ${
+                                authUser ? authUser.email : "null"
+                            }`,
+                        );
+                        setUser(authUser);
 
-                // Now check if user is signed in
-                const currentUser = authService.getCurrentUser();
-                console.log("👤 [PopupApp] Current user:", currentUser);
-
-                if (currentUser) {
-                    setUser(currentUser);
-                    setIsSignedIn(true);
-                    console.log("✅ [PopupApp] User is signed in");
-                } else {
-                    setUser(null);
-                    setIsSignedIn(false);
-                    console.log("❌ [PopupApp] No user signed in");
-                }
-
-                setLoading(false);
-
-                // Listen for auth state changes
-                unsubscribe = authService.onAuthStateChanged((user) => {
-                    console.log(
-                        "🔄 [PopupApp] Auth state changed:",
-                        user ? user.email : "null",
-                    );
-                    setUser(user);
-                    setIsSignedIn(!!user);
-                    setLoading(false);
-                });
-            } catch (error) {
-                console.error(
-                    "❌ [PopupApp] Auth initialization error:",
-                    error,
+                        // If we have a user, we're ready
+                        if (authUser) {
+                            setIsReady(true);
+                            await addDebugEntry(
+                                "✅ User authenticated, popup ready",
+                            );
+                        }
+                    },
                 );
-                setLoading(false);
-                setError("Failed to initialize authentication");
+
+                // THEN check for cached user and wait for auth ready
+                await addDebugEntry("Waiting for auth to be ready...");
+                await authService.waitForAuthReady();
+
+                // Get the current user state
+                const currentUser = authService.getCurrentUser();
+                await addDebugEntry(
+                    `Current user after auth ready: ${
+                        currentUser ? currentUser.email : "null"
+                    }`,
+                );
+
+                // Always set ready to true so we can show login screen if needed
+                setIsReady(true);
+                await addDebugEntry("✅ Auth initialization complete");
+            } catch (error) {
+                console.error("Auth error:", error);
+                await addDebugEntry(
+                    `❌ Auth error: ${
+                        error instanceof Error ? error.message : "unknown"
+                    }`,
+                );
+                setIsReady(true); // Show login screen even on error
             }
         };
 
         initAuth();
 
-        // Cleanup function
         return () => {
             if (unsubscribe) {
                 unsubscribe();
             }
         };
-    }, []);
+    }, []); // Only run once when component mounts
 
-    // Handle successful sign-in from LoginScreen
-    const handleSignIn = (signedInUser: AuthUser) => {
-        console.log("✅ [PopupApp] Sign in successful:", signedInUser.email);
+    // Handle sign in
+    const handleSignIn = async (signedInUser: AuthUser) => {
+        await addDebugEntry(`✅ Manual sign in: ${signedInUser.email}`);
         setUser(signedInUser);
-        setIsSignedIn(true);
-        setError(null);
     };
 
+    // Handle sign out
     const handleSignOut = async () => {
         try {
-            setError(null);
-            console.log("🔄 [PopupApp] Signing out...");
-
+            await addDebugEntry("🔄 Starting sign out");
             const authService = AuthService.getInstance();
             await authService.signOut();
-
-            console.log("✅ [PopupApp] Sign out successful");
             setUser(null);
-            setIsSignedIn(false);
+            await addDebugEntry("✅ Sign out complete");
         } catch (error) {
-            console.error("❌ [PopupApp] Sign out failed:", error);
-            setError("Failed to sign out.");
+            console.error("Sign out error:", error);
+            await addDebugEntry(
+                `❌ Sign out error: ${
+                    error instanceof Error ? error.message : "unknown"
+                }`,
+            );
         }
     };
 
-    console.log(
-        "🎯 [PopupApp] Render - loading:",
-        loading,
-        "isSignedIn:",
-        isSignedIn,
-        "user:",
-        user ? user.email : "null",
-    );
+    // Manual Firestore sync test
+    const handleManualSync = async () => {
+        try {
+            await addDebugEntry("🔄 Manual Firestore sync triggered");
+            const authService = AuthService.getInstance();
+            await authService.refreshUserData();
+            await addDebugEntry("✅ Manual sync completed");
+        } catch (error) {
+            console.error("Manual sync error:", error);
+            await addDebugEntry(
+                `❌ Manual sync error: ${
+                    error instanceof Error ? error.message : "unknown"
+                }`,
+            );
+        }
+    };
 
-    // Loading state while checking initial auth
-    if (loading) {
+    // Test API connection
+    const handleTestConnection = async () => {
+        try {
+            await addDebugEntry("🧪 Testing API connection");
+            const authService = AuthService.getInstance();
+            await authService.testApiConnection();
+            await addDebugEntry("✅ API connection test completed");
+        } catch (error) {
+            console.error("Connection test error:", error);
+            await addDebugEntry(
+                `❌ Connection test error: ${
+                    error instanceof Error ? error.message : "unknown"
+                }`,
+            );
+        }
+    };
+
+    // Clear debug log
+    const clearDebugLog = async () => {
+        await chrome.storage.local.remove(["debugLog"]);
+        setDebugLog([]);
+    };
+
+    // Don't render anything until we know the auth state
+    if (!isReady) {
         return (
             <div
                 style={{
                     width: "340px",
                     height: "330px",
                     display: "flex",
+                    flexDirection: "column",
                     alignItems: "center",
                     justifyContent: "center",
-                    fontFamily:
-                        "Nunito-Regular, -apple-system, BlinkMacSystemFont, sans-serif",
-                    background: "rgba(255, 255, 255, 0.95)",
-                    backdropFilter: "blur(8px)",
-                    WebkitBackdropFilter: "blur(8px)",
-                    borderRadius: "20px",
-                    border: "1px solid rgba(255, 255, 255, 0.18)",
-                    boxShadow: "0 8px 32px rgba(31, 38, 135, 0.37)",
+                    background: "#f8f9fa",
+                    fontFamily: "Arial, sans-serif",
+                    padding: "20px",
+                    boxSizing: "border-box",
                 }}
             >
-                <div style={{ textAlign: "center" }}>
-                    <div
-                        style={{
-                            width: "32px",
-                            height: "32px",
-                            border: "3px solid #e9ecef",
-                            borderTop: "3px solid #4285f4",
-                            borderRadius: "50%",
-                            animation: "spin 1s linear infinite",
-                            margin: "0 auto 16px",
-                        }}
-                    />
-                    <div
-                        style={{
-                            fontSize: "14px",
-                            color: "#6c757d",
-                            fontFamily: "Nunito-Regular",
-                        }}
-                    >
-                        Loading...
-                    </div>
+                <div
+                    style={{
+                        width: "24px",
+                        height: "24px",
+                        border: "2px solid #e9ecef",
+                        borderTop: "2px solid #4285f4",
+                        borderRadius: "50%",
+                        animation: "spin 1s linear infinite",
+                        marginBottom: "16px",
+                    }}
+                />
+                <div
+                    style={{
+                        fontSize: "14px",
+                        color: "#666",
+                        marginBottom: "16px",
+                    }}
+                >
+                    Loading...
                 </div>
+
                 <style>
-                    {`
-                        @keyframes spin {
-                            0% { transform: rotate(0deg); }
-                            100% { transform: rotate(360deg); }
-                        }
-                    `}
+                    {`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}
                 </style>
             </div>
         );
     }
 
-    // Show login screen if not signed in
-    if (!isSignedIn) {
-        console.log("🔑 [PopupApp] Showing LoginScreen");
-        return (
-            <LoginScreen
-                onSignIn={handleSignIn}
-                error={error}
-                loading={false} // LoginScreen handles its own loading state
-            />
-        );
-    }
+    // Render the appropriate screen
+    const mainComponent = user ? (
+        <MainContent user={user} onSignOut={handleSignOut} />
+    ) : (
+        <LoginScreen onSignIn={handleSignIn} error={null} loading={false} />
+    );
 
-    // Show main content if signed in
-    console.log("🏠 [PopupApp] Showing MainContent");
-    return <MainContent user={user} onSignOut={handleSignOut} />;
+    return (
+        <div style={{ position: "relative" }}>
+            {mainComponent}
+
+            {/* Debug Test Buttons - only show when debug is active */}
+            {showDebug && (
+                <div
+                    style={{
+                        position: "absolute",
+                        bottom: "40px",
+                        left: "5px",
+                        right: "5px",
+                        display: "flex",
+                        gap: "5px",
+                        zIndex: 1002,
+                    }}
+                >
+                    <button
+                        onClick={handleManualSync}
+                        style={{
+                            flex: 1,
+                            background: "#4285f4",
+                            color: "white",
+                            border: "none",
+                            borderRadius: "4px",
+                            padding: "4px 8px",
+                            fontSize: "10px",
+                            cursor: "pointer",
+                        }}
+                        disabled={!user}
+                    >
+                        Sync API
+                    </button>
+                    <button
+                        onClick={handleTestConnection}
+                        style={{
+                            flex: 1,
+                            background: "#34a853",
+                            color: "white",
+                            border: "none",
+                            borderRadius: "4px",
+                            padding: "4px 8px",
+                            fontSize: "10px",
+                            cursor: "pointer",
+                        }}
+                    >
+                        Test API
+                    </button>
+                </div>
+            )}
+
+            {/* Debug Toggle Button */}
+            <button
+                onClick={() => setShowDebug(!showDebug)}
+                style={{
+                    position: "absolute",
+                    top: "5px",
+                    right: "5px",
+                    background: showDebug ? "#4285f4" : "rgba(0,0,0,0.7)",
+                    color: "white",
+                    border: "none",
+                    borderRadius: "50%",
+                    width: "24px",
+                    height: "24px",
+                    fontSize: "12px",
+                    cursor: "pointer",
+                    zIndex: 1001,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                }}
+                title="Toggle Debug Info"
+            >
+                🐛
+            </button>
+
+            {/* Debug Overlay */}
+            {showDebug && (
+                <div
+                    style={{
+                        position: "absolute",
+                        top: "35px",
+                        left: "5px",
+                        right: "5px",
+                        bottom: "50px", // Leave space for buttons
+                        backgroundColor: "rgba(0, 0, 0, 0.95)",
+                        color: "#00ff00",
+                        padding: "10px",
+                        borderRadius: "8px",
+                        fontSize: "10px",
+                        fontFamily: "monospace",
+                        overflowY: "auto",
+                        zIndex: 1000,
+                        border: "1px solid #333",
+                    }}
+                >
+                    <div
+                        style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            marginBottom: "10px",
+                            borderBottom: "1px solid #333",
+                            paddingBottom: "5px",
+                        }}
+                    >
+                        <strong style={{ color: "#ffff00" }}>
+                            🔍 Auth Debug Log
+                        </strong>
+                        <button
+                            onClick={clearDebugLog}
+                            style={{
+                                background: "#ff4444",
+                                color: "white",
+                                border: "none",
+                                borderRadius: "3px",
+                                padding: "2px 6px",
+                                fontSize: "9px",
+                                cursor: "pointer",
+                            }}
+                        >
+                            Clear
+                        </button>
+                    </div>
+
+                    <div style={{ marginBottom: "10px", color: "#ffff00" }}>
+                        <strong>Current State:</strong>
+                        <br />• Ready: {isReady.toString()}
+                        <br />• User: {user ? user.email : "null"}
+                        <br />• Plan:{" "}
+                        {user?.plan
+                            ? `${user.plan.type} (${user.plan.status})`
+                            : "loading..."}
+                        <br />• Component:{" "}
+                        {user ? "MainContent" : "LoginScreen"}
+                    </div>
+
+                    <div style={{ color: "#00ffff", marginBottom: "5px" }}>
+                        <strong>Event Log:</strong>
+                    </div>
+
+                    {debugLog.length === 0 ? (
+                        <div style={{ color: "#888" }}>No events yet...</div>
+                    ) : (
+                        debugLog.map((entry, i) => (
+                            <div
+                                key={i}
+                                style={{
+                                    marginBottom: "2px",
+                                    padding: "2px 0",
+                                    borderLeft: entry.includes("✅")
+                                        ? "2px solid #00ff00"
+                                        : entry.includes("❌")
+                                        ? "2px solid #ff4444"
+                                        : entry.includes("🔄")
+                                        ? "2px solid #ffff00"
+                                        : "2px solid #666",
+                                    paddingLeft: "5px",
+                                }}
+                            >
+                                {entry}
+                            </div>
+                        ))
+                    )}
+                </div>
+            )}
+        </div>
+    );
 };
 
 export default PopupApp;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import DataService from "../../data/dataService";
+import AuthService from "../../services/authService";
 
 interface WeeklyInsightsProps {
     isDarkMode?: boolean;
@@ -19,53 +19,121 @@ const WeeklyInsights: React.FC<WeeklyInsightsProps> = ({
         days: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
     });
     const [chartHeight, setChartHeight] = useState(0);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
     const chartContainerRef = useRef<HTMLDivElement>(null);
+    const authService = AuthService.getInstance();
 
     useEffect(() => {
-        const loadWeeklyData = async () => {
-            const dataService = DataService.getInstance();
-            const sessions = await dataService.getSessionHistory(7);
+        loadWeeklyData();
+    }, []);
 
-            // Create a map of date to session data
-            const sessionMap = new Map(
-                sessions.map((session) => [session.date, session]),
+    const loadWeeklyData = async () => {
+        try {
+            setLoading(true);
+            setError(null);
+            console.log("🔄 Loading weekly insights from API...");
+
+            const response = await authService.apiCall(
+                "GET",
+                "/insights/weekly?days=7",
             );
 
-            // Get dates for the last 7 days (today and 6 days before)
-            const dates = Array.from({ length: 7 }, (_, i) => {
+            if (response.ok) {
+                const apiData = await response.json();
+                console.log("✅ Weekly insights API response:", apiData);
+
+                // Create a map of date to session data
+                const sessionMap = new Map();
+                (apiData.sessions || []).forEach((session: any) => {
+                    sessionMap.set(session.date, session);
+                });
+
+                // Get dates for the last 7 days (today and 6 days before)
+                const dates = Array.from({ length: 7 }, (_, i) => {
+                    const date = new Date();
+                    date.setDate(date.getDate() - (6 - i)); // 6 days ago to today
+                    return date.toISOString().split("T")[0];
+                });
+
+                // Initialize arrays
+                const weekData = Array(7).fill(0);
+                const screenTimeData = Array(7).fill(0);
+                const days = dates.map((date) =>
+                    new Date(date).toLocaleDateString("en-US", {
+                        weekday: "short",
+                    }),
+                );
+
+                // Fill in data where we have sessions
+                dates.forEach((date, index) => {
+                    const session = sessionMap.get(date);
+                    if (session) {
+                        console.log(
+                            `📊 Processing session for ${date}:`,
+                            session,
+                        );
+                        weekData[index] = session.wellnessScore || 0;
+                        screenTimeData[index] =
+                            session.totalTime || session.stats?.totalTime || 0;
+                    }
+                });
+
+                console.log("✅ Processed weekly data:", {
+                    scores: weekData,
+                    screenTime: screenTimeData,
+                    days,
+                });
+
+                setData({
+                    scores: weekData,
+                    screenTime: screenTimeData,
+                    days: days,
+                });
+            } else {
+                console.error(
+                    "❌ Failed to load weekly insights:",
+                    response.status,
+                );
+                const errorData = await response.json().catch(() => ({}));
+                console.error("Error details:", errorData);
+                setError("Failed to load weekly insights");
+
+                // Set default empty data on error
+                const days = Array.from({ length: 7 }, (_, i) => {
+                    const date = new Date();
+                    date.setDate(date.getDate() - (6 - i));
+                    return date.toLocaleDateString("en-US", {
+                        weekday: "short",
+                    });
+                });
+
+                setData({
+                    scores: Array(7).fill(0),
+                    screenTime: Array(7).fill(0),
+                    days: days,
+                });
+            }
+        } catch (err) {
+            console.error("❌ Error loading weekly insights:", err);
+            setError("Failed to load weekly insights");
+
+            // Set default empty data on error
+            const days = Array.from({ length: 7 }, (_, i) => {
                 const date = new Date();
-                date.setDate(date.getDate() - (6 - i)); // 6 days ago to today
-                return date.toISOString().split("T")[0];
-            });
-
-            // Initialize arrays
-            const weekData = Array(7).fill(0);
-            const screenTimeData = Array(7).fill(0);
-            const days = dates.map((date) =>
-                new Date(date).toLocaleDateString("en-US", {
-                    weekday: "short",
-                }),
-            );
-
-            // Fill in data where we have sessions
-            dates.forEach((date, index) => {
-                const session = sessionMap.get(date);
-                if (session) {
-                    weekData[index] =
-                        dataService.calculateDigitalWellnessScore(session);
-                    screenTimeData[index] = session.stats.totalTime;
-                }
+                date.setDate(date.getDate() - (6 - i));
+                return date.toLocaleDateString("en-US", { weekday: "short" });
             });
 
             setData({
-                scores: weekData,
-                screenTime: screenTimeData,
+                scores: Array(7).fill(0),
+                screenTime: Array(7).fill(0),
                 days: days,
             });
-        };
-
-        loadWeeklyData();
-    }, []);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     // Calculate available chart height dynamically
     useEffect(() => {
@@ -93,9 +161,20 @@ const WeeklyInsights: React.FC<WeeklyInsightsProps> = ({
             ? nonZeroValues.reduce((a, b) => a + b, 0) / nonZeroValues.length
             : 0;
 
-    const dataService = DataService.getInstance();
-    const formatScreenTime = (milliseconds: number) =>
-        dataService.formatTime(milliseconds);
+    // Format screen time (milliseconds to readable format)
+    const formatScreenTime = (milliseconds: number) => {
+        if (milliseconds === 0) return "0m";
+
+        const hours = Math.floor(milliseconds / (1000 * 60 * 60));
+        const minutes = Math.floor(
+            (milliseconds % (1000 * 60 * 60)) / (1000 * 60),
+        );
+
+        if (hours > 0) {
+            return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+        }
+        return `${minutes}m`;
+    };
 
     const getBarHeight = (value: number) => {
         if (currentData.length === 0 || value === 0) return 0;
@@ -122,6 +201,84 @@ const WeeklyInsights: React.FC<WeeklyInsightsProps> = ({
         // Today is always the last (rightmost) bar
         return index === 6;
     };
+
+    // Show loading state
+    if (loading) {
+        return (
+            <div
+                className={`
+                    h-full w-full rounded-xl border flex items-center justify-center
+                    ${
+                        isDarkMode
+                            ? "bg-white/5 border-white/10"
+                            : "bg-white border-gray-200"
+                    }
+                `}
+            >
+                <div className="text-center">
+                    <div
+                        className={`
+                            w-6 h-6 border-2 border-t-transparent rounded-full animate-spin mx-auto mb-2
+                            ${
+                                isDarkMode
+                                    ? "border-white/30"
+                                    : "border-gray-300"
+                            }
+                        `}
+                    />
+                    <div
+                        className={`
+                            text-sm
+                            ${isDarkMode ? "text-white/50" : "text-gray-500"}
+                        `}
+                    >
+                        Loading insights...
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // Show error state
+    if (error) {
+        return (
+            <div
+                className={`
+                    h-full w-full rounded-xl border flex items-center justify-center p-4
+                    ${
+                        isDarkMode
+                            ? "bg-white/5 border-white/10"
+                            : "bg-white border-gray-200"
+                    }
+                `}
+            >
+                <div className="text-center">
+                    <div className="text-red-500 text-sm mb-2">⚠️</div>
+                    <div
+                        className={`
+                            text-sm
+                            ${isDarkMode ? "text-white/70" : "text-gray-600"}
+                        `}
+                    >
+                        {error}
+                    </div>
+                    <button
+                        onClick={loadWeeklyData}
+                        className={`
+                            mt-2 px-3 py-1 text-xs rounded-lg transition-colors
+                            ${
+                                isDarkMode
+                                    ? "bg-white/10 text-white hover:bg-white/20"
+                                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                            }
+                        `}
+                    >
+                        Retry
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     if (isDarkMode) {
         return (

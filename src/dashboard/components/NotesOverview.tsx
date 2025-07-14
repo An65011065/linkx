@@ -10,11 +10,10 @@ import {
     Trash2,
     X,
 } from "lucide-react";
-
-// Mock freeTrial for demo
-const freeTrial = false;
+import AuthService from "../../services/authService";
 
 interface Note {
+    id?: string; // Backend ID
     domain: string;
     content: string;
     lastModified: number;
@@ -35,22 +34,17 @@ const NotesOverview: React.FC<NotesOverviewProps> = ({
     const [newNoteContent, setNewNoteContent] = useState("");
     const [selectedNote, setSelectedNote] = useState<Note | null>(null);
     const [copyMessage, setCopyMessage] = useState("");
-    const [isTrialMode, setIsTrialMode] = useState(freeTrial);
+    const [isTrialMode, setIsTrialMode] = useState(false);
     const [isDeleteMode, setIsDeleteMode] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [notesLimits, setNotesLimits] = useState<any>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const searchInputRef = useRef<HTMLInputElement>(null);
+    const authService = AuthService.getInstance();
 
     useEffect(() => {
         loadNotes();
-    }, []);
-
-    useEffect(() => {
-        const checkTrialStatus = () => {
-            setIsTrialMode(freeTrial);
-        };
-        checkTrialStatus();
-        const interval = setInterval(checkTrialStatus, 100);
-        return () => clearInterval(interval);
+        loadNotesLimits();
     }, []);
 
     useEffect(() => {
@@ -59,43 +53,98 @@ const NotesOverview: React.FC<NotesOverviewProps> = ({
         }
     }, [isSearchExpanded]);
 
-    const loadNotes = async () => {
+    const loadNotesLimits = async () => {
         try {
-            const storage = await chrome.storage.local.get(null);
-            const noteEntries: Note[] = [];
-            for (const [key, value] of Object.entries(storage)) {
-                if (
-                    key.startsWith("note_") &&
-                    !key.includes("timestamp") &&
-                    !key.includes("created")
-                ) {
-                    const domain = key.replace("note_", "");
-                    const timestamp =
-                        storage[`note_timestamp_${domain}`] || Date.now();
-                    noteEntries.push({
-                        domain,
-                        content: value as string,
-                        lastModified: timestamp,
-                        createdAt:
-                            storage[`note_created_${domain}`] || timestamp,
-                    });
-                }
+            const response = await authService.apiCall(
+                "GET",
+                "/notes/info/limits",
+            );
+            if (response.ok) {
+                const limits = await response.json();
+                setNotesLimits(limits);
+                setIsTrialMode(
+                    limits.planType === "free" || limits.planType === "trial",
+                );
             }
-            noteEntries.sort((a, b) => b.lastModified - a.lastModified);
-            setNotes(noteEntries);
         } catch (err) {
-            console.error("Error loading notes:", err);
+            console.error("Error loading notes limits:", err);
         }
     };
 
+    const loadNotes = async () => {
+        try {
+            setLoading(true);
+            console.log("🔄 Loading notes from API...");
+
+            const response = await authService.apiCall(
+                "GET",
+                `/notes${
+                    searchQuery
+                        ? `?search=${encodeURIComponent(searchQuery)}`
+                        : ""
+                }`,
+            );
+
+            if (response.ok) {
+                const data = await response.json();
+                console.log("✅ Notes API response:", data);
+
+                // Convert API response to component format
+                const noteEntries: Note[] = data.notes.map((note: any) => {
+                    // Handle different date formats from API
+                    const lastModified = note.lastModified
+                        ? typeof note.lastModified === "string"
+                            ? new Date(note.lastModified).getTime()
+                            : note.lastModified
+                        : Date.now();
+
+                    const createdAt = note.createdAt
+                        ? typeof note.createdAt === "string"
+                            ? new Date(note.createdAt).getTime()
+                            : note.createdAt
+                        : Date.now();
+
+                    return {
+                        id: note.id,
+                        domain: note.domain,
+                        content: note.content,
+                        lastModified,
+                        createdAt,
+                    };
+                });
+
+                console.log("✅ Processed notes:", noteEntries);
+                setNotes(noteEntries);
+            } else {
+                console.error("❌ Failed to load notes:", response.status);
+                const errorData = await response.json().catch(() => ({}));
+                console.error("Error details:", errorData);
+            }
+        } catch (err) {
+            console.error("❌ Error loading notes:", err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Reload notes when search changes
+    useEffect(() => {
+        const timeoutId = setTimeout(() => {
+            loadNotes();
+        }, 300); // Debounce search
+        return () => clearTimeout(timeoutId);
+    }, [searchQuery]);
+
     const handleDeleteNote = async (domain: string) => {
         try {
-            await chrome.storage.local.remove([
-                `note_${domain}`,
-                `note_timestamp_${domain}`,
-                `note_created_${domain}`,
-            ]);
-            await loadNotes();
+            const response = await authService.apiCall(
+                "DELETE",
+                `/notes/${encodeURIComponent(domain)}`,
+            );
+            if (response.ok) {
+                await loadNotes();
+                await loadNotesLimits(); // Refresh limits
+            }
         } catch (err) {
             console.error("Error deleting note:", err);
         }
@@ -103,18 +152,26 @@ const NotesOverview: React.FC<NotesOverviewProps> = ({
 
     const handleSaveNote = async (domain: string, content: string) => {
         try {
-            const timestamp = Date.now();
-            await chrome.storage.local.set({
-                [`note_${domain}`]: content,
-                [`note_timestamp_${domain}`]: timestamp,
+            const response = await authService.apiCall("POST", "/notes", {
+                domain,
+                content,
             });
-            await loadNotes();
-            if (selectedNote) {
-                setSelectedNote((prev) => ({
-                    ...prev!,
-                    content,
-                    lastModified: timestamp,
-                }));
+
+            if (response.ok) {
+                await loadNotes();
+                await loadNotesLimits(); // Refresh limits
+
+                // Update selected note if it's open
+                if (selectedNote) {
+                    const updatedNote = notes.find((n) => n.domain === domain);
+                    if (updatedNote) {
+                        setSelectedNote(updatedNote);
+                    }
+                }
+            } else {
+                const errorData = await response.json();
+                console.error("Failed to save note:", errorData.error);
+                // You could show an error message to user here
             }
         } catch (err) {
             console.error("Error saving note:", err);
@@ -129,16 +186,21 @@ const NotesOverview: React.FC<NotesOverviewProps> = ({
             const firstWord = content.trim().split(/\s+/)[0];
             const domain = firstWord.toLowerCase();
 
-            const timestamp = Date.now();
-            await chrome.storage.local.set({
-                [`note_${domain}`]: content,
-                [`note_timestamp_${domain}`]: timestamp,
-                [`note_created_${domain}`]: timestamp,
+            const response = await authService.apiCall("POST", "/notes", {
+                domain,
+                content,
             });
 
-            setNewNoteContent("");
-            setIsAddingNote(false);
-            loadNotes();
+            if (response.ok) {
+                setNewNoteContent("");
+                setIsAddingNote(false);
+                await loadNotes();
+                await loadNotesLimits(); // Refresh limits
+            } else {
+                const errorData = await response.json();
+                console.error("Failed to save new note:", errorData.error);
+                // You could show an error message to user here
+            }
         } catch (err) {
             console.error("Error saving note:", err);
         }
@@ -183,6 +245,7 @@ const NotesOverview: React.FC<NotesOverviewProps> = ({
         }
     };
 
+    // Apply frontend filtering for immediate UI response, backend will handle the real search
     const filteredNotes = notes.filter(
         (note) =>
             note.domain.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -336,6 +399,21 @@ const NotesOverview: React.FC<NotesOverviewProps> = ({
                         }`}
                     >
                         Site Notes
+                        {notesLimits && (
+                            <span
+                                className={`ml-2 text-xs ${
+                                    isDarkMode
+                                        ? "text-white text-opacity-50"
+                                        : "text-gray-500"
+                                }`}
+                            >
+                                ({notesLimits.currentCount}
+                                {notesLimits.maxNotes === -1
+                                    ? ""
+                                    : `/${notesLimits.maxNotes}`}
+                                )
+                            </span>
+                        )}
                     </h3>
                 </div>
                 <div className="flex items-center gap-0.5">
@@ -389,13 +467,32 @@ const NotesOverview: React.FC<NotesOverviewProps> = ({
                     </button>
                     {/* New Note Button */}
                     <button
-                        onClick={() => setIsAddingNote(true)}
+                        onClick={() => {
+                            // Check if user can add more notes
+                            if (notesLimits && notesLimits.isAtLimit) {
+                                // You could show an upgrade modal here
+                                console.log(
+                                    "Note limit reached, upgrade required",
+                                );
+                                return;
+                            }
+                            setIsAddingNote(true);
+                        }}
                         className={`p-1 rounded transition-colors ${
-                            isDarkMode
+                            notesLimits && notesLimits.isAtLimit
+                                ? isDarkMode
+                                    ? "text-gray-500 cursor-not-allowed"
+                                    : "text-gray-400 cursor-not-allowed"
+                                : isDarkMode
                                 ? "text-white hover:bg-white hover:bg-opacity-15"
                                 : "text-gray-600 hover:text-gray-800 hover:bg-gray-100"
                         }`}
-                        title="New Note"
+                        title={
+                            notesLimits && notesLimits.isAtLimit
+                                ? "Upgrade to add more notes"
+                                : "New Note"
+                        }
+                        disabled={notesLimits && notesLimits.isAtLimit}
                     >
                         <Plus size={18} />
                     </button>
@@ -422,83 +519,99 @@ const NotesOverview: React.FC<NotesOverviewProps> = ({
                             isDarkMode ? "text-yellow-400" : "text-yellow-700"
                         }`}
                     >
-                        Your plan only supports 4 notes at a time. Please access
-                        notes via extension popup.
+                        Your plan only supports 4 notes at a time. Upgrade to
+                        access all notes.
                     </div>
                 </div>
             )}
 
             {/* Notes List */}
             <div className="flex-1 overflow-y-auto">
-                {displayedNotes.map((note, index) => (
-                    <div key={note.domain}>
-                        <div
-                            onClick={() => {
-                                if (isDeleteMode) {
-                                    handleDeleteNote(note.domain);
-                                } else {
-                                    setSelectedNote(note);
-                                }
-                            }}
-                            className={`py-1.5 cursor-pointer rounded-lg px-2 -mx-2 transition-colors ${
-                                isDeleteMode
-                                    ? isDarkMode
-                                        ? "hover:bg-red-500 hover:bg-opacity-20"
-                                        : "hover:bg-red-50"
-                                    : isDarkMode
-                                    ? "hover:bg-white hover:bg-opacity-10"
-                                    : "hover:bg-gray-50"
-                            }`}
-                        >
-                            <div className="flex items-center justify-between mb-0.5">
-                                <div
-                                    className={`text-sm font-semibold truncate flex-1 mr-2 ${
-                                        isDarkMode ? "text-white" : "text-black"
-                                    }`}
-                                >
-                                    {note.domain}
-                                </div>
-                                <div
-                                    className={`flex items-center gap-1 text-xs flex-shrink-0 ${
-                                        isDarkMode
-                                            ? "text-white text-opacity-50"
-                                            : "text-gray-500"
-                                    }`}
-                                >
-                                    {isDeleteMode ? (
-                                        <X size={16} className="text-red-500" />
-                                    ) : (
-                                        <>
-                                            {formatLastModified(
-                                                note.lastModified,
-                                            )}
-                                            <ChevronRight size={12} />
-                                        </>
-                                    )}
-                                </div>
-                            </div>
+                {loading ? (
+                    <div
+                        className={`py-4 text-center text-sm ${
+                            isDarkMode
+                                ? "text-white text-opacity-50"
+                                : "text-gray-500"
+                        }`}
+                    >
+                        Loading notes...
+                    </div>
+                ) : displayedNotes.length > 0 ? (
+                    displayedNotes.map((note, index) => (
+                        <div key={note.domain}>
                             <div
-                                className={`text-xs truncate ${
-                                    isDarkMode
-                                        ? "text-white text-opacity-70"
-                                        : "text-gray-600"
+                                onClick={() => {
+                                    if (isDeleteMode) {
+                                        handleDeleteNote(note.domain);
+                                    } else {
+                                        setSelectedNote(note);
+                                    }
+                                }}
+                                className={`py-1.5 cursor-pointer rounded-lg px-2 -mx-2 transition-colors ${
+                                    isDeleteMode
+                                        ? isDarkMode
+                                            ? "hover:bg-red-500 hover:bg-opacity-20"
+                                            : "hover:bg-red-50"
+                                        : isDarkMode
+                                        ? "hover:bg-white hover:bg-opacity-10"
+                                        : "hover:bg-gray-50"
                                 }`}
                             >
-                                {getPreviewText(note.content)}
+                                <div className="flex items-center justify-between mb-0.5">
+                                    <div
+                                        className={`text-sm font-semibold truncate flex-1 mr-2 ${
+                                            isDarkMode
+                                                ? "text-white"
+                                                : "text-black"
+                                        }`}
+                                    >
+                                        {note.domain}
+                                    </div>
+                                    <div
+                                        className={`flex items-center gap-1 text-xs flex-shrink-0 ${
+                                            isDarkMode
+                                                ? "text-white text-opacity-50"
+                                                : "text-gray-500"
+                                        }`}
+                                    >
+                                        {isDeleteMode ? (
+                                            <X
+                                                size={16}
+                                                className="text-red-500"
+                                            />
+                                        ) : (
+                                            <>
+                                                {formatLastModified(
+                                                    note.lastModified,
+                                                )}
+                                                <ChevronRight size={12} />
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                                <div
+                                    className={`text-xs truncate ${
+                                        isDarkMode
+                                            ? "text-white text-opacity-70"
+                                            : "text-gray-600"
+                                    }`}
+                                >
+                                    {getPreviewText(note.content)}
+                                </div>
                             </div>
+                            {index < displayedNotes.length - 1 && (
+                                <div
+                                    className={`h-px my-1 ${
+                                        isDarkMode
+                                            ? "bg-white bg-opacity-10"
+                                            : "bg-gray-200"
+                                    }`}
+                                />
+                            )}
                         </div>
-                        {index < displayedNotes.length - 1 && (
-                            <div
-                                className={`h-px my-1 ${
-                                    isDarkMode
-                                        ? "bg-white bg-opacity-10"
-                                        : "bg-gray-200"
-                                }`}
-                            />
-                        )}
-                    </div>
-                ))}
-                {displayedNotes.length === 0 && !isAddingNote && (
+                    ))
+                ) : (
                     <div
                         className={`py-4 text-center text-sm ${
                             isDarkMode
