@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Send } from "lucide-react";
+import { Send, Download } from "lucide-react";
 import DataService from "../data/dataService";
 import AIService from "./services/AIService";
 import { freeTrial } from "./MainTab";
@@ -80,6 +80,100 @@ const Insights: React.FC<InsightsProps> = ({ onInputFocusChange }) => {
                 chatContainerRef.current.scrollHeight;
         }
     }, [visibleInsights, insights]);
+
+    const downloadBrowsingData = async () => {
+        try {
+            console.log("📊 Preparing browsing data for download...");
+
+            // Get the same data that's sent to the assistant
+            const aiService = AIService.getInstance();
+            const browsingContext = await aiService.getAllBrowsingData();
+
+            if (!browsingContext) {
+                console.error("No browsing data available");
+                alert("No browsing data available to download");
+                return;
+            }
+
+            // Create CSV content (same as Firebase function)
+            const visits = browsingContext.today.allVisits || [];
+            const sortedVisits = [...visits].sort(
+                (a, b) => b.startTime - a.startTime,
+            );
+
+            const headers = [
+                "domain",
+                "title",
+                "date",
+                "readableTime",
+                "activeTimeMinutes",
+            ];
+
+            const rows = sortedVisits.map((visit) => {
+                const date = new Date(visit.startTime);
+                const timeDisplay =
+                    visit.readableTime ||
+                    date.toLocaleTimeString("en-US", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        hour12: false,
+                    });
+
+                return [
+                    visit.domain || "",
+                    (visit.title || "").replace(/"/g, '""'),
+                    date.toISOString().split("T")[0],
+                    timeDisplay,
+                    visit.activeTimeMinutes || 0,
+                ];
+            });
+
+            // Add summary row (5 columns to match headers)
+            const summaryRow = [
+                "SUMMARY_DATA",
+                `Total visits: ${sortedVisits.length}, Active minutes: ${browsingContext.today.totalActiveMinutes}, Sessions: ${browsingContext.today.tabSessions}`,
+                browsingContext.today.date,
+                "Summary",
+                browsingContext.today.totalActiveMinutes,
+            ];
+
+            const csvLines = [
+                headers.join(","),
+                summaryRow.map((cell) => `"${cell}"`).join(","),
+                ...rows.map((row) => row.map((cell) => `"${cell}"`).join(",")),
+            ];
+
+            const csvContent = csvLines.join("\n");
+
+            // Create and download file
+            const blob = new Blob([csvContent], { type: "text/csv" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `browsing-data-${browsingContext.today.date}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            console.log("✅ CSV downloaded successfully");
+
+            // Show success message in chat
+            const downloadInsight: Insight = {
+                id: `download-${Date.now()}`,
+                text: `📊 Downloaded ${sortedVisits.length} visits from ${browsingContext.today.date}`,
+                type: "insight",
+            };
+
+            const updatedInsights = [...insights, downloadInsight];
+            setInsights(updatedInsights);
+            setVisibleInsights(updatedInsights.length);
+            persistentInsights = updatedInsights;
+        } catch (error) {
+            console.error("❌ Error downloading browsing data:", error);
+            alert("Error downloading data. Check console for details.");
+        }
+    };
 
     const handleSendMessage = async () => {
         if (!message.trim()) return;
@@ -302,6 +396,30 @@ const Insights: React.FC<InsightsProps> = ({ onInputFocusChange }) => {
                         backdropFilter: "blur(10px)",
                     }}
                 >
+                    <button
+                        onClick={downloadBrowsingData}
+                        style={{
+                            padding: "6px",
+                            backgroundColor: "#6c757d",
+                            border: "none",
+                            borderRadius: "10px",
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            transition: "all 0.2s ease",
+                            color: "white",
+                        }}
+                        title="Download browsing data CSV"
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = "#5a6268";
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = "#6c757d";
+                        }}
+                    >
+                        <Download size={14} />
+                    </button>
                     <textarea
                         value={message}
                         onChange={(e) => setMessage(e.target.value)}

@@ -1,20 +1,19 @@
-// EvolutionSearch.tsx - Evolution mode search component
-
 import React, { useState, useRef, useEffect } from "react";
 import { X } from "lucide-react";
 import type { NetworkNode } from "../types/network.types";
-import "../styles/components.css";
 
 interface EvolutionSearchProps {
     nodes: NetworkNode[];
     onNodeSelect: (nodeId: string | null) => void;
     selectedNode: string | null;
+    isDarkMode?: boolean;
 }
 
 const EvolutionSearch: React.FC<EvolutionSearchProps> = ({
     nodes,
     onNodeSelect,
     selectedNode,
+    isDarkMode = true,
 }) => {
     const [searchTerm, setSearchTerm] = useState("");
     const [dropdownVisible, setDropdownVisible] = useState(false);
@@ -44,7 +43,7 @@ const EvolutionSearch: React.FC<EvolutionSearchProps> = ({
                         .toLowerCase()
                         .includes(searchTermLower),
             )
-            .slice(0, 5); // Limit to 5 results
+            .slice(0, 5);
 
         setMatchingNodes(filtered);
         setDropdownVisible(filtered.length > 0);
@@ -71,7 +70,6 @@ const EvolutionSearch: React.FC<EvolutionSearchProps> = ({
     const formatUrl = (url: string) => {
         try {
             const urlObj = new URL(url);
-            // Include path and query parameters for more detail
             const path = urlObj.pathname !== "/" ? urlObj.pathname : "";
             const query = urlObj.search;
             const domain = urlObj.hostname.replace(/^www\./, "");
@@ -87,69 +85,71 @@ const EvolutionSearch: React.FC<EvolutionSearchProps> = ({
         }
     };
 
+    // Truncate text for display
+    const truncateText = (text: string, maxLength: number = 30) => {
+        if (text.length <= maxLength) return text;
+        return text.substring(0, maxLength) + "...";
+    };
+
     return (
-        <div
-            className="evolution-search-container"
-            style={{ position: "relative" }}
-        >
+        <div style={{ position: "relative", width: "100%" }}>
             <div
                 style={{
                     display: "flex",
                     alignItems: "center",
                     gap: "8px",
-                    width: "300px",
-                    background: "white",
-                    borderRadius: "8px",
-                    padding: "8px 12px",
-                    border: "1px solid #ddd",
+                    width: "100%",
                 }}
             >
                 {selectedNode ? (
-                    <>
-                        <div
+                    <div
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "4px",
+                            background: isDarkMode
+                                ? "rgba(66, 133, 244, 0.2)"
+                                : "#e3f2fd",
+                            padding: "4px 8px",
+                            borderRadius: "4px",
+                            fontSize: "14px",
+                            color: isDarkMode ? "#66b3ff" : "#1976d2",
+                            // Remove flex: 1 to make it fit content
+                            width: "fit-content",
+                        }}
+                    >
+                        <span
                             style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "4px",
-                                background: "#e3f2fd",
-                                padding: "4px 8px",
-                                borderRadius: "4px",
-                                fontSize: "14px",
-                                color: "#1976d2",
-                                flex: 1,
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                                maxWidth: "250px", // Set a reasonable max width
                             }}
                         >
-                            <span
-                                style={{
-                                    maxWidth: "200px",
-                                    overflow: "hidden",
-                                    textOverflow: "ellipsis",
-                                    whiteSpace: "nowrap",
-                                }}
-                            >
-                                {selectedNodeDetails?.youtubeMetadata?.title ||
+                            {truncateText(
+                                selectedNodeDetails?.youtubeMetadata?.title ||
                                     formatUrl(selectedNodeDetails?.url || "")
-                                        .fullPath}
-                            </span>
-                            <button
-                                onClick={() => {
-                                    onNodeSelect(null);
-                                    setSearchTerm("");
-                                }}
-                                style={{
-                                    background: "none",
-                                    border: "none",
-                                    padding: "2px",
-                                    cursor: "pointer",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    color: "#1976d2",
-                                }}
-                            >
-                                <X size={14} />
-                            </button>
-                        </div>
-                    </>
+                                        .fullPath,
+                            )}
+                        </span>
+                        <button
+                            onClick={() => {
+                                onNodeSelect(null);
+                                setSearchTerm("");
+                            }}
+                            style={{
+                                background: "none",
+                                border: "none",
+                                padding: "2px",
+                                cursor: "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                color: isDarkMode ? "#66b3ff" : "#1976d2",
+                            }}
+                        >
+                            <X size={14} />
+                        </button>
+                    </div>
                 ) : (
                     <input
                         ref={inputRef}
@@ -162,6 +162,8 @@ const EvolutionSearch: React.FC<EvolutionSearchProps> = ({
                             outline: "none",
                             width: "100%",
                             fontSize: "14px",
+                            background: "transparent",
+                            color: isDarkMode ? "#ffffff" : "#333333",
                         }}
                     />
                 )}
@@ -177,12 +179,17 @@ const EvolutionSearch: React.FC<EvolutionSearchProps> = ({
                         left: 0,
                         right: 0,
                         marginTop: "4px",
-                        background: "white",
+                        background: isDarkMode
+                            ? "rgba(0, 0, 0, 0.95)"
+                            : "white",
                         borderRadius: "8px",
                         boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
                         maxHeight: "200px",
                         overflowY: "auto",
                         zIndex: 1001,
+                        border: isDarkMode
+                            ? "1px solid rgba(255, 255, 255, 0.2)"
+                            : "1px solid #ddd",
                     }}
                 >
                     {matchingNodes.map((node) => {
@@ -198,7 +205,9 @@ const EvolutionSearch: React.FC<EvolutionSearchProps> = ({
                                 style={{
                                     padding: "8px 12px",
                                     cursor: "pointer",
-                                    borderBottom: "1px solid #eee",
+                                    borderBottom: isDarkMode
+                                        ? "1px solid rgba(255, 255, 255, 0.1)"
+                                        : "1px solid #eee",
                                     fontSize: "14px",
                                     display: "flex",
                                     flexDirection: "column",
@@ -206,18 +215,33 @@ const EvolutionSearch: React.FC<EvolutionSearchProps> = ({
                                 }}
                                 onMouseEnter={(e) => {
                                     e.currentTarget.style.background =
-                                        "#f5f5f5";
+                                        isDarkMode
+                                            ? "rgba(255, 255, 255, 0.1)"
+                                            : "#f5f5f5";
                                 }}
                                 onMouseLeave={(e) => {
-                                    e.currentTarget.style.background = "white";
+                                    e.currentTarget.style.background =
+                                        "transparent";
                                 }}
                             >
-                                <div style={{ fontWeight: 500 }}>
+                                <div
+                                    style={{
+                                        fontWeight: 500,
+                                        color: isDarkMode
+                                            ? "#ffffff"
+                                            : "#333333",
+                                    }}
+                                >
                                     {node.youtubeMetadata?.title ||
                                         urlInfo.fullPath}
                                 </div>
                                 <div
-                                    style={{ fontSize: "12px", color: "#666" }}
+                                    style={{
+                                        fontSize: "12px",
+                                        color: isDarkMode
+                                            ? "#888888"
+                                            : "#666666",
+                                    }}
                                 >
                                     {urlInfo.domain}
                                 </div>

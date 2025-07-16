@@ -1,0 +1,402 @@
+/* Onboarding Overlay Styles */
+.onboarding-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.95);
+    /* backdrop-filter: blur(20px); */
+    z-index: 10000;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.onboarding-overlay.visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.onboarding-overlay.instructions-mode {
+    background: rgba(0, 0, 0, 0.1);
+    /* backdrop-filter: blur(2px); */
+}
+
+/* Welcome Screen Styles */
+.onboarding-welcome {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #fff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10001;
+}
+
+.welcome-content {
+    text-align: center;
+    max-width: 600px;
+    padding: 40px;
+    opacity: 0;
+    transform: translateY(20px);
+    animation: fadeInUp 0.8s ease forwards;
+}
+
+.welcome-content.fade-out {
+    animation: fadeOut 0.5s ease forwards;
+}
+
+.welcome-title {
+    font-size: 48px;
+    margin-bottom: 20px;
+    background: #4a90e2;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+}
+
+.welcome-subtitle {
+    font-size: 18px;
+    line-height: 1.6;
+    color: #ccc;
+    margin-bottom: 20px;
+}
+
+.welcome-instruction {
+    margin-top: 30px;
+    display: inline-block;
+    font-size: 14px;
+    color: #4a90e2;
+}
+
+/* Instruction Content Styles - Red Card Design */
+.onboarding-instruction {
+    position: absolute;
+    width: 300px;
+    height: 400px;
+    background: #ff6b6b;
+    border: none;
+    border-radius: 0;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+    transform: translateY(8px);
+    transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    z-index: 10001;
+    overflow: hidden;
+}
+
+.onboarding-instruction::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, #ff6b6b 0%, #ff8e8e 100%);
+    z-index: 1;
+}
+
+.onboarding-instruction::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 60%;
+    background: linear-gradient(
+        45deg,
+        rgba(255, 126, 126, 0.8) 0%,
+        rgba(255, 160, 160, 0.9) 50%,
+        rgba(255, 212, 212, 0.9) 100%
+    );
+    clip-path: polygon(0 30%, 100% 20%, 100% 100%, 0 100%);
+    z-index: 2;
+}
+
+.instruction-content {
+    position: relative;
+    padding: 30px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    z-index: 3;
+}
+
+.instruction-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 2rem;
+}
+
+.instruction-meta-line {
+    width: 40px;
+    height: 1px;
+    background-color: #ffffff;
+    transform: scaleX(0.5);
+    transform-origin: left;
+    transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.instruction-meta-text {
+    font-family: "Space Mono", monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+    color: #ffffff;
+    opacity: 0.8;
+    transform: translateX(-5px);
+    transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.instruction-title {
+    color: #ffffff;
+    margin-bottom: 8px;
+    font-size: 2rem;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    transform: translateY(10px);
+    opacity: 0.9;
+    transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.instruction-text {
+    color: #ffffff;
+    line-height: 1.6;
+    margin: 1.5rem 0;
+    font-size: 0.9rem;
+    font-weight: 400;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    opacity: 0.9;
+    transform: translateY(10px);
+    transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.instruction-navigation {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    margin-top: auto;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.instruction-arrow {
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    opacity: 0.9;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.instruction-progress {
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    opacity: 0.8;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+/* Hover animations */
+.onboarding-instruction:hover .instruction-title,
+.onboarding-instruction:hover .instruction-text {
+    transform: translateY(0);
+    opacity: 1;
+}
+
+.onboarding-instruction:hover .instruction-meta-line {
+    transform: scaleX(1);
+}
+
+.onboarding-instruction:hover .instruction-meta-text {
+    transform: translateX(0);
+    opacity: 1;
+}
+
+/* Component Highlighting Styles */
+.dashboard-component {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 12px;
+    position: relative;
+}
+
+.dashboard-component.onboarding-hidden {
+    opacity: 0.1;
+    filter: blur(8px);
+    pointer-events: none;
+}
+
+.dashboard-component.onboarding-visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.dashboard-component.onboarding-highlighted {
+    box-shadow: 0 0 0 3px #4a90e2;
+    transform: scale(1.02);
+    z-index: 100;
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* Skip Button */
+.onboarding-skip {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    color: #6b7280;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    z-index: 10002;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.onboarding-skip:hover {
+    background: #f9fafb;
+    border-color: #d1d5db;
+    color: #374151;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Progress Dots */
+.onboarding-progress-dots {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 8px;
+    z-index: 10002;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 8px 16px;
+    border-radius: 12px;
+    backdrop-filter: blur(8px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.progress-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #d1d5db;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.progress-dot.active {
+    background: #4a90e2;
+    transform: scale(1.2);
+}
+
+.progress-dot.completed {
+    background: #10b981;
+}
+
+.progress-dot:hover {
+    background: #9ca3af;
+    transform: scale(1.1);
+}
+
+.progress-dot.active:hover {
+    background: #4a90e2;
+    transform: scale(1.2);
+}
+
+/* Animations */
+@keyframes fadeInUp {
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fadeOut {
+    to {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+}
+
+/* Position-specific adjustments for card sizing */
+.onboarding-instruction.position-stories {
+    width: 400px;
+    height: 400px;
+}
+
+.onboarding-instruction.position-templates,
+.onboarding-instruction.position-timers,
+.onboarding-instruction.position-weekly-insights {
+    width: 320px;
+    height: 400px;
+}
+
+.onboarding-instruction.position-scrollable,
+.onboarding-instruction.position-shortcuts {
+    width: 280px;
+    height: 400px;
+}
+
+.onboarding-instruction.position-blocker,
+.onboarding-instruction.position-notes {
+    width: 360px;
+    height: 400px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+    .onboarding-instruction {
+        width: 300px !important;
+        height: 380px !important;
+    }
+
+    .welcome-title {
+        font-size: 36px;
+    }
+
+    .welcome-subtitle {
+        font-size: 16px;
+    }
+}
+
+@media (max-width: 768px) {
+    .onboarding-instruction {
+        width: 280px !important;
+        height: 360px !important;
+    }
+
+    .instruction-content {
+        padding: 20px;
+    }
+
+    .instruction-title {
+        font-size: 1.6rem;
+    }
+
+    .instruction-text {
+        font-size: 0.8rem;
+    }
+
+    .welcome-title {
+        font-size: 28px;
+    }
+
+    .welcome-subtitle {
+        font-size: 14px;
+    }
+}

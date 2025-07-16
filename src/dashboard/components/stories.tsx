@@ -13,7 +13,15 @@ const StoriesComponent: React.FC<StoriesComponentProps> = ({
     isDarkMode = false,
 }) => {
     const containerRef = useRef<HTMLDivElement>(null);
-    const { currentSession, isLoading } = useExtensionData();
+    const {
+        currentSession,
+        isLoading,
+        topDomains,
+        longestStreak,
+        longestBreak,
+        sleepPatterns,
+        wellnessScore,
+    } = useExtensionData();
     const intervalRef = useRef<number | undefined>(undefined);
 
     const [currentIndex, setCurrentIndex] = useState(0);
@@ -131,6 +139,11 @@ const StoriesComponent: React.FC<StoriesComponentProps> = ({
                             currentSession={currentSession}
                             cardType={type}
                             isDarkMode={isDarkMode}
+                            topDomains={topDomains}
+                            longestStreak={longestStreak}
+                            longestBreak={longestBreak}
+                            sleepPatterns={sleepPatterns}
+                            wellnessScore={wellnessScore}
                         />
                     </div>
                 ))}

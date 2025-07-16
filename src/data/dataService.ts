@@ -24,7 +24,7 @@ export interface SessionStats {
 
 // Daily browsing session containing all tab sessions for one day
 export interface BrowsingSession {
-    date: string; // 'YYYY-MM-DD'
+    date: string; // 'YYYY-MM-DD' - actual calendar date
     startTime: number; // First activity timestamp
     endTime: number; // Most recent activity timestamp
     tabSessions: TabSession[]; // All tab sessions for this day
@@ -53,9 +53,95 @@ class DataService {
         return DataService.instance;
     }
 
-    // Get or create today's browsing session
+    // Get the actual calendar date (no manipulation)
+    private getCurrentDateKey(): string {
+        return new Date().toISOString().split("T")[0];
+    }
+
+    // Get session window boundaries for filtering (27-hour window)
+    private getSessionWindow(): { start: number; end: number } {
+        const now = new Date();
+        const currentHour = now.getHours();
+
+        // If it's before 2 AM, we want data from yesterday midnight to today 3 AM
+        if (currentHour < 2) {
+            const yesterday = new Date(now);
+            yesterday.setDate(yesterday.getDate() - 1);
+            yesterday.setHours(0, 0, 0, 0); // Yesterday midnight
+
+            const endTime = new Date(now);
+            endTime.setHours(3, 0, 0, 0); // Today 3 AM
+
+            return {
+                start: yesterday.getTime(),
+                end: endTime.getTime(),
+            };
+        }
+
+        // If it's 2 AM or later, we want data from today midnight to tomorrow 3 AM
+        const startTime = new Date(now);
+        startTime.setHours(0, 0, 0, 0); // Today midnight
+
+        const tomorrow = new Date(now);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(3, 0, 0, 0); // Tomorrow 3 AM
+
+        return {
+            start: startTime.getTime(),
+            end: tomorrow.getTime(),
+        };
+    }
+
+    // Filter visits to only include those within the session window
+    private filterVisitsToSessionWindow(visits: UrlVisit[]): UrlVisit[] {
+        const { start, end } = this.getSessionWindow();
+        return visits.filter(
+            (visit) => visit.startTime >= start && visit.startTime <= end,
+        );
+    }
+
+    // Helper method to get readable day info for debugging
+    getCustomDayInfo(): {
+        currentDateKey: string;
+        sessionWindow: { start: number; end: number };
+        isAfter2AM: boolean;
+        currentHour: number;
+        explanation: string;
+    } {
+        const now = new Date();
+        const currentHour = now.getHours();
+        const isAfter2AM = currentHour >= 2;
+        const currentDateKey = this.getCurrentDateKey();
+        const sessionWindow = this.getSessionWindow();
+
+        const explanation = isAfter2AM
+            ? `It's ${currentHour}:${now
+                  .getMinutes()
+                  .toString()
+                  .padStart(
+                      2,
+                      "0",
+                  )} - showing data from today midnight to tomorrow 3 AM`
+            : `It's ${currentHour}:${now
+                  .getMinutes()
+                  .toString()
+                  .padStart(
+                      2,
+                      "0",
+                  )} (before 2 AM) - showing data from yesterday midnight to today 3 AM`;
+
+        return {
+            currentDateKey,
+            sessionWindow,
+            isAfter2AM,
+            currentHour,
+            explanation,
+        };
+    }
+
+    // Get or create today's browsing session (using actual calendar date)
     async getCurrentSession(): Promise<BrowsingSession> {
-        const today = new Date().toISOString().split("T")[0];
+        const today = this.getCurrentDateKey(); // Use actual calendar date
         const key = `session_${today}`;
 
         try {
@@ -73,7 +159,22 @@ class DataService {
                         uniqueUrls.size;
                     await this.saveSession(session);
                 }
-                return session;
+
+                // Filter visits to session window when returning data
+                const filteredSession = { ...session };
+                filteredSession.tabSessions = session.tabSessions
+                    .map((tabSession) => ({
+                        ...tabSession,
+                        urlVisits: this.filterVisitsToSessionWindow(
+                            tabSession.urlVisits,
+                        ),
+                    }))
+                    .filter((tabSession) => tabSession.urlVisits.length > 0);
+
+                // Recalculate stats for filtered data
+                this.updateSessionStats(filteredSession);
+
+                return filteredSession;
             }
         } catch (error) {
             console.error("Error loading session:", error);
@@ -81,7 +182,7 @@ class DataService {
 
         // Create new session if none exists
         const newSession: BrowsingSession = {
-            date: today,
+            date: today, // Use actual calendar date
             startTime: Date.now(),
             endTime: Date.now(),
             tabSessions: [],
@@ -102,72 +203,112 @@ class DataService {
 
     // Add or update a URL visit in the current session
     async addUrlVisit(visit: UrlVisit): Promise<void> {
-        const session = await this.getCurrentSession();
+        // Always store the visit with actual calendar date
+        const today = this.getCurrentDateKey();
+        const key = `session_${today}`;
 
-        // Find or create tab session
-        let tabSession = session.tabSessions.find(
-            (ts) => ts.tabId === visit.tabId,
-        );
-        if (!tabSession) {
-            tabSession = {
-                tabId: visit.tabId,
-                windowId: visit.windowId,
-                openedAt: visit.startTime,
-                totalActiveTime: 0,
-                urlVisits: [],
-            };
-            session.tabSessions.push(tabSession);
-        }
+        try {
+            const result = await chrome.storage.local.get(key);
+            let session = result[key] as BrowsingSession | undefined;
 
-        // Update or add the visit
-        const existingIndex = tabSession.urlVisits.findIndex(
-            (v) => v.id === visit.id,
-        );
-        if (existingIndex >= 0) {
-            tabSession.urlVisits[existingIndex] = visit;
-        } else {
-            tabSession.urlVisits.push(visit);
-        }
+            if (!session) {
+                session = {
+                    date: today,
+                    startTime: Date.now(),
+                    endTime: Date.now(),
+                    tabSessions: [],
+                    stats: {
+                        totalUrls: 0,
+                        uniqueUrls: 0,
+                        uniqueDomains: 0,
+                        workTime: 0,
+                        socialTime: 0,
+                        otherTime: 0,
+                        totalTime: 0,
+                    } as SessionStats,
+                };
+            }
 
-        // Update tab session total active time
-        tabSession.totalActiveTime = tabSession.urlVisits.reduce(
-            (total, v) => total + v.activeTime,
-            0,
-        );
+            // Find or create tab session
+            let tabSession = session.tabSessions.find(
+                (ts) => ts.tabId === visit.tabId,
+            );
+            if (!tabSession) {
+                tabSession = {
+                    tabId: visit.tabId,
+                    windowId: visit.windowId,
+                    openedAt: visit.startTime,
+                    totalActiveTime: 0,
+                    urlVisits: [],
+                };
+                session.tabSessions.push(tabSession);
+            }
 
-        // Update session stats and save
-        this.updateSessionStats(session);
-        await this.saveSession(session);
-    }
+            // Update or add the visit
+            const existingIndex = tabSession.urlVisits.findIndex(
+                (v) => v.id === visit.id,
+            );
+            if (existingIndex >= 0) {
+                tabSession.urlVisits[existingIndex] = visit;
+            } else {
+                tabSession.urlVisits.push(visit);
+            }
 
-    // Close a tab and finalize its session data
-    async closeTab(tabId: number): Promise<void> {
-        const session = await this.getCurrentSession();
-        const tabSession = session.tabSessions.find((ts) => ts.tabId === tabId);
-
-        if (tabSession) {
-            tabSession.closedAt = Date.now();
-
-            // Ensure all visits in this tab are properly ended
-            tabSession.urlVisits.forEach((visit) => {
-                if (!visit.endTime) {
-                    visit.endTime = Date.now();
-                    visit.duration = visit.endTime - visit.startTime;
-                }
-            });
-
-            // Recalculate final active time
+            // Update tab session total active time
             tabSession.totalActiveTime = tabSession.urlVisits.reduce(
                 (total, v) => total + v.activeTime,
                 0,
             );
 
+            // Update session stats and save (this saves ALL data, not filtered)
             this.updateSessionStats(session);
             await this.saveSession(session);
+        } catch (error) {
+            console.error("Error adding URL visit:", error);
         }
     }
 
-    // Get all URL visits from current session
+    // Close a tab and finalize its session data
+    async closeTab(tabId: number): Promise<void> {
+        const today = this.getCurrentDateKey();
+        const key = `session_${today}`;
+
+        try {
+            const result = await chrome.storage.local.get(key);
+            const session = result[key] as BrowsingSession | undefined;
+
+            if (!session) return;
+
+            const tabSession = session.tabSessions.find(
+                (ts) => ts.tabId === tabId,
+            );
+
+            if (tabSession) {
+                tabSession.closedAt = Date.now();
+
+                // Ensure all visits in this tab are properly ended
+                tabSession.urlVisits.forEach((visit) => {
+                    if (!visit.endTime) {
+                        visit.endTime = Date.now();
+                        visit.duration = visit.endTime - visit.startTime;
+                    }
+                });
+
+                // Recalculate final active time
+                tabSession.totalActiveTime = tabSession.urlVisits.reduce(
+                    (total, v) => total + v.activeTime,
+                    0,
+                );
+
+                this.updateSessionStats(session);
+                await this.saveSession(session);
+            }
+        } catch (error) {
+            console.error("Error closing tab:", error);
+        }
+    }
+
+    // Get all URL visits from current session (filtered to session window)
     async getAllUrlVisits(): Promise<UrlVisit[]> {
         const session = await this.getCurrentSession();
         return session.tabSessions.flatMap((ts) => ts.urlVisits);
@@ -345,9 +486,7 @@ class DataService {
 
     // Export session data for backup or analysis
     async exportSessionData(dateStr?: string): Promise<BrowsingSession | null> {
-        const key = `session_${
-            dateStr || new Date().toISOString().split("T")[0]
-        }`;
+        const key = `session_${dateStr || this.getCurrentDateKey()}`;
         try {
             const result = await chrome.storage.local.get(key);
             return result[key] || null;

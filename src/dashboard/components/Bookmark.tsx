@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Bookmark, Calendar, Clock, ExternalLink } from "lucide-react";
+import { Bookmark, ExternalLink } from "lucide-react";
 
 interface SmartBookmark {
     id: string;
@@ -204,13 +204,13 @@ const SmartBookmarks: React.FC<SmartBookmarksProps> = ({ isDarkMode }) => {
                                     }
                                 `}
                             >
-                                {/* Favicon - Larger Size */}
-                                <div className="w-12 h-12 rounded-lg overflow-hidden flex items-center justify-center">
+                                {/* Favicon - Smaller Size */}
+                                <div className="w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center">
                                     {getFavicon(bookmark.url) ? (
                                         <img
                                             src={getFavicon(bookmark.url) || ""}
                                             alt=""
-                                            className="w-10 h-10"
+                                            className="w-6 h-6"
                                             onError={(e) => {
                                                 e.currentTarget.style.display =
                                                     "none";
@@ -218,7 +218,7 @@ const SmartBookmarks: React.FC<SmartBookmarksProps> = ({ isDarkMode }) => {
                                         />
                                     ) : (
                                         <ExternalLink
-                                            size={24}
+                                            size={20}
                                             className={
                                                 isDarkMode
                                                     ? "text-white/60"

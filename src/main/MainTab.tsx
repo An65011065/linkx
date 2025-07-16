@@ -3,7 +3,15 @@ import Insights from "./Insights";
 import DashboardTab from "../dashboard/components/DashboardTab";
 import GraphVisualization from "../graph/components/GraphVisualization";
 import { downloadSessionData } from "../data/useExtensionData";
-import { Download, Sun, Moon } from "lucide-react";
+import {
+    Download,
+    Sun,
+    Moon,
+    HelpCircle,
+    Expand,
+    ArrowLeft,
+} from "lucide-react";
+import OnboardingOverlay from "../onboarding/OnboardingOverlay";
 import AuthService from "../services/authService";
 import type { AuthUser } from "../services/authService";
 import "./styles/sunlit-window.css";
@@ -26,6 +34,8 @@ const MainTab: React.FC = () => {
     const [isInputFocused, setIsInputFocused] = useState(false);
     const [windowWidth, setWindowWidth] = useState(window.innerWidth);
     const [isDarkMode, setIsDarkMode] = useState(true);
+    const [isNetworkExpanded, setIsNetworkExpanded] = useState(false);
+    const [showOnboarding, setShowOnboarding] = useState(false);
 
     // Add auth state and trial toggle
     const [user, setUser] = useState<AuthUser | null>(null);
@@ -164,6 +174,8 @@ const MainTab: React.FC = () => {
             setActiveTab(tabId);
             setNetworkLoaded(false);
         }
+        // Reset expansion when switching tabs
+        setIsNetworkExpanded(false);
     };
 
     // Reset animation state when leaving network tab
@@ -178,67 +190,84 @@ const MainTab: React.FC = () => {
         const baseStyle = {
             border: "1px solid rgba(255, 255, 255, 0.18)",
             borderRadius: "16px",
-            overflowY:
-                activeTab === "network"
-                    ? ("hidden" as const)
-                    : ("hidden" as const),
+            overflowY: "hidden" as const,
             overflowX: "hidden" as const,
             transition: "all 0.8s cubic-bezier(0.4, 0, 0.2, 1)",
             position: "relative" as const,
             zIndex: 10,
-            // Glass effect properties
             background: "rgba(255, 255, 255, 0.25)",
             boxShadow: "0 8px 32px rgba(31, 38, 135, 0.37)",
             backdropFilter: "blur(8px) saturate(100%)",
             WebkitBackdropFilter: "blur(8px) saturate(100%)",
         };
 
-        if (activeTab === "network") {
-            // Always use full size for network tab to prevent constraint issues
+        if (activeTab === "network" && isNetworkExpanded) {
             return {
                 ...baseStyle,
                 width: "100vw",
-                height: "95vh",
+                height: "100vh",
                 maxWidth: "none",
                 transform: "scale(1)",
-            };
-        } else {
-            // Fixed size for other tabs - maintain 1200px until screen width ≤ 1200px
-            const fixedWidth = 1200;
-            const shouldScale = windowWidth <= fixedWidth;
-
-            return {
-                ...baseStyle,
-                width: shouldScale ? "100vw" : `${fixedWidth}px`,
-                height: "100vh",
-                maxWidth: shouldScale ? "none" : `${fixedWidth}px`,
-                transform: shouldScale
-                    ? `scale(${windowWidth / fixedWidth})`
-                    : "scale(1)",
-                transformOrigin: "top center",
+                border: "none",
+                borderRadius: "0",
             };
         }
+
+        // Standard size for all other cases (including normal network tab)
+        const fixedWidth = 1200;
+        const shouldScale = windowWidth <= fixedWidth;
+        return {
+            ...baseStyle,
+            width: shouldScale ? "100vw" : `${fixedWidth}px`,
+            height: "100vh",
+            maxWidth: shouldScale ? "none" : `${fixedWidth}px`,
+            transform: shouldScale
+                ? `scale(${windowWidth / fixedWidth})`
+                : "scale(1)",
+            transformOrigin: "top center",
+        };
     };
 
     // Content components for each tab
     const renderTabContent = () => {
-        switch (activeTab) {
-            case "insights":
-                return <Insights onInputFocusChange={handleInputFocusChange} />;
-            case "dashboard":
-                return <DashboardTab isDarkMode={isDarkMode} />;
-            case "network":
-                return (
-                    <div
-                        className="w-full h-full opacity-0 transition-opacity duration-500 ease-in-out"
-                        style={{ opacity: networkLoaded ? 1 : 0 }}
-                    >
-                        <GraphVisualization />
-                    </div>
-                );
-            default:
-                return null;
-        }
+        console.log(
+            "Rendering content, helpMode:",
+            false, // Removed helpMode
+            "activeTab:",
+            activeTab,
+        );
+
+        const getBaseContent = () => {
+            switch (activeTab) {
+                case "insights":
+                    return (
+                        <Insights onInputFocusChange={handleInputFocusChange} />
+                    );
+                case "dashboard":
+                    return <DashboardTab isDarkMode={isDarkMode} />;
+                case "network":
+                    return (
+                        <div
+                            className="w-full h-full opacity-0 transition-opacity duration-500 ease-in-out"
+                            style={{ opacity: networkLoaded ? 1 : 0 }}
+                        >
+                            <GraphVisualization
+                                isDarkMode={isDarkMode}
+                                isExpanded={isNetworkExpanded}
+                                onExpandToggle={setIsNetworkExpanded}
+                            />
+                        </div>
+                    );
+                default:
+                    return null;
+            }
+        };
+
+        const baseContent = getBaseContent();
+
+        // If help mode is active, wrap content with help overlay
+        // Removed help mode logic
+        return baseContent;
     };
 
     return (
@@ -375,56 +404,74 @@ const MainTab: React.FC = () => {
                     cursor: not-allowed;
                     opacity: 0.6;
                 }
+                .help-button-container {
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    z-index: 1000;
+                    background: rgba(255, 255, 255, 0.9);
+                    padding: 8px;
+                    border-radius: 8px;
+                    backdrop-filter: blur(8px);
+                }
+                .help-button-active {
+                    background: #3b82f6 !important;
+                    color: white !important;
+                }
             `}</style>
             <div className="main-tab-container">
-                {/* Trial Control with Plan Display */}
-                <div className="trial-control">
-                    <label className="switch">
-                        <input
-                            type="checkbox"
-                            checked={isFreeTrial}
-                            onChange={(e) =>
-                                handleTrialToggle(e.target.checked)
-                            }
-                            disabled={user?.plan?.type !== "free"}
-                        />
-                        <span
-                            className={`slider ${
-                                user?.plan?.type !== "free" ? "disabled" : ""
-                            }`}
-                        ></span>
-                    </label>
-                    <div
-                        style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: "2px",
-                        }}
-                    >
-                        <span
+                {/* Trial Control - Hidden for now */}
+                {false && (
+                    <div className="trial-control">
+                        <label className="switch">
+                            <input
+                                type="checkbox"
+                                checked={isFreeTrial}
+                                onChange={(e) =>
+                                    handleTrialToggle(e.target.checked)
+                                }
+                                disabled={user?.plan?.type !== "free"}
+                            />
+                            <span
+                                className={`slider ${
+                                    user?.plan?.type !== "free"
+                                        ? "disabled"
+                                        : ""
+                                }`}
+                            ></span>
+                        </label>
+                        <div
                             style={{
-                                color: "#2d3436",
-                                fontFamily:
-                                    "system-ui, -apple-system, sans-serif",
-                                fontSize: "1rem",
-                                fontWeight: "600",
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: "2px",
                             }}
                         >
-                            Free Trial
-                        </span>
-                        <span
-                            style={{
-                                color: getPlanColor(),
-                                fontFamily:
-                                    "system-ui, -apple-system, sans-serif",
-                                fontSize: "12px",
-                                fontWeight: "700",
-                            }}
-                        >
-                            {getPlanDisplayText()}
-                        </span>
+                            <span
+                                style={{
+                                    color: "#2d3436",
+                                    fontFamily:
+                                        "system-ui, -apple-system, sans-serif",
+                                    fontSize: "1rem",
+                                    fontWeight: "600",
+                                }}
+                            >
+                                Free Trial
+                            </span>
+                            <span
+                                style={{
+                                    color: getPlanColor(),
+                                    fontFamily:
+                                        "system-ui, -apple-system, sans-serif",
+                                    fontSize: "12px",
+                                    fontWeight: "700",
+                                }}
+                            >
+                                {getPlanDisplayText()}
+                            </span>
+                        </div>
                     </div>
-                </div>
+                )}
 
                 {/* Animation Background Layer */}
                 <div
@@ -499,75 +546,124 @@ const MainTab: React.FC = () => {
                         </div>
                     </div>
                 </div>
+
                 {/* Content Layer */}
                 <div className="content-layer">
-                    {/* Tab Navigation Container */}
-                    <div
-                        className="flex justify-center items-center pt-10 mb-10 relative"
-                        style={{
-                            width: (() => {
-                                const fixedWidth = 1200;
-                                const shouldScale = windowWidth <= fixedWidth;
-                                return shouldScale
-                                    ? "100vw"
-                                    : `${fixedWidth}px`;
-                            })(),
-                            maxWidth: (() => {
-                                const fixedWidth = 1200;
-                                const shouldScale = windowWidth <= fixedWidth;
-                                return shouldScale ? "none" : `${fixedWidth}px`;
-                            })(),
-                        }}
-                    >
-                        {/* Tabs */}
-                        <div className="flex items-center gap-[60px]">
-                            {tabs.map((tab) => (
-                                <div
-                                    key={tab.id}
-                                    className="flex flex-col items-center cursor-pointer"
-                                >
-                                    {/* Circle Indicator */}
+                    {/* Tab Navigation Container - Hide for expanded network tab */}
+                    {!(activeTab === "network" && isNetworkExpanded) && (
+                        <div
+                            className="flex justify-center items-center pt-10 mb-10 relative"
+                            style={{
+                                width: (() => {
+                                    const fixedWidth = 1200;
+                                    const shouldScale =
+                                        windowWidth <= fixedWidth;
+                                    return shouldScale
+                                        ? "100vw"
+                                        : `${fixedWidth}px`;
+                                })(),
+                                maxWidth: (() => {
+                                    const fixedWidth = 1200;
+                                    const shouldScale =
+                                        windowWidth <= fixedWidth;
+                                    return shouldScale
+                                        ? "none"
+                                        : `${fixedWidth}px`;
+                                })(),
+                            }}
+                        >
+                            {/* Tabs */}
+                            <div className="flex items-center gap-[60px]">
+                                {tabs.map((tab) => (
                                     <div
-                                        className="w-2 h-2 rounded-full mb-0 transition-colors duration-200"
-                                        style={{
-                                            backgroundColor:
-                                                activeTab === tab.id
-                                                    ? "#d63031"
-                                                    : "transparent",
-                                        }}
-                                    />
-                                    {/* Tab Button */}
-                                    <button
-                                        onClick={() => handleTabClick(tab.id)}
-                                        className="bg-transparent border-none px-4 py-2 text-lg cursor-pointer transition-colors duration-200 outline-none"
-                                        style={{
-                                            fontFamily:
-                                                "system-ui, -apple-system, sans-serif",
-                                            fontWeight: "600",
-                                            color:
-                                                activeTab === tab.id
-                                                    ? "#2d3436"
-                                                    : "#636e72",
-                                        }}
-                                        onMouseEnter={(e) => {
-                                            if (activeTab !== tab.id) {
-                                                e.currentTarget.style.color =
-                                                    "#2d3436";
-                                            }
-                                        }}
-                                        onMouseLeave={(e) => {
-                                            if (activeTab !== tab.id) {
-                                                e.currentTarget.style.color =
-                                                    "#636e72";
-                                            }
-                                        }}
+                                        key={tab.id}
+                                        className="flex flex-col items-center cursor-pointer"
                                     >
-                                        {tab.label}
-                                    </button>
-                                </div>
-                            ))}
+                                        {/* Circle Indicator */}
+                                        <div
+                                            className="w-2 h-2 rounded-full mb-0 transition-colors duration-200"
+                                            style={{
+                                                backgroundColor:
+                                                    activeTab === tab.id
+                                                        ? "#d63031"
+                                                        : "transparent",
+                                            }}
+                                        />
+                                        {/* Tab Button */}
+                                        <button
+                                            onClick={() =>
+                                                handleTabClick(tab.id)
+                                            }
+                                            className="bg-transparent border-none px-4 py-2 text-lg cursor-pointer transition-colors duration-200 outline-none"
+                                            style={{
+                                                fontFamily:
+                                                    "system-ui, -apple-system, sans-serif",
+                                                fontWeight: "600",
+                                                color:
+                                                    activeTab === tab.id
+                                                        ? "#2d3436"
+                                                        : "#636e72",
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                if (activeTab !== tab.id) {
+                                                    e.currentTarget.style.color =
+                                                        "#2d3436";
+                                                }
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                if (activeTab !== tab.id) {
+                                                    e.currentTarget.style.color =
+                                                        "#636e72";
+                                                }
+                                            }}
+                                        >
+                                            {tab.label}
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
-                    </div>
+                    )}
+
+                    {/* Back Button for Expanded Network */}
+                    {activeTab === "network" && isNetworkExpanded && (
+                        <div
+                            style={{
+                                position: "fixed",
+                                top: "20px",
+                                left: "20px",
+                                zIndex: 1001,
+                            }}
+                        >
+                            <button
+                                onClick={() => setIsNetworkExpanded(false)}
+                                style={{
+                                    width: "40px",
+                                    height: "40px",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    background: "rgba(0, 0, 0, 0.7)",
+                                    borderRadius: "50%",
+                                    border: "none",
+                                    color: "#fff",
+                                    cursor: "pointer",
+                                    transition: "all 0.2s ease",
+                                }}
+                                title="Exit full screen"
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.background =
+                                        "rgba(0, 0, 0, 0.9)";
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.background =
+                                        "rgba(0, 0, 0, 0.7)";
+                                }}
+                            >
+                                <ArrowLeft size={20} />
+                            </button>
+                        </div>
+                    )}
 
                     {/* Glass View Window */}
                     <div style={getViewportStyle()}>
@@ -593,109 +689,133 @@ const MainTab: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Action Buttons - positioned outside content layer at bottom-right */}
-                {activeTab === "dashboard" && (
-                    <div
-                        className="fixed flex flex-col gap-0 z-20 -mb-0.5"
+                {/* Universal Action Buttons - Show on all tabs */}
+                <div
+                    className="fixed flex flex-col gap-0 z-20 -mb-0.5"
+                    style={{
+                        bottom: "0.5rem",
+                        right: (() => {
+                            if (activeTab === "network" && isNetworkExpanded) {
+                                return "20px"; // Fixed right margin when expanded
+                            }
+                            const fixedWidth = 1200;
+                            const shouldScale = windowWidth <= fixedWidth;
+                            if (shouldScale) {
+                                return "20px"; // Close to screen edge when scaled
+                            } else {
+                                const leftMargin =
+                                    (windowWidth - fixedWidth) / 2;
+                                return `${leftMargin - 40}px`; // Outside viewport
+                            }
+                        })(),
+                    }}
+                >
+                    {/* Dark Mode Toggle Button */}
+                    <button
+                        onClick={() => setIsDarkMode(!isDarkMode)}
+                        className="p-2 rounded-lg cursor-pointer transition-all duration-200 hover:bg-black/5 -mb-2"
                         style={{
-                            bottom: "0.5rem",
-                            right: (() => {
-                                const fixedWidth = 1200;
-                                const shouldScale = windowWidth <= fixedWidth;
-                                if (shouldScale) {
-                                    return "20px"; // Close to screen edge when scaled
-                                } else {
-                                    const leftMargin =
-                                        (windowWidth - fixedWidth) / 2;
-                                    return `${leftMargin - 40}px`; // 60px to the left of viewport (outside it)
-                                }
-                            })(),
+                            background: "transparent",
+                            border: "none",
+                            color: "#636e72",
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.color = "#000";
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.color = "#636e72";
                         }}
                     >
-                        {/* Dark Mode Toggle Button */}
+                        {isDarkMode ? <Moon size={20} /> : <Sun size={20} />}
+                    </button>
+
+                    {/* Help Button */}
+                    <button
+                        onClick={() => setShowOnboarding(true)}
+                        className="p-2 rounded-lg cursor-pointer transition-all duration-200 hover:bg-black/5 -mb-2"
+                        style={{
+                            background: "transparent",
+                            border: "none",
+                            color: "#636e72",
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.color = "#000";
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.color = "#636e72";
+                        }}
+                    >
+                        <HelpCircle size={20} />
+                    </button>
+
+                    {/* Download Button */}
+                    <div className="relative">
                         <button
-                            onClick={() => setIsDarkMode(!isDarkMode)}
-                            className="p-2 rounded-lg cursor-pointer transition-all duration-200 hover:bg-black/5 -mb-2"
+                            onClick={() =>
+                                setShowDownloadMenu(!showDownloadMenu)
+                            }
+                            onBlur={() =>
+                                setTimeout(
+                                    () => setShowDownloadMenu(false),
+                                    200,
+                                )
+                            }
+                            className="p-2 rounded-lg cursor-pointer transition-all duration-200 hover:bg-black/5"
                             style={{
                                 background: "transparent",
                                 border: "none",
                                 color: "#636e72",
                             }}
                             onMouseEnter={(e) => {
-                                e.currentTarget.style.color = "#000";
+                                e.currentTarget.style.color = "#2d3436";
                             }}
                             onMouseLeave={(e) => {
                                 e.currentTarget.style.color = "#636e72";
                             }}
                         >
-                            {isDarkMode ? (
-                                <Moon size={20} />
-                            ) : (
-                                <Sun size={20} />
-                            )}
+                            <Download size={20} />
                         </button>
-
-                        {/* Download Button */}
-                        <div className="relative">
-                            <button
-                                onClick={() =>
-                                    setShowDownloadMenu(!showDownloadMenu)
-                                }
-                                onBlur={() =>
-                                    setTimeout(
-                                        () => setShowDownloadMenu(false),
-                                        200,
-                                    )
-                                }
-                                className="p-2 rounded-lg cursor-pointer transition-all duration-200 hover:bg-black/5"
-                                style={{
-                                    background: "transparent",
-                                    border: "none",
-                                    color: "#636e72",
-                                }}
-                                onMouseEnter={(e) => {
-                                    e.currentTarget.style.color = "#2d3436";
-                                }}
-                                onMouseLeave={(e) => {
-                                    e.currentTarget.style.color = "#636e72";
-                                }}
-                            >
-                                <Download size={20} />
-                            </button>
-                            {showDownloadMenu && (
-                                <div className="absolute bottom-full right-0 mb-2 bg-white border border-gray-200 rounded-lg py-2 shadow-lg z-[1000] min-w-[140px]">
-                                    <div
-                                        className="px-4 py-2 text-sm text-[#2d3436] cursor-pointer transition-colors duration-200 whitespace-nowrap hover:bg-[#f8f9fa]"
-                                        style={{
-                                            fontFamily:
-                                                "system-ui, -apple-system, sans-serif",
-                                            fontWeight: "600",
-                                        }}
-                                        onClick={() => {
-                                            downloadSessionData("json");
-                                            setShowDownloadMenu(false);
-                                        }}
-                                    >
-                                        Download as JSON
-                                    </div>
-                                    <div
-                                        className="px-4 py-2 text-sm text-[#2d3436] cursor-pointer transition-colors duration-200 whitespace-nowrap hover:bg-[#f8f9fa]"
-                                        style={{
-                                            fontFamily:
-                                                "system-ui, -apple-system, sans-serif",
-                                            fontWeight: "600",
-                                        }}
-                                        onClick={() => {
-                                            downloadSessionData("csv");
-                                            setShowDownloadMenu(false);
-                                        }}
-                                    >
-                                        Download as CSV
-                                    </div>
+                        {showDownloadMenu && (
+                            <div className="absolute bottom-full right-0 mb-2 bg-white border border-gray-200 rounded-lg py-2 shadow-lg z-[1000] min-w-[140px]">
+                                <div
+                                    className="px-4 py-2 text-sm text-[#2d3436] cursor-pointer transition-colors duration-200 whitespace-nowrap hover:bg-[#f8f9fa]"
+                                    style={{
+                                        fontFamily:
+                                            "system-ui, -apple-system, sans-serif",
+                                        fontWeight: "600",
+                                    }}
+                                    onClick={() => {
+                                        downloadSessionData("json");
+                                        setShowDownloadMenu(false);
+                                    }}
+                                >
+                                    Download as JSON
                                 </div>
-                            )}
-                        </div>
+                                <div
+                                    className="px-4 py-2 text-sm text-[#2d3436] cursor-pointer transition-colors duration-200 whitespace-nowrap hover:bg-[#f8f9fa]"
+                                    style={{
+                                        fontFamily:
+                                            "system-ui, -apple-system, sans-serif",
+                                        fontWeight: "600",
+                                    }}
+                                    onClick={() => {
+                                        downloadSessionData("csv");
+                                        setShowDownloadMenu(false);
+                                    }}
+                                >
+                                    Download as CSV
+                                </div>
+                            </div>
+                        )}
                     </div>
+                </div>
+
+                {/* Onboarding Overlay */}
+                {showOnboarding && (
+                    <OnboardingOverlay
+                        onClose={() => setShowOnboarding(false)}
+                        isDarkMode={isDarkMode}
+                    />
                 )}
             </div>
         </>

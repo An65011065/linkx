@@ -8,7 +8,9 @@ interface WeeklyInsightsProps {
 const WeeklyInsights: React.FC<WeeklyInsightsProps> = ({
     isDarkMode = false,
 }) => {
-    const [viewMode, setViewMode] = useState<"scores" | "screenTime">("scores");
+    const [viewMode, setViewMode] = useState<"scores" | "screenTime">(
+        "screenTime",
+    ); // Default to screenTime
     const [data, setData] = useState<{
         scores: number[];
         screenTime: number[];
@@ -359,64 +361,94 @@ const WeeklyInsights: React.FC<WeeklyInsightsProps> = ({
                         >
                             Weekly Scores
                         </h2>
-                        {/* Toggle */}
+
+                        {/* Simple Toggle */}
                         <div
                             style={{
-                                display: "flex",
-                                gap: "2px",
+                                position: "relative",
+                                display: "inline-flex",
                                 background: "rgba(255, 255, 255, 0.05)",
                                 border: "1px solid rgba(255, 255, 255, 0.1)",
-                                borderRadius: "16px",
-                                padding: "4px",
+                                borderRadius: "20px",
+                                padding: "3px",
+                                width: "180px",
+                                height: "32px",
                             }}
                         >
-                            <button
-                                onClick={() => setViewMode("scores")}
+                            {/* Sliding Background */}
+                            <div
                                 style={{
-                                    padding: "4px 12px",
-                                    fontSize: "11px",
-                                    fontWeight: "500",
-                                    border: "none",
-                                    borderRadius: "12px",
-                                    cursor: "pointer",
-                                    transition: "all 0.2s ease",
-                                    background:
-                                        viewMode === "scores"
-                                            ? "#4285f4"
-                                            : "transparent",
-                                    color:
-                                        viewMode === "scores"
-                                            ? "white"
-                                            : "rgba(255, 255, 255, 0.7)",
-                                    fontFamily:
-                                        "system-ui, -apple-system, sans-serif",
+                                    position: "absolute",
+                                    top: "3px",
+                                    left:
+                                        viewMode === "screenTime"
+                                            ? "3px"
+                                            : "50%",
+                                    width: "calc(50% - 3px)",
+                                    height: "calc(100% - 6px)",
+                                    background: "#4285f4",
+                                    borderRadius: "17px",
+                                    transition: "left 0.25s ease-out",
+                                    boxShadow: "0 1px 3px rgba(0, 0, 0, 0.3)",
                                 }}
-                            >
-                                Wellness
-                            </button>
+                            />
+
+                            {/* Screen Time Button */}
                             <button
                                 onClick={() => setViewMode("screenTime")}
                                 style={{
-                                    padding: "4px 12px",
+                                    position: "relative",
+                                    zIndex: 2,
+                                    width: "50%",
+                                    height: "100%",
+                                    background: "transparent",
+                                    border: "none",
+                                    borderRadius: "17px",
+                                    cursor: "pointer",
                                     fontSize: "11px",
                                     fontWeight: "500",
-                                    border: "none",
-                                    borderRadius: "12px",
-                                    cursor: "pointer",
-                                    transition: "all 0.2s ease",
-                                    background:
-                                        viewMode === "screenTime"
-                                            ? "#4285f4"
-                                            : "transparent",
                                     color:
                                         viewMode === "screenTime"
-                                            ? "white"
-                                            : "rgba(255, 255, 255, 0.7)",
+                                            ? "#ffffff"
+                                            : "rgba(255, 255, 255, 0.6)",
+                                    transition: "color 0.25s ease-out",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
                                     fontFamily:
                                         "system-ui, -apple-system, sans-serif",
                                 }}
                             >
                                 Screen Time
+                            </button>
+
+                            {/* Wellness Button */}
+                            <button
+                                onClick={() => setViewMode("scores")}
+                                style={{
+                                    position: "relative",
+                                    zIndex: 2,
+                                    width: "50%",
+                                    height: "100%",
+                                    background: "transparent",
+                                    border: "none",
+                                    borderRadius: "17px",
+                                    cursor: "pointer",
+                                    fontSize: "11px",
+                                    fontWeight: "500",
+                                    color:
+                                        viewMode === "scores"
+                                            ? "#ffffff"
+                                            : "rgba(255, 255, 255, 0.6)",
+                                    transition: "color 0.25s ease-out",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    fontFamily:
+                                        "system-ui, -apple-system, sans-serif",
+                                }}
+                            >
+                                Wellness
                             </button>
                         </div>
                     </div>
@@ -629,27 +661,87 @@ const WeeklyInsights: React.FC<WeeklyInsightsProps> = ({
                 <h2 className="text-lg font-medium text-black m-0">
                     Weekly Scores
                 </h2>
-                {/* Toggle matching StoryCard button style */}
-                <div className="flex gap-0.5 bg-white border border-gray-200 rounded-full p-1">
-                    <button
-                        onClick={() => setViewMode("scores")}
-                        className={`px-3 py-1 text-xs font-medium border-none rounded-full cursor-pointer transition-all duration-200 ${
-                            viewMode === "scores"
-                                ? "bg-gray-100 text-black"
-                                : "bg-transparent text-gray-600 hover:text-black"
-                        }`}
-                    >
-                        Wellness
-                    </button>
+
+                {/* Simple Toggle */}
+                <div
+                    style={{
+                        position: "relative",
+                        display: "inline-flex",
+                        background: "#f3f4f6",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "20px",
+                        padding: "3px",
+                        width: "180px",
+                        height: "32px",
+                    }}
+                >
+                    {/* Sliding Background */}
+                    <div
+                        style={{
+                            position: "absolute",
+                            top: "3px",
+                            left: viewMode === "screenTime" ? "3px" : "50%",
+                            width: "calc(50% - 3px)",
+                            height: "calc(100% - 6px)",
+                            background: "#ffffff",
+                            borderRadius: "17px",
+                            transition: "left 0.25s ease-out",
+                            boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)",
+                        }}
+                    />
+
+                    {/* Screen Time Button */}
                     <button
                         onClick={() => setViewMode("screenTime")}
-                        className={`px-3 py-1 text-xs font-medium border-none rounded-full cursor-pointer transition-all duration-200 ${
-                            viewMode === "screenTime"
-                                ? "bg-gray-100 text-black"
-                                : "bg-transparent text-gray-600 hover:text-black"
-                        }`}
+                        style={{
+                            position: "relative",
+                            zIndex: 2,
+                            width: "50%",
+                            height: "100%",
+                            background: "transparent",
+                            border: "none",
+                            borderRadius: "17px",
+                            cursor: "pointer",
+                            fontSize: "11px",
+                            fontWeight: "500",
+                            color:
+                                viewMode === "screenTime"
+                                    ? "#000000"
+                                    : "#6b7280",
+                            transition: "color 0.25s ease-out",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontFamily: "system-ui, -apple-system, sans-serif",
+                        }}
                     >
                         Screen Time
+                    </button>
+
+                    {/* Wellness Button */}
+                    <button
+                        onClick={() => setViewMode("scores")}
+                        style={{
+                            position: "relative",
+                            zIndex: 2,
+                            width: "50%",
+                            height: "100%",
+                            background: "transparent",
+                            border: "none",
+                            borderRadius: "17px",
+                            cursor: "pointer",
+                            fontSize: "11px",
+                            fontWeight: "500",
+                            color:
+                                viewMode === "scores" ? "#000000" : "#6b7280",
+                            transition: "color 0.25s ease-out",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontFamily: "system-ui, -apple-system, sans-serif",
+                        }}
+                    >
+                        Wellness
                     </button>
                 </div>
             </div>

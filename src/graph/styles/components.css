@@ -17,10 +17,7 @@
 
 /* Node and link animations */
 .node circle {
-    transition:
-        r 0.3s ease-out,
-        fill 0.3s ease-out,
-        stroke 0.3s ease-out;
+    transition: r 0.3s ease-out, fill 0.3s ease-out, stroke 0.3s ease-out;
     will-change: transform;
 }
 
@@ -31,9 +28,7 @@
 }
 
 .links path {
-    transition:
-        stroke-width 0.3s ease-out,
-        opacity 0.3s ease-out;
+    transition: stroke-width 0.3s ease-out, opacity 0.3s ease-out;
     will-change: d, opacity;
 }
 
@@ -47,9 +42,7 @@
 .cluster-hull {
     pointer-events: none;
     z-index: 1;
-    transition:
-        d 0.3s ease-out,
-        opacity 0.3s ease-out;
+    transition: d 0.3s ease-out, opacity 0.3s ease-out;
     will-change: d, opacity;
 }
 
@@ -246,4 +239,16 @@
 
 .nodes circle:hover {
     stroke-width: 5px;
+}
+
+/* Evolution Player Animations */
+@keyframes dropdownFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-4px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
 }

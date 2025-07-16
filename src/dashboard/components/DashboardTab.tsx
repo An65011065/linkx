@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import StoriesComponent from "./stories";
-import GhostTab from "./GhostTab";
 import Shortcuts from "./Shortcuts";
 // import WebsiteBlocker from "./WebsiteBlocker";
 // import NotesOverview from "./NotesOverview";
@@ -13,7 +12,6 @@ import Templates from "./Templates";
 // import Shortcuts from "./light-mode/Shortcuts";
 import WebsiteBlocker from "./WebsiteBlocker";
 import NotesOverview from "./NotesOverview";
-import SmartBookmarks from "./Bookmark";
 import ScrollableContainer from "./ScrollableContainer";
 
 interface DashboardTabProps {
@@ -196,7 +194,11 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ isDarkMode = true }) => {
                             gap: "10px",
                         }}
                     >
-                        <div style={{ width: "70%", height: "100%" }}>
+                        <div
+                            style={{ width: "70%", height: "100%" }}
+                            id="stories-component"
+                            className="dashboard-component"
+                        >
                             <StoriesComponent isDarkMode={isDarkMode} />
                         </div>
                         <div
@@ -208,13 +210,25 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ isDarkMode = true }) => {
                                 gap: "0.4rem",
                             }}
                         >
-                            <div style={{ height: "25%" }}>
+                            <div
+                                style={{ height: "25%" }}
+                                id="templates-component"
+                                className="dashboard-component"
+                            >
                                 <Templates isDarkMode={isDarkMode} />
                             </div>
-                            <div style={{ height: "25%" }}>
+                            <div
+                                style={{ height: "25%" }}
+                                id="timers-component"
+                                className="dashboard-component"
+                            >
                                 <Timers isDarkMode={isDarkMode} />
                             </div>
-                            <div style={{ height: "46%" }}>
+                            <div
+                                style={{ height: "46%" }}
+                                id="weekly-insights-component"
+                                className="dashboard-component"
+                            >
                                 <WeeklyInsights isDarkMode={isDarkMode} />
                             </div>
 
@@ -245,21 +259,42 @@ const DashboardTab: React.FC<DashboardTabProps> = ({ isDarkMode = true }) => {
                                 // border: "1px solid white",
                             }}
                         >
-                            <div style={{ height: "60%" }}>
+                            <div
+                                style={{ height: "60%" }}
+                                id="scrollable-component"
+                                className="dashboard-component"
+                            >
                                 <ScrollableContainer isDarkMode={isDarkMode} />
                             </div>
-                            <div style={{ height: "40%" }}>
+                            <div
+                                style={{ height: "40%" }}
+                                id="shortcuts-component"
+                                className="dashboard-component"
+                            >
                                 <Shortcuts isDarkMode={isDarkMode} />
                             </div>
                         </div>
 
                         {/* Column 2: Website Blocker (37% width) */}
-                        <div style={{ width: "37%", height: "100%" }}>
+                        <div
+                            style={{
+                                width: "37%",
+                                height: "100%",
+                                display: "flex",
+                                flexDirection: "column",
+                            }}
+                            id="blocker-component"
+                            className="dashboard-component"
+                        >
                             <WebsiteBlocker isDarkMode={isDarkMode} />
                         </div>
 
                         {/* Column 3: Notes Overview (38% width) */}
-                        <div style={{ width: "38%", height: "100%" }}>
+                        <div
+                            style={{ width: "38%", height: "100%" }}
+                            id="notes-component"
+                            className="dashboard-component"
+                        >
                             <NotesOverview isDarkMode={isDarkMode} />
                         </div>
                     </div>

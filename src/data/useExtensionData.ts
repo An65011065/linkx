@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import DataService from "./dataService";
 import type { BrowsingSession, TabSession } from "./dataService";
 
@@ -42,6 +42,32 @@ interface DetailedVisitAnalytics {
     }>;
 }
 
+// New interfaces for StoryCard optimizations
+interface DomainStats {
+    count: number;
+    favicon: string;
+}
+
+interface FocusStreak {
+    time: number;
+    startTime: number;
+    domains: Map<string, DomainStats>;
+    urls: string[];
+}
+
+interface SleepPatterns {
+    lastActivityTime: number;
+    firstActivityTime: number;
+    estimatedSleepHours: number;
+    lateNightActivity: boolean;
+}
+
+interface BreakInfo {
+    start: number;
+    end: number;
+    duration: number;
+}
+
 export function useExtensionData() {
     const [currentSession, setCurrentSession] =
         useState<BrowsingSession | null>(null);
@@ -56,14 +82,308 @@ export function useExtensionData() {
 
     const dataService = DataService.getInstance();
 
+    // Memoized calculations for StoryCard components
+    const storyCardData = useMemo(() => {
+        if (!currentSession) {
+            return {
+                topDomains: [],
+                longestStreak: {
+                    time: 0,
+                    startTime: 0,
+                    domains: new Map(),
+                    urls: [],
+                },
+                longestBreak: { start: 0, end: 0, duration: 0 },
+                sleepPatterns: {
+                    lastActivityTime: 0,
+                    firstActivityTime: 0,
+                    estimatedSleepHours: 0,
+                    lateNightActivity: false,
+                },
+                wellnessScore: 0,
+            };
+        }
+
+        // Calculate top domains (from StoryCard)
+        const getTopDomains = () => {
+            const domainTimes: Record<string, number> = {};
+            currentSession.tabSessions.forEach((tab) => {
+                tab.urlVisits.forEach((visit) => {
+                    domainTimes[visit.domain] =
+                        (domainTimes[visit.domain] || 0) + visit.activeTime;
+                });
+            });
+            return Object.entries(domainTimes)
+                .sort(([, a], [, b]) => b - a)
+                .slice(0, 12)
+                .map(([domain, time]) => ({ domain, time }));
+        };
+
+        // Calculate longest focus streak (from StoryCard)
+        const getLongestStreak = (): FocusStreak => {
+            const allVisits = currentSession.tabSessions
+                .flatMap((tab) => tab.urlVisits)
+                .filter((visit) => visit.activeTime > 0)
+                .sort((a, b) => a.startTime - b.startTime);
+
+            if (allVisits.length === 0) {
+                return { time: 0, startTime: 0, domains: new Map(), urls: [] };
+            }
+
+            const MAX_GAP_BETWEEN_SESSIONS = 10 * 60 * 1000;
+            let longestStreak: FocusStreak = {
+                time: 0,
+                startTime: 0,
+                domains: new Map(),
+                urls: [],
+            };
+            let currentStreak: FocusStreak = {
+                time: 0,
+                startTime: 0,
+                domains: new Map(),
+                urls: [],
+            };
+            let lastVisitEnd = 0;
+
+            allVisits.forEach((visit) => {
+                const gapFromLastVisit = visit.startTime - lastVisitEnd;
+                const visitEnd = visit.startTime + visit.activeTime;
+
+                if (gapFromLastVisit <= MAX_GAP_BETWEEN_SESSIONS) {
+                    currentStreak.time += visit.activeTime;
+                    const domainCount = currentStreak.domains.get(
+                        visit.domain,
+                    ) || {
+                        count: 0,
+                        favicon: `https://www.google.com/s2/favicons?domain=${visit.domain}&sz=32`,
+                    };
+                    domainCount.count++;
+                    currentStreak.domains.set(visit.domain, domainCount);
+                    currentStreak.urls.push(visit.url);
+                } else {
+                    if (currentStreak.time > longestStreak.time) {
+                        longestStreak = {
+                            time: currentStreak.time,
+                            startTime: currentStreak.startTime,
+                            domains: new Map(currentStreak.domains),
+                            urls: [...currentStreak.urls],
+                        };
+                    }
+                    currentStreak = {
+                        time: visit.activeTime,
+                        startTime: visit.startTime,
+                        domains: new Map([
+                            [
+                                visit.domain,
+                                {
+                                    count: 1,
+                                    favicon: `https://www.google.com/s2/favicons?domain=${visit.domain}&sz=32`,
+                                },
+                            ],
+                        ]),
+                        urls: [visit.url],
+                    };
+                }
+                lastVisitEnd = visitEnd;
+            });
+
+            if (currentStreak.time > longestStreak.time) {
+                longestStreak = {
+                    time: currentStreak.time,
+                    startTime: currentStreak.startTime,
+                    domains: new Map(currentStreak.domains),
+                    urls: [...currentStreak.urls],
+                };
+            }
+
+            return longestStreak;
+        };
+
+        // Calculate longest break (from StoryCard)
+        const getLongestBreak = (): BreakInfo => {
+            interface TimeRange {
+                start: number;
+                end: number;
+            }
+
+            const allVisits: TimeRange[] = currentSession.tabSessions
+                .flatMap((tab) => tab.urlVisits)
+                .filter((visit) => visit.activeTime > 0)
+                .map((visit) => ({
+                    start: visit.startTime,
+                    end: visit.endTime || visit.startTime + visit.activeTime,
+                }))
+                .sort((a, b) => a.start - b.start);
+
+            if (allVisits.length === 0) {
+                return { start: 0, end: 0, duration: 0 };
+            }
+
+            const now = Date.now();
+            const twentyFourHoursAgo = now - 24 * 60 * 60 * 1000;
+            const recentVisits: TimeRange[] = allVisits.filter(
+                (visit) => visit.end > twentyFourHoursAgo && visit.start < now,
+            );
+
+            if (recentVisits.length === 0) {
+                return { start: 0, end: 0, duration: 0 };
+            }
+
+            const SAME_SESSION_GAP = 10 * 60 * 1000;
+            const sessions: TimeRange[] = [];
+            let activeSession: TimeRange = { ...recentVisits[0] };
+
+            for (let i = 1; i < recentVisits.length; i++) {
+                const visit = recentVisits[i];
+                if (visit.start <= activeSession.end + SAME_SESSION_GAP) {
+                    activeSession.end = Math.max(activeSession.end, visit.end);
+                } else {
+                    sessions.push(activeSession);
+                    activeSession = { ...visit };
+                }
+            }
+            sessions.push(activeSession);
+
+            let longestBreak: BreakInfo = { start: 0, end: 0, duration: 0 };
+
+            for (let i = 0; i < sessions.length - 1; i++) {
+                const session = sessions[i];
+                const nextSession = sessions[i + 1];
+                const breakDuration = nextSession.start - session.end;
+
+                if (
+                    breakDuration > SAME_SESSION_GAP &&
+                    breakDuration > longestBreak.duration
+                ) {
+                    longestBreak = {
+                        start: session.end,
+                        end: nextSession.start,
+                        duration: breakDuration,
+                    };
+                }
+            }
+
+            return longestBreak;
+        };
+
+        // Analyze sleep patterns (from StoryCard)
+        const analyzeSleepPatterns = (): SleepPatterns => {
+            const allVisits = currentSession.tabSessions
+                .flatMap((tab) => tab.urlVisits)
+                .filter((visit) => visit.activeTime > 0)
+                .sort((a, b) => a.startTime - b.startTime);
+
+            if (allVisits.length === 0) {
+                return {
+                    lastActivityTime: 0,
+                    firstActivityTime: 0,
+                    estimatedSleepHours: 0,
+                    lateNightActivity: false,
+                };
+            }
+
+            const today = new Date();
+            const todayStart = new Date(
+                today.getFullYear(),
+                today.getMonth(),
+                today.getDate(),
+            );
+
+            let lastActivityTime = 0;
+            allVisits.forEach((visit) => {
+                const visitEndTime =
+                    visit.endTime || visit.startTime + visit.activeTime;
+                if (visitEndTime > lastActivityTime) {
+                    lastActivityTime = visitEndTime;
+                }
+            });
+
+            const todayVisits = allVisits.filter(
+                (visit) => visit.startTime >= todayStart.getTime(),
+            );
+            const firstActivityTime =
+                todayVisits.length > 0
+                    ? todayVisits[0].startTime
+                    : todayStart.getTime();
+
+            const lastActivityDate = new Date(lastActivityTime);
+            let estimatedSleepHours = 0;
+            if (lastActivityDate.getDate() === today.getDate()) {
+                const bedTime = Math.max(
+                    lastActivityTime,
+                    todayStart.getTime(),
+                );
+                estimatedSleepHours = Math.max(
+                    0,
+                    (firstActivityTime - bedTime) / (1000 * 60 * 60),
+                );
+            } else {
+                estimatedSleepHours = Math.max(
+                    0,
+                    (firstActivityTime - lastActivityTime) / (1000 * 60 * 60),
+                );
+            }
+
+            const lateNightActivity = allVisits.some((visit) => {
+                const visitDate = new Date(visit.startTime);
+                const hour = visitDate.getHours();
+                return hour >= 0 && hour < 5;
+            });
+
+            return {
+                lastActivityTime,
+                firstActivityTime,
+                estimatedSleepHours: Math.min(estimatedSleepHours, 12),
+                lateNightActivity,
+            };
+        };
+
+        // Calculate wellness score
+        const calculateWellnessScore = (): number => {
+            const baseScore =
+                dataService.calculateDigitalWellnessScore(currentSession);
+            const sleepData = analyzeSleepPatterns();
+            let sleepBonus = 0;
+            let sleepPenalty = 0;
+
+            if (sleepData.estimatedSleepHours >= 5) {
+                const extraHours = sleepData.estimatedSleepHours - 5;
+                sleepBonus = Math.min(extraHours * 2, 10);
+            }
+
+            if (sleepData.lateNightActivity) {
+                sleepPenalty = 15;
+            }
+
+            if (
+                sleepData.estimatedSleepHours > 0 &&
+                sleepData.estimatedSleepHours < 5
+            ) {
+                const missedHours = 5 - sleepData.estimatedSleepHours;
+                sleepPenalty += missedHours * 3;
+            }
+
+            return Math.max(
+                0,
+                Math.min(100, baseScore + sleepBonus - sleepPenalty),
+            );
+        };
+
+        return {
+            topDomains: getTopDomains(),
+            longestStreak: getLongestStreak(),
+            longestBreak: getLongestBreak(),
+            sleepPatterns: analyzeSleepPatterns(),
+            wellnessScore: calculateWellnessScore(),
+        };
+    }, [currentSession, dataService]);
+
     useEffect(() => {
         let mounted = true;
-
         const fetchData = async () => {
             try {
                 setIsLoading(true);
                 setError(null);
-
                 const [
                     session,
                     tabs,
@@ -77,7 +397,6 @@ export function useExtensionData() {
                     dataService.getTimeEfficiencyAnalytics(),
                     dataService.getDetailedVisitAnalytics(),
                 ]);
-
                 if (mounted) {
                     setCurrentSession(session);
                     setRecentTabs(tabs);
@@ -101,9 +420,7 @@ export function useExtensionData() {
         };
 
         fetchData();
-
-        // Set up periodic refresh
-        const refreshInterval = setInterval(fetchData, 30000); // Refresh every 30 seconds
+        const refreshInterval = setInterval(fetchData, 30000);
 
         return () => {
             mounted = false;
@@ -122,7 +439,6 @@ export function useExtensionData() {
                     dataService.getTimeEfficiencyAnalytics(),
                     dataService.getDetailedVisitAnalytics(),
                 ]);
-
             setCurrentSession(session);
             setRecentTabs(tabs);
             setAnalytics(analyticsData);
@@ -149,6 +465,8 @@ export function useExtensionData() {
         isLoading,
         error,
         refreshData,
+        // New optimized data for StoryCard
+        ...storyCardData,
     };
 }
 
@@ -157,7 +475,6 @@ export const formatDuration = (milliseconds: number): string => {
     const seconds = Math.floor(milliseconds / 1000);
     const minutes = Math.floor(seconds / 60);
     const hours = Math.floor(minutes / 60);
-
     if (hours > 0) {
         return `${hours}h ${minutes % 60}m`;
     } else if (minutes > 0) {
@@ -180,11 +497,9 @@ export const formatUrl = (url: string): string => {
 // Get category breakdown as percentages
 export const getCategoryBreakdown = (stats: BrowsingSession["stats"]) => {
     const { workTime, socialTime, otherTime, totalTime } = stats;
-
     if (totalTime === 0) {
         return { work: 0, social: 0, other: 0 };
     }
-
     return {
         work: Math.round((workTime / totalTime) * 100),
         social: Math.round((socialTime / totalTime) * 100),
@@ -198,7 +513,6 @@ export const getTopDomains = (
     limit: number = 5,
 ) => {
     if (!analytics?.topDomains) return [];
-
     return analytics.topDomains.slice(0, limit).map((domain) => ({
         ...domain,
         formattedTime: formatDuration(domain.time),
@@ -216,7 +530,6 @@ export const getActivitySummary = (recentActivity: TabSession[]) => {
         (sum, tab) => sum + tab.totalActiveTime,
         0,
     );
-
     const categoryTimes = recentActivity.reduce(
         (acc, tab) => {
             tab.urlVisits.forEach((visit) => {
@@ -226,7 +539,6 @@ export const getActivitySummary = (recentActivity: TabSession[]) => {
         },
         { work: 0, social: 0, other: 0 },
     );
-
     return {
         totalTabs,
         totalUrls: recentActivity.reduce(
@@ -249,9 +561,7 @@ export const getNavigationInsights = (
     detailedAnalytics: DetailedVisitAnalytics | null,
 ) => {
     if (!analytics || !detailedAnalytics) return [];
-
     const insights = [];
-
     // Hyperlink vs chain navigation
     if (analytics.navigationPatterns.hyperlinkRatio > 70) {
         insights.push(
@@ -262,50 +572,42 @@ export const getNavigationInsights = (
     } else {
         insights.push("Balanced navigation between links and direct access");
     }
-
     // Multitasking analysis
     if (analytics.navigationPatterns.multitaskingScore > 60) {
         insights.push("High multitasking - many tabs active simultaneously");
     } else if (analytics.navigationPatterns.multitaskingScore < 30) {
         insights.push("Focused browsing - few tabs at a time");
     }
-
     // Session depth
     if (detailedAnalytics.sessionDepth > 5) {
         insights.push("Deep browsing sessions - thorough exploration");
     } else if (detailedAnalytics.sessionDepth < 3) {
         insights.push("Brief site visits - quick information gathering");
     }
-
     // Focus efficiency
     if (detailedAnalytics.focusEfficiency > 80) {
         insights.push("Excellent focus - minimal background browsing");
     } else if (detailedAnalytics.focusEfficiency < 50) {
         insights.push("Distracted browsing - many background tabs");
     }
-
     return insights;
 };
 
 // Get time comparison insights
 export const getTimeInsights = (efficiency: TimeEfficiencyAnalytics | null) => {
     if (!efficiency) return null;
-
     const insights = [];
     const { work, social, other } = efficiency.activeVsDuration;
-
     // Work efficiency
     if (work.efficiency > 80) {
         insights.push("Highly focused work sessions");
     } else if (work.efficiency < 50) {
         insights.push("Work time includes significant background browsing");
     }
-
     // Social vs work comparison
     if (social.efficiency > work.efficiency) {
         insights.push("More focused on social content than work");
     }
-
     // Other category efficiency
     if (
         other.efficiency > work.efficiency &&
@@ -313,14 +615,12 @@ export const getTimeInsights = (efficiency: TimeEfficiencyAnalytics | null) => {
     ) {
         insights.push("Most focused on non-work/non-social content");
     }
-
     // Overall efficiency
     if (efficiency.overallEfficiency > 75) {
         insights.push("Excellent overall focus and attention");
     } else if (efficiency.overallEfficiency < 50) {
         insights.push("Significant time spent with background tabs");
     }
-
     return {
         insights,
         backgroundTimeFormatted: formatDuration(efficiency.backgroundTime),
@@ -338,11 +638,9 @@ export const getQuickStats = (session: BrowsingSession | null) => {
             sessionLength: "0m",
         };
     }
-
     const { stats } = session;
     const activeTime = formatDuration(stats.totalTime);
     const sitesVisited = stats.uniqueUrls;
-
     // Determine top category
     let topCategory = "other";
     if (stats.workTime > stats.socialTime && stats.workTime > stats.otherTime) {
@@ -350,9 +648,7 @@ export const getQuickStats = (session: BrowsingSession | null) => {
     } else if (stats.socialTime > stats.otherTime) {
         topCategory = "social";
     }
-
     const sessionLength = formatDuration(session.endTime - session.startTime);
-
     return {
         activeTime,
         sitesVisited,
@@ -378,7 +674,6 @@ export const getChannelData = (session: BrowsingSession | null) => {
             },
         };
     }
-
     const allVisits = session.tabSessions.flatMap((ts) => ts.urlVisits);
     const channelTimes = {
         gmail: 0,
@@ -386,11 +681,9 @@ export const getChannelData = (session: BrowsingSession | null) => {
         youtube: 0,
         chatgpt: 0,
     };
-
     allVisits.forEach((visit) => {
         const domain = visit.domain.toLowerCase();
         const timeSpent = visit.activeTime; // Use activeTime (focused time)
-
         if (domain.includes("gmail") || domain.includes("mail.google")) {
             channelTimes.gmail += timeSpent;
         } else if (
@@ -409,12 +702,10 @@ export const getChannelData = (session: BrowsingSession | null) => {
             channelTimes.chatgpt += timeSpent;
         }
     });
-
     // Format time based on duration
     const formatTime = (ms: number): string => {
         const seconds = Math.floor(ms / 1000);
         const minutes = Math.floor(seconds / 60);
-
         if (seconds < 60) {
             return `${seconds}s`;
         } else if (minutes < 60) {
@@ -424,7 +715,6 @@ export const getChannelData = (session: BrowsingSession | null) => {
             return `${decimalHours}h`;
         }
     };
-
     return {
         gmail: formatTime(channelTimes.gmail),
         outlook: formatTime(channelTimes.outlook),
@@ -450,7 +740,6 @@ export const getChannelUrlCounts = (session: BrowsingSession | null) => {
             chatgpt: 0,
         };
     }
-
     const allVisits = session.tabSessions.flatMap((ts) => ts.urlVisits);
     const counts = {
         gmail: 0,
@@ -458,10 +747,8 @@ export const getChannelUrlCounts = (session: BrowsingSession | null) => {
         youtube: 0,
         chatgpt: 0,
     };
-
     allVisits.forEach((visit) => {
         const domain = visit.domain.toLowerCase();
-
         if (domain.includes("gmail") || domain.includes("mail.google")) {
             counts.gmail++;
         } else if (
@@ -480,27 +767,22 @@ export const getChannelUrlCounts = (session: BrowsingSession | null) => {
             counts.chatgpt++;
         }
     });
-
     return counts;
 };
 
 // Get hourly activity data for charts
 export const getHourlyActivityData = (session: BrowsingSession | null) => {
     if (!session) return [];
-
     const now = new Date();
     const hourlyData = [];
-
     // Generate 24 hours of data (current hour - 23 hours to current hour)
     for (let i = 23; i >= 0; i--) {
         const hourStart = new Date(now);
         hourStart.setHours(hourStart.getHours() - i, 0, 0, 0);
         const hourEnd = new Date(hourStart);
         hourEnd.setHours(hourEnd.getHours() + 1);
-
         let workTime = 0;
         let otherTime = 0; // Combined non-work time
-
         // Aggregate time for this hour from all tab sessions
         session.tabSessions.forEach((tabSession) => {
             tabSession.urlVisits.forEach((visit) => {
@@ -508,7 +790,6 @@ export const getHourlyActivityData = (session: BrowsingSession | null) => {
                 const visitEnd = visit.endTime
                     ? new Date(visit.endTime)
                     : new Date();
-
                 // Check if visit overlaps with this hour
                 if (visitStart < hourEnd && visitEnd > hourStart) {
                     const overlapStart =
@@ -517,7 +798,6 @@ export const getHourlyActivityData = (session: BrowsingSession | null) => {
                     const overlapDuration =
                         (overlapEnd.getTime() - overlapStart.getTime()) /
                         (1000 * 60 * 60); // in hours
-
                     if (visit.category === "work") {
                         workTime += overlapDuration;
                     } else {
@@ -527,7 +807,6 @@ export const getHourlyActivityData = (session: BrowsingSession | null) => {
                 }
             });
         });
-
         hourlyData.push({
             hour: hourStart.getHours(),
             date: hourStart,
@@ -535,7 +814,6 @@ export const getHourlyActivityData = (session: BrowsingSession | null) => {
             otherTime: Math.max(0, otherTime),
         });
     }
-
     return hourlyData;
 };
 

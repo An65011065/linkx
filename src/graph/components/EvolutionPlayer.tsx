@@ -1,8 +1,5 @@
-// EvolutionPlayer.tsx - Evolution playback component
-
-import React from "react";
-import { format } from "date-fns";
-import { Play, Pause, SkipBack, X } from "lucide-react";
+import React, { useState, useRef, useEffect } from "react";
+import { Play, Pause, Square, X, ChevronDown } from "lucide-react";
 import EvolutionSearch from "./EvolutionSearch";
 import type { NetworkNode } from "../types/network.types";
 
@@ -18,6 +15,7 @@ interface EvolutionPlayerProps {
     onSpeedChange: (speed: number) => void;
     onClose: () => void;
     onNodeSelect: (nodeId: string | null) => void;
+    isDarkMode?: boolean;
 }
 
 const speedOptions = [
@@ -41,10 +39,43 @@ export const EvolutionPlayer: React.FC<EvolutionPlayerProps> = ({
     onSpeedChange,
     onClose,
     onNodeSelect,
+    isDarkMode = true,
 }) => {
+    const [speedDropdownVisible, setSpeedDropdownVisible] = useState(false);
+    const [isVisible, setIsVisible] = useState(false);
+    const speedDropdownRef = useRef<HTMLDivElement>(null);
+
+    // Entrance animation
+    useEffect(() => {
+        setIsVisible(true);
+    }, []);
+
+    // Handle click outside to close dropdown
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (
+                speedDropdownRef.current &&
+                !speedDropdownRef.current.contains(event.target as Node)
+            ) {
+                setSpeedDropdownVisible(false);
+            }
+        };
+
+        document.addEventListener("mousedown", handleClickOutside);
+        return () =>
+            document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
     const date = new Date(currentTimestamp);
-    const timeStr = format(date, "h:mm a");
-    const dateStr = format(date, "MMMM d");
+    const timeStr = date.toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+    });
+    const dateStr = date.toLocaleDateString("en-US", {
+        month: "long",
+        day: "numeric",
+    });
 
     return (
         <>
@@ -53,17 +84,174 @@ export const EvolutionPlayer: React.FC<EvolutionPlayerProps> = ({
                     position: "absolute",
                     top: "20px",
                     left: "50%",
-                    transform: "translateX(-50%)",
+                    transform: `translateX(-50%) translateY(${
+                        isVisible ? "0" : "-20px"
+                    }) scale(${isVisible ? "1" : "0.95"})`,
                     display: "flex",
                     alignItems: "center",
                     gap: "12px",
                     padding: "12px 16px",
-                    background: "white",
+                    background: isDarkMode ? "rgba(0, 0, 0, 0.9)" : "white",
                     borderRadius: "12px",
                     boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
                     zIndex: 1000,
+                    border: isDarkMode
+                        ? "1px solid rgba(255, 255, 255, 0.1)"
+                        : "1px solid rgba(0, 0, 0, 0.1)",
+                    backdropFilter: "blur(10px)",
+                    opacity: isVisible ? 1 : 0,
+                    transition: "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
+                    willChange: "transform, opacity",
                 }}
             >
+                {/* Container for search and speed dropdown */}
+                <div
+                    style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                        background: isDarkMode
+                            ? "rgba(255, 255, 255, 0.1)"
+                            : "rgba(0, 0, 0, 0.05)",
+                        borderRadius: "20px",
+                        padding: "8px 12px",
+                        border: isDarkMode
+                            ? "1px solid rgba(255, 255, 255, 0.2)"
+                            : "1px solid #ddd",
+                        height: "36px",
+                        minWidth: "400px",
+                        transition: "all 0.3s ease",
+                        willChange: "background, border-color",
+                    }}
+                >
+                    {/* Evolution Search Component */}
+                    <div style={{ flex: 1 }}>
+                        <EvolutionSearch
+                            nodes={nodes}
+                            onNodeSelect={onNodeSelect}
+                            selectedNode={selectedNode}
+                            isDarkMode={isDarkMode}
+                        />
+                    </div>
+
+                    {/* Speed Dropdown */}
+                    <div style={{ position: "relative" }}>
+                        <button
+                            onClick={() =>
+                                setSpeedDropdownVisible(!speedDropdownVisible)
+                            }
+                            style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "4px",
+                                padding: "4px 8px",
+                                background: "transparent",
+                                color: isDarkMode ? "#ffffff" : "#333333",
+                                border: "none",
+                                borderRadius: "4px",
+                                fontSize: "12px",
+                                cursor: "pointer",
+                                fontWeight: "500",
+                                transition: "all 0.2s ease",
+                                willChange: "background, transform",
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.background = isDarkMode
+                                    ? "rgba(255, 255, 255, 0.1)"
+                                    : "rgba(0, 0, 0, 0.1)";
+                                e.currentTarget.style.transform = "scale(1.02)";
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.background =
+                                    "transparent";
+                                e.currentTarget.style.transform = "scale(1)";
+                            }}
+                        >
+                            {speed}x
+                            <ChevronDown size={12} />
+                        </button>
+                        {speedDropdownVisible && (
+                            <div
+                                ref={speedDropdownRef}
+                                style={{
+                                    position: "absolute",
+                                    top: "100%",
+                                    right: 0,
+                                    marginTop: "4px",
+                                    background: isDarkMode
+                                        ? "rgba(0, 0, 0, 0.95)"
+                                        : "white",
+                                    borderRadius: "8px",
+                                    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
+                                    border: isDarkMode
+                                        ? "1px solid rgba(255, 255, 255, 0.2)"
+                                        : "1px solid #ddd",
+                                    zIndex: 1002,
+                                    minWidth: "60px",
+                                    transform: "translateY(-4px) scale(0.98)",
+                                    opacity: 0,
+                                    animation:
+                                        "dropdownFadeIn 0.2s ease forwards",
+                                }}
+                            >
+                                {speedOptions.map((option) => (
+                                    <button
+                                        key={option.value}
+                                        onClick={() => {
+                                            onSpeedChange(option.value);
+                                            setSpeedDropdownVisible(false);
+                                        }}
+                                        style={{
+                                            width: "100%",
+                                            padding: "4px 8px",
+                                            textAlign: "left",
+                                            background:
+                                                speed === option.value
+                                                    ? isDarkMode
+                                                        ? "rgba(255, 255, 255, 0.1)"
+                                                        : "#f5f5f5"
+                                                    : "transparent",
+                                            color: isDarkMode
+                                                ? "#ffffff"
+                                                : "#333333",
+                                            border: "none",
+                                            fontSize: "12px",
+                                            cursor: "pointer",
+                                            borderRadius:
+                                                speed === option.value
+                                                    ? "4px"
+                                                    : "0",
+                                            transition: "all 0.2s ease",
+                                            willChange: "background, transform",
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            if (speed !== option.value) {
+                                                e.currentTarget.style.background =
+                                                    isDarkMode
+                                                        ? "rgba(255, 255, 255, 0.1)"
+                                                        : "#f5f5f5";
+                                                e.currentTarget.style.transform =
+                                                    "scale(1.02)";
+                                            }
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            if (speed !== option.value) {
+                                                e.currentTarget.style.background =
+                                                    "transparent";
+                                                e.currentTarget.style.transform =
+                                                    "scale(1)";
+                                            }
+                                        }}
+                                    >
+                                        {option.label}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Control Buttons */}
                 <button
                     onClick={isPlaying ? onPause : onPlay}
                     style={{
@@ -72,19 +260,26 @@ export const EvolutionPlayer: React.FC<EvolutionPlayerProps> = ({
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        background: isPlaying ? "#ff6b6b" : "#4285f4",
-                        color: "white",
+                        background: "transparent",
+                        color: isDarkMode ? "#ffffff" : "#333333",
                         border: "none",
                         borderRadius: "8px",
                         cursor: "pointer",
-                        transition: "all 0.2s ease",
+                        transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                        willChange: "background, transform",
+                    }}
+                    onMouseEnter={(e) => {
+                        e.currentTarget.style.background = isDarkMode
+                            ? "rgba(255, 255, 255, 0.15)"
+                            : "rgba(0, 0, 0, 0.15)";
+                        e.currentTarget.style.transform = "scale(1.05)";
+                    }}
+                    onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "transparent";
+                        e.currentTarget.style.transform = "scale(1)";
                     }}
                 >
-                    {isPlaying ? (
-                        <Pause size={16} fill="currentColor" />
-                    ) : (
-                        <Play size={16} fill="currentColor" />
-                    )}
+                    {isPlaying ? <Pause size={16} /> : <Play size={16} />}
                 </button>
 
                 <button
@@ -95,40 +290,27 @@ export const EvolutionPlayer: React.FC<EvolutionPlayerProps> = ({
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        background: "#636e72",
-                        color: "white",
+                        background: "transparent",
+                        color: isDarkMode ? "#ffffff" : "#333333",
                         border: "none",
                         borderRadius: "8px",
                         cursor: "pointer",
+                        transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                        willChange: "background, transform",
+                    }}
+                    onMouseEnter={(e) => {
+                        e.currentTarget.style.background = isDarkMode
+                            ? "rgba(255, 255, 255, 0.15)"
+                            : "rgba(0, 0, 0, 0.15)";
+                        e.currentTarget.style.transform = "scale(1.05)";
+                    }}
+                    onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "transparent";
+                        e.currentTarget.style.transform = "scale(1)";
                     }}
                 >
-                    <SkipBack size={16} fill="currentColor" />
+                    <Square size={16} />
                 </button>
-
-                <select
-                    value={speed}
-                    onChange={(e) => onSpeedChange(Number(e.target.value))}
-                    style={{
-                        padding: "8px 12px",
-                        border: "1px solid #ddd",
-                        borderRadius: "8px",
-                        background: "white",
-                        fontSize: "14px",
-                        cursor: "pointer",
-                    }}
-                >
-                    {speedOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                            {option.label}
-                        </option>
-                    ))}
-                </select>
-
-                <EvolutionSearch
-                    nodes={nodes}
-                    onNodeSelect={onNodeSelect}
-                    selectedNode={selectedNode}
-                />
 
                 <button
                     onClick={onClose}
@@ -139,11 +321,22 @@ export const EvolutionPlayer: React.FC<EvolutionPlayerProps> = ({
                         alignItems: "center",
                         justifyContent: "center",
                         background: "transparent",
-                        color: "#636e72",
-                        border: "1px solid #ddd",
+                        color: isDarkMode ? "#ffffff" : "#333333",
+                        border: "none",
                         borderRadius: "8px",
                         cursor: "pointer",
-                        transition: "all 0.2s ease",
+                        transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                        willChange: "background, transform",
+                    }}
+                    onMouseEnter={(e) => {
+                        e.currentTarget.style.background = isDarkMode
+                            ? "rgba(255, 255, 255, 0.15)"
+                            : "rgba(0, 0, 0, 0.15)";
+                        e.currentTarget.style.transform = "scale(1.05)";
+                    }}
+                    onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "transparent";
+                        e.currentTarget.style.transform = "scale(1)";
                     }}
                 >
                     <X size={16} />
@@ -161,9 +354,15 @@ export const EvolutionPlayer: React.FC<EvolutionPlayerProps> = ({
                     alignItems: "flex-end",
                     gap: "4px",
                     fontFamily: "Nunito-Regular, sans-serif",
-                    color: "#2d3436",
+                    color: isDarkMode ? "#ffffff" : "#2d3436",
                     textShadow: "0 2px 4px rgba(0,0,0,0.1)",
                     zIndex: 1000,
+                    transform: `translateX(${
+                        isVisible ? "0" : "20px"
+                    }) translateY(${isVisible ? "0" : "20px"})`,
+                    opacity: isVisible ? 1 : 0,
+                    transition: "all 0.5s cubic-bezier(0.4, 0, 0.2, 1)",
+                    willChange: "transform, opacity",
                 }}
             >
                 <div

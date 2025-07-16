@@ -38,7 +38,7 @@ const Shortcuts: React.FC<ShortcutsProps> = ({ isDarkMode = false }) => {
                                         ${
                                             isDarkMode
                                                 ? "bg-green-500/20 border border-green-500/30 text-white hover:bg-green-500/30 hover:border-green-500/50 transition-all duration-200 cursor-pointer hover:-translate-y-0.2"
-                                                : "bg-green-50 border border-green-200 text-green-700 hover:bg-green-100 hover:border-green-300 transition-all duration-200 cursor-pointer hover:-translate-y-0.25"
+                                                : "bg-green-100 border border-green-200 text-green-700 hover:bg-green-100 hover:border-green-300 transition-all duration-200 cursor-pointer hover:-translate-y-0.25"
                                         }
                                     `}
                 >

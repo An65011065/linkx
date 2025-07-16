@@ -11,7 +11,7 @@ import type {
 import { EvolutionPlayer } from "./EvolutionPlayer";
 import SearchComponent from "./SearchComponent";
 import { NetworkMetricsCalculator } from "../services/NetworkMetricsCalculator";
-import { History, Trash2, Sun, Moon } from "lucide-react";
+import { History, Expand } from "lucide-react";
 import "../styles/graph.css";
 
 const generateLinkPath = (
@@ -36,7 +36,17 @@ const generateLinkPath = (
     return `M${startPoint.x},${startPoint.y} L${endPoint.x},${endPoint.y}`;
 };
 
-const GraphVisualization: React.FC = () => {
+interface GraphVisualizationProps {
+    isDarkMode?: boolean;
+    isExpanded?: boolean;
+    onExpandToggle?: (expanded: boolean) => void;
+}
+
+const GraphVisualization: React.FC<GraphVisualizationProps> = ({
+    isDarkMode = true,
+    isExpanded = false,
+    onExpandToggle,
+}) => {
     const svgRef = useRef<SVGSVGElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const simulationRef = useRef<d3.Simulation<
@@ -64,7 +74,6 @@ const GraphVisualization: React.FC = () => {
     const [pathLinks, setPathLinks] = useState<Set<string>>(new Set());
     const [searchResults, setSearchResults] = useState<Set<string>>(new Set());
     const [pathOrder, setPathOrder] = useState<Map<string, number>>(new Map());
-    const [isDarkMode, setIsDarkMode] = useState(true);
 
     const evolution = useEvolutionState(nodes || [], links || [], selectedNode);
 
@@ -782,11 +791,13 @@ const GraphVisualization: React.FC = () => {
                 transition: "background 0.3s ease, color 0.3s ease",
             }}
         >
-            <SearchComponent
-                nodes={nodes || []}
-                onSearch={handleSearch}
-                isDarkMode={isDarkMode}
-            />
+            {!isEvolutionMode && ( // Add this condition
+                <SearchComponent
+                    nodes={nodes || []}
+                    onSearch={handleSearch}
+                    isDarkMode={isDarkMode}
+                />
+            )}
 
             {isEvolutionMode && (
                 <EvolutionPlayer
@@ -807,7 +818,58 @@ const GraphVisualization: React.FC = () => {
                     onNodeSelect={(nodeId) =>
                         nodeId ? tracePathToNode(nodeId) : clearPath()
                     }
+                    isDarkMode={isDarkMode} // Add this line
                 />
+            )}
+
+            {/* Expand Button - Only show when not expanded */}
+            {!isExpanded && onExpandToggle && (
+                <div
+                    style={{
+                        position: "absolute",
+                        top: "0.75rem",
+                        left: "0.75rem",
+                        zIndex: 1001,
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "0.1rem",
+                    }}
+                >
+                    <button
+                        onClick={() => onExpandToggle(true)}
+                        className={`p-2 rounded-lg transition-colors ${
+                            isDarkMode ? "text-white" : "text-gray-700"
+                        } hover:scale-110 transition-all duration-300`}
+                        title="Expand to full screen"
+                    >
+                        <Expand size={20} />
+                    </button>
+                    {/* Evolution Button */}
+                    <button
+                        onClick={() => {
+                            if (isEvolutionMode) {
+                                setIsEvolutionMode(false);
+                                evolution.reset();
+                                clearPath();
+                            } else {
+                                setIsEvolutionMode(true);
+                                evolution.reset();
+                                clearPath();
+                            }
+                        }}
+                        className={`p-2 rounded-lg transition-colors -mt-[0.3rem] hover:scale-110`}
+                        style={{
+                            color: isEvolutionMode
+                                ? "#4285f4"
+                                : isDarkMode
+                                ? "white"
+                                : "#374151",
+                        }}
+                        title="Show network evolution"
+                    >
+                        <History size={20} />
+                    </button>
+                </div>
             )}
 
             <div
@@ -819,113 +881,7 @@ const GraphVisualization: React.FC = () => {
                     gap: "8px",
                     zIndex: 1000,
                 }}
-            >
-                {/* Theme Toggle */}
-                <button
-                    onClick={() => setIsDarkMode(!isDarkMode)}
-                    style={{
-                        width: "36px",
-                        height: "36px",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        background: isDarkMode
-                            ? "rgba(255, 255, 255, 0.1)"
-                            : "rgba(0, 0, 0, 0.1)",
-                        color: isDarkMode ? "#ffffff" : "#333333",
-                        border: "none",
-                        borderRadius: "50%",
-                        cursor: "pointer",
-                        transition: "all 0.2s ease",
-                    }}
-                    title={
-                        isDarkMode
-                            ? "Switch to light mode"
-                            : "Switch to dark mode"
-                    }
-                    onMouseEnter={(e) =>
-                        (e.currentTarget.style.background = isDarkMode
-                            ? "rgba(255, 255, 255, 0.2)"
-                            : "rgba(0, 0, 0, 0.2)")
-                    }
-                    onMouseLeave={(e) =>
-                        (e.currentTarget.style.background = isDarkMode
-                            ? "rgba(255, 255, 255, 0.1)"
-                            : "rgba(0, 0, 0, 0.1)")
-                    }
-                >
-                    {isDarkMode ? <Sun size={16} /> : <Moon size={16} />}
-                </button>
-
-                <button
-                    onClick={() => {
-                        setIsEvolutionMode(true);
-                        evolution.reset();
-                        clearPath();
-                    }}
-                    style={{
-                        width: "36px",
-                        height: "36px",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        background: "rgba(66, 133, 244, 0.1)",
-                        color: "#4285f4",
-                        border: "none",
-                        borderRadius: "50%",
-                        cursor: "pointer",
-                        transition: "all 0.2s ease",
-                    }}
-                    title="Show network evolution"
-                    onMouseEnter={(e) =>
-                        (e.currentTarget.style.background =
-                            "rgba(66, 133, 244, 0.2)")
-                    }
-                    onMouseLeave={(e) =>
-                        (e.currentTarget.style.background =
-                            "rgba(66, 133, 244, 0.1)")
-                    }
-                >
-                    <History size={16} />
-                </button>
-
-                <button
-                    onClick={() => {
-                        if (
-                            window.confirm(
-                                "Are you sure you want to delete all browsing data? This action cannot be undone.",
-                            )
-                        ) {
-                            chrome.storage.local.clear();
-                            window.location.reload();
-                        }
-                    }}
-                    style={{
-                        width: "36px",
-                        height: "36px",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        background: "rgba(255, 68, 68, 0.1)",
-                        color: "#ff4444",
-                        border: "none",
-                        borderRadius: "50%",
-                        cursor: "pointer",
-                        transition: "all 0.2s ease",
-                    }}
-                    title="Delete all data"
-                    onMouseEnter={(e) =>
-                        (e.currentTarget.style.background =
-                            "rgba(255, 68, 68, 0.2)")
-                    }
-                    onMouseLeave={(e) =>
-                        (e.currentTarget.style.background =
-                            "rgba(255, 68, 68, 0.1)")
-                    }
-                >
-                    <Trash2 size={16} />
-                </button>
-            </div>
+            ></div>
 
             <svg
                 ref={svgRef}

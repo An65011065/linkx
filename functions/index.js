@@ -25,9 +25,9 @@ function createCleanCSV(data) {
         const timeDisplay =
             visit.readableTime ||
             date.toLocaleTimeString("en-US", {
-                hour: "numeric",
+                hour: "2-digit",
                 minute: "2-digit",
-                hour12: true,
+                hour12: false,
             });
 
         return [
@@ -39,7 +39,7 @@ function createCleanCSV(data) {
         ];
     });
 
-    // Add summary as first data row
+    // Add summary as first data row (5 columns to match headers)
     const summaryRow = [
         "SUMMARY_DATA",
         `Total visits: ${sortedVisits.length}, Active minutes: ${data.today.totalActiveMinutes}, Sessions: ${data.today.tabSessions}`,
@@ -57,95 +57,6 @@ function createCleanCSV(data) {
     return csvLines.join("\n");
 }
 
-// Create text summary with all visits (no URLs)
-function createCompactDataSummary(data) {
-    const visits = data.today.allVisits || [];
-    const summary = data.today.summary || {};
-
-    console.log("📊 Processing clean data:", {
-        visits: visits.length,
-        hasSummary: !!summary,
-    });
-
-    // Ensure all visits have consistent structure
-    const cleanVisits = visits.filter((visit) => {
-        return (
-            visit &&
-            visit.domain &&
-            typeof visit.domain === "string" &&
-            visit.domain !== "SUMMARY_DATA" &&
-            !visit.domain.includes("Total visits")
-        );
-    });
-
-    console.log("✅ Filtered to", cleanVisits.length, "clean visits");
-
-    // Sort visits chronologically (most recent first)
-    const sortedVisits = [...cleanVisits].sort(
-        (a, b) => b.startTime - a.startTime,
-    );
-
-    // Get top domains by time
-    const domainTimes = {};
-    sortedVisits.forEach((visit) => {
-        domainTimes[visit.domain] =
-            (domainTimes[visit.domain] || 0) + visit.activeTimeMinutes;
-    });
-
-    const topDomains = Object.entries(domainTimes)
-        .sort(([, a], [, b]) => b - a)
-        .slice(0, 10)
-        .map(([domain, minutes]) => `${domain}: ${minutes}min`);
-
-    // Create visit list with consistent format
-    const allVisitsCompact = sortedVisits
-        .slice(0, 30) // Top 30 visits only
-        .map((visit) => {
-            const timeDisplay = visit.readableTime || "Unknown time";
-            const cleanTitle = (visit.title || "No title").substring(0, 60);
-
-            return `${visit.domain} (${visit.activeTimeMinutes}min) at ${timeDisplay} - ${cleanTitle}`;
-        })
-        .join("\n");
-
-    const visitsWithActiveTime = sortedVisits.filter(
-        (visit) => visit.activeTimeMinutes > 0,
-    );
-
-    // Use summary data if available, otherwise calculate
-    const totalVisits = summary.totalVisits || sortedVisits.length;
-    const totalActiveMinutes =
-        summary.totalActiveMinutes || data.today.totalActiveMinutes;
-    const tabSessions = summary.tabSessions || data.today.tabSessions;
-    const workTime =
-        summary.workTime || Math.round(data.today.stats.workTime / (1000 * 60));
-    const socialTime =
-        summary.socialTime ||
-        Math.round(data.today.stats.socialTime / (1000 * 60));
-    const otherTime =
-        summary.otherTime ||
-        Math.round(data.today.stats.otherTime / (1000 * 60));
-
-    const finalSummary = `BROWSING DATA for ${data.today.date}:
-
-STATS:
-- Total visits: ${totalVisits} (showing top ${sortedVisits.length}, ${
-        visitsWithActiveTime.length
-    } with active time)
-- Total active time: ${totalActiveMinutes} minutes  
-- Tab sessions: ${tabSessions}
-- Work: ${workTime}min, Social: ${socialTime}min, Other: ${otherTime}min
-
-TOP DOMAINS BY TIME:
-${topDomains.join("\n")}
-
-RECENT VISITS (MOST RECENT FIRST):
-${allVisitsCompact}`;
-
-    console.log("📄 Generated clean summary length:", finalSummary.length);
-    return finalSummary;
-}
-
 exports.chatWithOpenAI = onCall(
     {
         secrets: [openaiApiKey],
@@ -161,16 +72,14 @@ exports.chatWithOpenAI = onCall(
             (request.data && request.data.browsingData) || null;
         const existingThreadId =
             (request.data && request.data.threadId) || null;
-        const systemContext =
-            (request.data && request.data.systemContext) || "";
         const assistantType =
-            (request.data && request.data.assistantType) || "browsing"; // NEW: Add assistant type
+            (request.data && request.data.assistantType) || "browsing";
 
         if (!userMessage) {
             throw new Error("No message provided");
         }
 
-        // NEW: Set assistant ID based on type
+        // Set assistant ID based on type
         const assistantIds = {
             browsing: "asst_oGJq9HXdbQ5VoLRuE8JdgvRQ",
             summarise: "asst_y1LZY5JHQX3YZiAXyVs1Iiif",
@@ -185,7 +94,7 @@ exports.chatWithOpenAI = onCall(
         try {
             console.log("=== OPENAI REQUEST ===");
             console.log("User message:", userMessage);
-            console.log("Assistant type:", assistantType); // NEW: Log assistant type
+            console.log("Assistant type:", assistantType);
             console.log("Browsing data received:", browsingData ? "YES" : "NO");
             console.log("Existing thread:", existingThreadId ? "YES" : "NO");
 
@@ -205,66 +114,40 @@ exports.chatWithOpenAI = onCall(
 
             let messageContent = userMessage;
 
-            // MODIFIED: Only process browsing data for browsing assistant
+            // Always upload CSV for new browsing conversations
             if (
                 !existingThreadId &&
                 browsingData &&
                 assistantType === "browsing"
             ) {
-                // First message - decide between text summary or CSV upload
-                let fullContext = "";
+                console.log("Uploading CSV file for browsing data...");
 
-                if (systemContext) {
-                    fullContext += systemContext + "\n\n";
-                }
+                const csvContent = createCleanCSV(browsingData);
+                const timestamp = new Date().toISOString().split("T")[0];
+                const fileName = `browsing-data-${timestamp}.csv`;
 
-                // Try compact text summary first
-                const textSummary = createCompactDataSummary(browsingData);
-                console.log(
-                    "Generated text summary length:",
-                    textSummary.length,
-                );
+                console.log("Generated CSV length:", csvContent.length);
 
-                // If text is too large (>20KB), fall back to CSV upload
-                if (textSummary.length > 20000) {
-                    console.log(
-                        "Text summary too large, uploading CSV file...",
-                    );
+                // Upload CSV file
+                const fs = require("fs");
+                const os = require("os");
+                const path = require("path");
 
-                    const csvContent = createCleanCSV(browsingData);
-                    const timestamp = new Date().toISOString().split("T")[0];
-                    const fileName = `browsing-data-${timestamp}.csv`;
+                const tempDir = os.tmpdir();
+                const tempFilePath = path.join(tempDir, fileName);
+                fs.writeFileSync(tempFilePath, csvContent);
 
-                    console.log("Generated CSV length:", csvContent.length);
+                const file = await openai.files.create({
+                    file: fs.createReadStream(tempFilePath),
+                    purpose: "assistants",
+                });
 
-                    // Upload CSV file
-                    const fs = require("fs");
-                    const os = require("os");
-                    const path = require("path");
+                fs.unlinkSync(tempFilePath);
+                fileId = file.id;
 
-                    const tempDir = os.tmpdir();
-                    const tempFilePath = path.join(tempDir, fileName);
-                    fs.writeFileSync(tempFilePath, csvContent);
-
-                    const file = await openai.files.create({
-                        file: fs.createReadStream(tempFilePath),
-                        purpose: "assistants",
-                    });
-
-                    fs.unlinkSync(tempFilePath);
-                    fileId = file.id;
-
-                    console.log("File uploaded:", fileId);
-                    fullContext +=
-                        "Your browsing data has been uploaded as a CSV file for analysis.\n\n";
-                } else {
-                    console.log("Using text summary (fits in message)");
-                    fullContext += textSummary + "\n\n";
-                }
-
-                messageContent = fullContext + "User question: " + userMessage;
+                console.log("File uploaded:", fileId);
+                messageContent = `Your browsing data has been uploaded as a CSV file for analysis.\n\nUser question: ${userMessage}`;
             }
-            // NEW: For summarise assistant, userMessage should already contain the page text
 
             console.log("Final message content length:", messageContent.length);
 
@@ -286,9 +169,9 @@ exports.chatWithOpenAI = onCall(
             await openai.beta.threads.messages.create(threadId, messageData);
             console.log("Message added to thread");
 
-            // MODIFIED: Run assistant with the correct ID
+            // Run assistant with the correct ID
             const runConfig = {
-                assistant_id: assistantId, // Use dynamic assistant ID
+                assistant_id: assistantId,
             };
 
             if (fileId) {
@@ -304,7 +187,7 @@ exports.chatWithOpenAI = onCall(
             );
             console.log("Assistant run created:", run.id);
 
-            // Poll until completion (rest of the code stays the same)
+            // Poll until completion
             let completed = false;
             let runResult;
             let attempts = 0;
@@ -338,7 +221,7 @@ exports.chatWithOpenAI = onCall(
                         const retryRun = await openai.beta.threads.runs.create(
                             threadId,
                             {
-                                assistant_id: assistantId, // MODIFIED: Use dynamic assistant ID
+                                assistant_id: assistantId,
                             },
                         );
 

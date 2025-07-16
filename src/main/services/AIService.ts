@@ -72,8 +72,6 @@ class AIService {
                 userMessage: message,
                 browsingData: browsingContext, // ← SEND THE ACTUAL DATA NOW
                 threadId: this.currentThreadId,
-                systemContext:
-                    "You are an AI assistant inside a browser extension that tracks browsing habits. The user has live browsing data from today. The visits are sorted chronologically with MOST RECENT FIRST. Pay close attention to the 'readableTime' field which shows the correct local time (like '5:54 PM'). When the user asks for recent pages, use the first entries in the list as they are the most recent. You should analyze their browsing patterns and provide insights about their digital habits. Never mention uploaded files or JSON - this is live data from their browser extension.",
                 assistantType: "browsing",
             };
 
@@ -84,10 +82,6 @@ class AIService {
             console.log(
                 "🔗 Thread ID:",
                 requestPayload.threadId || "NEW THREAD",
-            );
-            console.log(
-                "🧠 System Context Length:",
-                requestPayload.systemContext.length,
             );
             console.log(
                 "📊 Browsing Data Present:",
@@ -202,7 +196,6 @@ class AIService {
                                 !visit.domain.includes("Summary")
                             );
                         })
-                        .slice(0, 50) // Limit to 50 visits
                         .map((visit) => {
                             const visitDate = new Date(visit.startTime);
                             return {

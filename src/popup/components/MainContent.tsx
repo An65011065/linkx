@@ -11,7 +11,6 @@ import ConsolidateTabs from "../../dashboard/components/ConsolidateTabs";
 import "../../shared/styles/fonts.css";
 import BookmarkButton from "./Mark";
 import SummarizeView from "./SummarizeView";
-import Header from "./Header";
 
 interface Note {
     id?: string;
@@ -116,11 +115,11 @@ const MainContent: React.FC<MainContentProps> = () => {
             if (!currentDomain) return;
             try {
                 const dataService = DataService.getInstance();
-                const allVisits = (await dataService.getAllUrlVisits()) || [];
+                const allVisits = await dataService.getAllUrlVisits();
                 // Sum up active time for all visits to the current domain
                 const totalTime = allVisits
                     .filter((visit) => visit.domain === currentDomain)
-                    .reduce((sum, visit) => sum + (visit.activeTime || 0), 0);
+                    .reduce((sum, visit) => sum + visit.activeTime, 0);
                 setDomainTime(totalTime);
             } catch (error) {
                 console.error("Error calculating domain time:", error);
@@ -137,7 +136,7 @@ const MainContent: React.FC<MainContentProps> = () => {
             if (!currentDomain) return;
             try {
                 const note = await handleLoadNote(currentDomain);
-                setHasNote(Boolean(note?.content?.trim().length));
+                setHasNote(note?.content?.trim().length > 0 ?? false);
             } catch (err) {
                 console.error("Error checking for note:", err);
                 setHasNote(false);
@@ -155,7 +154,7 @@ const MainContent: React.FC<MainContentProps> = () => {
         const refreshNoteStatus = async () => {
             try {
                 const note = await handleLoadNote(currentDomain);
-                setHasNote(Boolean(note?.content?.trim().length));
+                setHasNote(note?.content?.trim().length > 0 ?? false);
             } catch (err) {
                 console.error("Error refreshing note status:", err);
             }
@@ -360,6 +359,15 @@ const MainContent: React.FC<MainContentProps> = () => {
     // Format domain name for display
     const formatDomainName = (domain: string): string => {
         if (!domain) return "";
+
+        // Check if it's the extension's dashboard URL or extension ID
+        if (
+            domain === chrome.runtime.id ||
+            domain.includes("chrome-extension")
+        ) {
+            return "LyncX";
+        }
+
         // Remove common extensions
         const withoutExtension = domain
             .replace(/\.(com|org|net|edu|gov|co\.uk|co\.in|io|app|dev)$/i, "")
@@ -433,146 +441,91 @@ const MainContent: React.FC<MainContentProps> = () => {
     }
 
     return (
-        <div style={{ position: "relative" }}>
-            <Header />
+        <div
+            style={{
+                width: "340px",
+                height: "330px",
+                padding: "16px",
+                fontFamily: "system-ui, -apple-system, sans-serif",
+                background: "rgba(255, 255, 255, 0.7)",
+                backdropFilter: "blur(10px)",
+                WebkitBackdropFilter: "blur(10px)",
+                borderRadius: "16px",
+                border: "1px solid rgba(255, 255, 255, 0.18)",
+                boxShadow: "0 8px 32px rgba(31, 38, 135, 0.1)",
+                position: "relative",
+                display: "flex",
+                flexDirection: "column",
+                gap: "12px",
+            }}
+        >
+            {/* Header with time and menu */}
             <div
                 style={{
-                    width: "340px",
-                    height: "330px",
-                    padding: "16px",
-                    fontFamily: "system-ui, -apple-system, sans-serif",
-                    background: "rgba(255, 255, 255, 0.7)",
-                    backdropFilter: "blur(10px)",
-                    WebkitBackdropFilter: "blur(10px)",
-                    borderRadius: "16px",
-                    border: "1px solid rgba(255, 255, 255, 0.18)",
-                    boxShadow: "0 8px 32px rgba(31, 38, 135, 0.1)",
-                    position: "relative",
                     display: "flex",
-                    flexDirection: "column",
-                    gap: "12px",
+                    justifyContent: "space-between",
+                    alignItems: "flex-start",
                 }}
             >
-                {/* Header with time and menu */}
-                <div
-                    style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "flex-start",
-                    }}
-                >
-                    <div style={{ textAlign: "center", flex: 1 }}>
-                        <div
-                            style={{
-                                fontSize: "18px",
-                                fontWeight: "600",
-                                color: "#2c3e50",
-                            }}
-                        >
-                            {formatTime(domainTime)} on{" "}
-                            {formatDomainName(currentDomain)}
-                        </div>
-                        {/* Timer display */}
-                        {timeRemaining && (
-                            <div
-                                style={{
-                                    fontSize: "12px",
-                                    color: timeRemaining.includes("finished")
-                                        ? "#28a745"
-                                        : "#dc3545",
-                                    marginTop: "2px",
-                                }}
-                            >
-                                {timeRemaining}
-                            </div>
-                        )}
-                    </div>
-                    <MoreHorizontal
-                        size={18}
-                        color="#6c757d"
-                        style={{ cursor: "pointer" }}
-                    />
-                </div>
-
-                {/* Top Action Buttons Row */}
-                <div
-                    style={{
-                        display: "grid",
-                        gridTemplateColumns: "repeat(5, 1fr)",
-                        gap: "8px",
-                        width: "100%",
-                        marginBottom: "4px",
-                    }}
-                >
-                    <BookmarkButton />
-                    <CrossTabSearch>
-                        <div
-                            style={{
-                                display: "flex",
-                                flexDirection: "column",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                cursor: "pointer",
-                                padding: "4px",
-                                borderRadius: "8px",
-                                transition: "all 0.2s ease",
-                                height: "100%",
-                            }}
-                        >
-                            <Search size={20} color="#28a745" strokeWidth={2} />
-                            <span
-                                style={{
-                                    fontSize: "11px",
-                                    color: "#2c3e50",
-                                    marginTop: "4px",
-                                    whiteSpace: "nowrap",
-                                }}
-                            >
-                                Find
-                            </span>
-                        </div>
-                    </CrossTabSearch>
+                <div style={{ textAlign: "center", flex: 1 }}>
                     <div
                         style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            height: "100%",
+                            fontSize: "18px",
+                            fontWeight: "600",
+                            color: "#2c3e50",
                         }}
                     >
-                        <ConsolidateTabs
-                            shouldConsolidate={true}
-                            className="flex flex-col items-center cursor-pointer p-1 rounded-lg transition-all duration-200 ease-in-out"
-                        >
-                            <span
-                                style={{
-                                    fontSize: "11px",
-                                    color: "#2c3e50",
-                                    marginTop: "4px",
-                                    whiteSpace: "nowrap",
-                                }}
-                            >
-                                Consolidate
-                            </span>
-                        </ConsolidateTabs>
+                        {formatTime(domainTime)} on{" "}
+                        {formatDomainName(currentDomain)}
                     </div>
+                    {/* Timer display */}
+                    {timeRemaining && (
+                        <div
+                            style={{
+                                fontSize: "12px",
+                                color: timeRemaining.includes("finished")
+                                    ? "#28a745"
+                                    : "#dc3545",
+                                marginTop: "2px",
+                            }}
+                        >
+                            {timeRemaining}
+                        </div>
+                    )}
+                </div>
+                <MoreHorizontal
+                    size={18}
+                    color="#6c757d"
+                    style={{ cursor: "pointer" }}
+                />
+            </div>
+
+            {/* Top Action Buttons Row */}
+            <div
+                style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(5, 1fr)",
+                    gap: "8px",
+                    width: "100%",
+                    marginBottom: "4px",
+                }}
+            >
+                <BookmarkButton />
+                <CrossTabSearch>
                     <div
-                        onClick={handleScreenshot}
                         style={{
                             display: "flex",
                             flexDirection: "column",
                             alignItems: "center",
                             justifyContent: "center",
-                            cursor: isCapturing ? "not-allowed" : "pointer",
+                            cursor: "pointer",
                             padding: "4px",
                             borderRadius: "8px",
                             transition: "all 0.2s ease",
-                            opacity: isCapturing ? 0.6 : 1,
                             height: "100%",
                         }}
                     >
-                        <Camera size={20} color="#495057" strokeWidth={2} />
+                        <Search size={20} color="#28a745" strokeWidth={2} />
                         <span
                             style={{
                                 fontSize: "11px",
@@ -581,245 +534,297 @@ const MainContent: React.FC<MainContentProps> = () => {
                                 whiteSpace: "nowrap",
                             }}
                         >
-                            Screenshot
+                            Find
                         </span>
                     </div>
-                    <Reminders
-                        currentDomain={currentDomain}
-                        onTimerSet={(minutes: number) => {
-                            const endTime = Date.now() + minutes * 60 * 1000;
-                            setActiveTimer({ endTime, minutes });
-                            const timerKey = `timer_${currentDomain}`;
-                            localStorage.setItem(
-                                timerKey,
-                                JSON.stringify({ endTime, minutes }),
-                            );
-                            window.dispatchEvent(
-                                new CustomEvent("timerSet", {
-                                    detail: { domain: currentDomain, minutes },
-                                }),
-                            );
-                        }}
-                        onTimerClear={() => {
-                            setActiveTimer(null);
-                            setTimeRemaining("");
-                            const timerKey = `timer_${currentDomain}`;
-                            localStorage.removeItem(timerKey);
-                            window.dispatchEvent(
-                                new CustomEvent("timerClear", {
-                                    detail: { domain: currentDomain },
-                                }),
-                            );
-                        }}
-                    >
-                        <div
-                            style={{
-                                display: "flex",
-                                flexDirection: "column",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                cursor: "pointer",
-                                padding: "4px",
-                                borderRadius: "8px",
-                                transition: "all 0.2s ease",
-                                position: "relative",
-                                height: "100%",
-                            }}
-                        >
-                            <Bell
-                                fill={activeTimer ? "#dc3545" : "#ff922b"}
-                                size={20}
-                                color={activeTimer ? "#dc3545" : "#ff922b"}
-                                strokeWidth={2}
-                            />
-                            {activeTimer && (
-                                <div
-                                    style={{
-                                        position: "absolute",
-                                        top: "0",
-                                        right: "0",
-                                        width: "6px",
-                                        height: "6px",
-                                        backgroundColor: "#dc3545",
-                                        borderRadius: "50%",
-                                        border: "2px solid white",
-                                    }}
-                                />
-                            )}
-                            <span
-                                style={{
-                                    fontSize: "11px",
-                                    color: "#2c3e50",
-                                    marginTop: "4px",
-                                    whiteSpace: "nowrap",
-                                }}
-                            >
-                                Timers
-                            </span>
-                        </div>
-                    </Reminders>
-                </div>
-
-                {/* Summarize and Add Tab Note Buttons */}
+                </CrossTabSearch>
                 <div
                     style={{
                         display: "flex",
-                        gap: "8px",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        height: "100%",
                     }}
                 >
-                    <button
-                        onClick={handleSummarize}
+                    <ConsolidateTabs
+                        shouldConsolidate={true}
+                        className="flex flex-col items-center cursor-pointer p-1 rounded-lg transition-all duration-200 ease-in-out"
+                    >
+                        <span
+                            style={{
+                                fontSize: "11px",
+                                color: "#2c3e50",
+                                marginTop: "4px",
+                                whiteSpace: "nowrap",
+                            }}
+                        >
+                            Consolidate
+                        </span>
+                    </ConsolidateTabs>
+                </div>
+                <div
+                    onClick={handleScreenshot}
+                    style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        cursor: isCapturing ? "not-allowed" : "pointer",
+                        padding: "4px",
+                        borderRadius: "8px",
+                        transition: "all 0.2s ease",
+                        opacity: isCapturing ? 0.6 : 1,
+                        height: "100%",
+                    }}
+                >
+                    <Camera size={20} color="#495057" strokeWidth={2} />
+                    <span
                         style={{
-                            flex: 1,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            gap: "6px",
-                            padding: "10px",
-                            border: "1px solid rgba(66, 133, 244, 0.2)",
-                            borderRadius: "10px",
-                            cursor: "pointer",
-                            fontSize: "13px",
+                            fontSize: "11px",
                             color: "#2c3e50",
-                            transition: "all 0.2s ease",
-                            background: "transparent",
+                            marginTop: "4px",
+                            whiteSpace: "nowrap",
                         }}
                     >
-                        <div style={{ display: "flex", gap: "3px" }}>
-                            <div
-                                style={{
-                                    width: "6px",
-                                    height: "6px",
-                                    borderRadius: "50%",
-                                    backgroundColor: "#ff6b6b",
-                                }}
-                            />
-                            <div
-                                style={{
-                                    width: "6px",
-                                    height: "6px",
-                                    borderRadius: "50%",
-                                    backgroundColor: "#4285f4",
-                                }}
-                            />
-                            <div
-                                style={{
-                                    width: "6px",
-                                    height: "6px",
-                                    borderRadius: "50%",
-                                    backgroundColor: "#9b59b6",
-                                }}
-                            />
-                        </div>
-                        Summarize
-                    </button>
-                    <button
-                        onClick={() => setShowNotepad(true)}
+                        Screenshot
+                    </span>
+                </div>
+                <Reminders
+                    currentDomain={currentDomain}
+                    onTimerSet={(minutes: number) => {
+                        const endTime = Date.now() + minutes * 60 * 1000;
+                        setActiveTimer({ endTime, minutes });
+                        const timerKey = `timer_${currentDomain}`;
+                        localStorage.setItem(
+                            timerKey,
+                            JSON.stringify({ endTime, minutes }),
+                        );
+                        window.dispatchEvent(
+                            new CustomEvent("timerSet", {
+                                detail: { domain: currentDomain, minutes },
+                            }),
+                        );
+                    }}
+                    onTimerClear={() => {
+                        setActiveTimer(null);
+                        setTimeRemaining("");
+                        const timerKey = `timer_${currentDomain}`;
+                        localStorage.removeItem(timerKey);
+                        window.dispatchEvent(
+                            new CustomEvent("timerClear", {
+                                detail: { domain: currentDomain },
+                            }),
+                        );
+                    }}
+                >
+                    <div
                         style={{
-                            flex: 1,
                             display: "flex",
+                            flexDirection: "column",
                             alignItems: "center",
                             justifyContent: "center",
-                            gap: "6px",
-                            padding: "10px",
-                            border: `1px solid ${
-                                hasNote
-                                    ? "rgba(40, 167, 69, 0.2)"
-                                    : "rgba(0, 0, 0, 0.1)"
-                            }`,
-                            borderRadius: "10px",
                             cursor: "pointer",
-                            fontSize: "13px",
-                            color: "#2c3e50",
+                            padding: "4px",
+                            borderRadius: "8px",
                             transition: "all 0.2s ease",
-                            background: "transparent",
                             position: "relative",
+                            height: "100%",
                         }}
                     >
-                        <FileText size={16} color="#28a745" />
-                        {hasNote ? "View note" : "Add tab note"}
-                        {hasNote && (
+                        <Bell
+                            fill={activeTimer ? "#dc3545" : "#ff922b"}
+                            size={20}
+                            color={activeTimer ? "#dc3545" : "#ff922b"}
+                            strokeWidth={2}
+                        />
+                        {activeTimer && (
                             <div
                                 style={{
                                     position: "absolute",
-                                    top: "6px",
-                                    right: "6px",
+                                    top: "0",
+                                    right: "0",
                                     width: "6px",
                                     height: "6px",
-                                    backgroundColor: "#28a745",
+                                    backgroundColor: "#dc3545",
                                     borderRadius: "50%",
+                                    border: "2px solid white",
                                 }}
                             />
                         )}
-                    </button>
-                </div>
+                        <span
+                            style={{
+                                fontSize: "11px",
+                                color: "#2c3e50",
+                                marginTop: "4px",
+                                whiteSpace: "nowrap",
+                            }}
+                        >
+                            Timers
+                        </span>
+                    </div>
+                </Reminders>
+            </div>
 
-                {/* Open Dashboard Button */}
+            {/* Summarize and Add Tab Note Buttons */}
+            <div
+                style={{
+                    display: "flex",
+                    gap: "8px",
+                }}
+            >
                 <button
-                    onClick={() => {
-                        chrome.tabs.create({
-                            url: chrome.runtime.getURL("src/main/main.html"),
-                        });
-                    }}
+                    onClick={handleSummarize}
                     style={{
-                        width: "100%",
-                        padding: "12px",
-                        border: "1px solid rgba(66, 133, 244, 0.2)",
-                        borderRadius: "12px",
-                        color: "#4285f4",
-                        fontSize: "14px",
-                        fontWeight: "600",
-                        cursor: "pointer",
-                        transition: "all 0.2s ease",
-                        background: "transparent",
-                        marginTop: "auto",
-                    }}
-                >
-                    Open dashboard
-                </button>
-
-                {/* LyncX Branding */}
-                <div
-                    style={{
+                        flex: 1,
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
                         gap: "6px",
-                        marginTop: "4px",
+                        padding: "10px",
+                        border: "1px solid rgba(66, 133, 244, 0.2)",
+                        borderRadius: "10px",
+                        cursor: "pointer",
+                        fontSize: "13px",
+                        color: "#2c3e50",
+                        transition: "all 0.2s ease",
+                        background: "transparent",
                     }}
                 >
-                    <span
-                        style={{
-                            fontSize: "16px",
-                            fontWeight: "600",
-                            color: "#2c3e50",
-                        }}
-                    >
-                        LyncX
-                    </span>
-                </div>
-
-                {/* Error Message */}
-                {error && (
-                    <div
-                        style={{
-                            position: "absolute",
-                            bottom: "16px",
-                            left: "16px",
-                            right: "16px",
-                            backgroundColor: "rgba(220, 53, 69, 0.1)",
-                            color: "#dc3545",
-                            padding: "8px 12px",
-                            borderRadius: "8px",
-                            fontSize: "12px",
-                            textAlign: "center",
-                            zIndex: 1000,
-                        }}
-                    >
-                        {error}
+                    <div style={{ display: "flex", gap: "3px" }}>
+                        <div
+                            style={{
+                                width: "6px",
+                                height: "6px",
+                                borderRadius: "50%",
+                                backgroundColor: "#ff6b6b",
+                            }}
+                        />
+                        <div
+                            style={{
+                                width: "6px",
+                                height: "6px",
+                                borderRadius: "50%",
+                                backgroundColor: "#4285f4",
+                            }}
+                        />
+                        <div
+                            style={{
+                                width: "6px",
+                                height: "6px",
+                                borderRadius: "50%",
+                                backgroundColor: "#9b59b6",
+                            }}
+                        />
                     </div>
-                )}
+                    Summarize
+                </button>
+                <button
+                    onClick={() => setShowNotepad(true)}
+                    style={{
+                        flex: 1,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "6px",
+                        padding: "10px",
+                        border: `1px solid ${
+                            hasNote
+                                ? "rgba(40, 167, 69, 0.2)"
+                                : "rgba(0, 0, 0, 0.1)"
+                        }`,
+                        borderRadius: "10px",
+                        cursor: "pointer",
+                        fontSize: "13px",
+                        color: "#2c3e50",
+                        transition: "all 0.2s ease",
+                        background: "transparent",
+                        position: "relative",
+                    }}
+                >
+                    <FileText size={16} color="#28a745" />
+                    {hasNote ? "View note" : "Add tab note"}
+                    {hasNote && (
+                        <div
+                            style={{
+                                position: "absolute",
+                                top: "6px",
+                                right: "6px",
+                                width: "6px",
+                                height: "6px",
+                                backgroundColor: "#28a745",
+                                borderRadius: "50%",
+                            }}
+                        />
+                    )}
+                </button>
             </div>
+
+            {/* Open Dashboard Button */}
+            <button
+                onClick={() => {
+                    chrome.tabs.create({
+                        url: chrome.runtime.getURL("src/main/main.html"),
+                    });
+                }}
+                style={{
+                    width: "100%",
+                    padding: "12px",
+                    border: "1px solid rgba(66, 133, 244, 0.2)",
+                    borderRadius: "12px",
+                    color: "#4285f4",
+                    fontSize: "14px",
+                    fontWeight: "600",
+                    cursor: "pointer",
+                    transition: "all 0.2s ease",
+                    background: "transparent",
+                    marginTop: "auto",
+                }}
+            >
+                Open dashboard
+            </button>
+
+            {/* LyncX Branding */}
+            <div
+                style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "6px",
+                    marginTop: "4px",
+                }}
+            >
+                <span
+                    style={{
+                        fontSize: "16px",
+                        fontWeight: "600",
+                        color: "#2c3e50",
+                    }}
+                >
+                    LyncX
+                </span>
+            </div>
+
+            {/* Error Message */}
+            {error && (
+                <div
+                    style={{
+                        position: "absolute",
+                        bottom: "16px",
+                        left: "16px",
+                        right: "16px",
+                        backgroundColor: "rgba(220, 53, 69, 0.1)",
+                        color: "#dc3545",
+                        padding: "8px 12px",
+                        borderRadius: "8px",
+                        fontSize: "12px",
+                        textAlign: "center",
+                        zIndex: 1000,
+                    }}
+                >
+                    {error}
+                </div>
+            )}
         </div>
     );
 };
