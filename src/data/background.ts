@@ -1037,6 +1037,48 @@ async function handleGetActiveTimers(sendResponse: (response?: any) => void) {
 }
 
 // ===============================
+// SCREENSHOT HANDLER
+// ===============================
+
+async function handleCaptureScreenshot(sendResponse: (response?: any) => void) {
+    try {
+        console.log("📸 Background: Starting screenshot capture...");
+        
+        // Import ScreenshotService dynamically to avoid circular dependencies
+        const { ScreenshotService } = await import("../services/screenshotService");
+        
+        await ScreenshotService.captureFullPage();
+        
+        console.log("✅ Background: Screenshot captured successfully");
+        sendResponse({ success: true });
+    } catch (error) {
+        console.error("❌ Background: Screenshot failed:", error);
+        sendResponse({ 
+            success: false, 
+            error: error instanceof Error ? error.message : "Screenshot capture failed" 
+        });
+    }
+}
+
+// ===============================
+// AUTH STATE HANDLER
+// ===============================
+
+async function handleGetAuthState(sendResponse: (response?: any) => void) {
+    try {
+        console.log("🔍 Background: Getting auth state for hover navbar");
+        const authService = AuthService.getInstance();
+        const user = await authService.getCachedUser();
+        
+        console.log("🔍 Background: Auth state result:", user ? "authenticated" : "not authenticated");
+        sendResponse({ user });
+    } catch (error) {
+        console.error("❌ Background: Failed to get auth state:", error);
+        sendResponse({ user: null, error: error instanceof Error ? error.message : "Unknown error" });
+    }
+}
+
+// ===============================
 // UNIFIED MESSAGE HANDLER
 // ===============================
 
@@ -1071,6 +1113,49 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
                 console.error("Error in proceedToSite:", error);
                 sendResponse({ success: false, error: error.message });
             });
+        return true;
+    }
+
+    // Navbar messages
+    if (request.type === "OPEN_NOTEPAD") {
+        handleOpenNotepad(request, sendResponse);
+        return true;
+    }
+
+    if (request.type === "OPEN_REMINDERS") {
+        handleOpenReminders(sendResponse);
+        return true;
+    }
+
+    if (request.type === "OPEN_SEARCH") {
+        handleOpenSearch(sendResponse);
+        return true;
+    }
+
+    if (request.type === "TOGGLE_BOOKMARK") {
+        handleToggleBookmark(request, sendResponse);
+        return true;
+    }
+
+    if (request.type === "OPEN_TIMER") {
+        handleOpenTimer(sendResponse);
+        return true;
+    }
+
+    if (request.type === "SUMMARIZE_PAGE") {
+        handleSummarizePage(sendResponse);
+        return true;
+    }
+
+    // Auth state messages for hover navbar
+    if (request.type === "GET_AUTH_STATE") {
+        handleGetAuthState(sendResponse);
+        return true;
+    }
+
+    // Screenshot capture message
+    if (request.type === "CAPTURE_SCREENSHOT") {
+        handleCaptureScreenshot(sendResponse);
         return true;
     }
 
@@ -1349,6 +1434,104 @@ chrome.runtime.onInstalled.addListener(async () => {
 
     // Set up periodic cleanup alarm
     chrome.alarms.create("cleanupExpiredBlocks", { periodInMinutes: 5 });
+});
+
+// ===============================
+// NAVBAR ACTION HANDLERS
+// ===============================
+
+// Handle opening notepad from navbar
+function handleOpenNotepad(request: any, sendResponse: (response: any) => void) {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0]) {
+            chrome.tabs.sendMessage(tabs[0].id!, {
+                type: "SHOW_NOTEPAD",
+                domain: request.domain || new URL(tabs[0].url || "").hostname
+            });
+        }
+    });
+    sendResponse({ success: true });
+}
+
+// Handle opening reminders from navbar
+function handleOpenReminders(sendResponse: (response: any) => void) {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0]) {
+            chrome.tabs.sendMessage(tabs[0].id!, {
+                type: "SHOW_REMINDERS"
+            });
+        }
+    });
+    sendResponse({ success: true });
+}
+
+// Handle opening search from navbar
+function handleOpenSearch(sendResponse: (response: any) => void) {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0]) {
+            chrome.tabs.sendMessage(tabs[0].id!, {
+                type: "SHOW_SEARCH"
+            });
+        }
+    });
+    sendResponse({ success: true });
+}
+
+// Handle toggling bookmark from navbar
+function handleToggleBookmark(request: any, sendResponse: (response: any) => void) {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0]) {
+            chrome.tabs.sendMessage(tabs[0].id!, {
+                type: "TOGGLE_BOOKMARK",
+                url: request.url || tabs[0].url
+            });
+        }
+    });
+    sendResponse({ success: true });
+}
+
+// Handle opening timer from navbar
+function handleOpenTimer(sendResponse: (response: any) => void) {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0]) {
+            chrome.tabs.sendMessage(tabs[0].id!, {
+                type: "SHOW_TIMER"
+            });
+        }
+    });
+    sendResponse({ success: true });
+}
+
+// Handle summarizing page from navbar
+function handleSummarizePage(sendResponse: (response: any) => void) {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0]) {
+            chrome.tabs.sendMessage(tabs[0].id!, {
+                type: "SUMMARIZE_PAGE"
+            });
+        }
+    });
+    sendResponse({ success: true });
+}
+
+// Set up auth state change listener for hover navbar
+const authService = AuthService.getInstance();
+authService.onAuthStateChanged((user) => {
+    console.log("🔄 Background: Auth state changed, notifying content scripts:", user ? "authenticated" : "not authenticated");
+    
+    // Notify all content scripts about auth state changes
+    chrome.tabs.query({}, (tabs) => {
+        tabs.forEach((tab) => {
+            if (tab.id) {
+                chrome.tabs.sendMessage(tab.id, {
+                    type: "AUTH_STATE_CHANGED",
+                    user: user
+                }).catch(() => {
+                    // Ignore errors - content script may not be loaded
+                });
+            }
+        });
+    });
 });
 
 // Clean up when the extension is about to be terminated

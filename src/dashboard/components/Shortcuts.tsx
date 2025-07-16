@@ -47,7 +47,7 @@ const Shortcuts: React.FC<ShortcutsProps> = ({ isDarkMode = false }) => {
                 <div className="flex gap-2">
                     <button
                         onClick={() => {
-                            console.log("Ask LynxX clicked");
+                            console.log("Ask LyncX clicked");
                         }}
                         className={`
                             flex-1 px-3 py-2 rounded-lg text-xs font-medium
@@ -59,7 +59,7 @@ const Shortcuts: React.FC<ShortcutsProps> = ({ isDarkMode = false }) => {
                                     : "bg-purple-50 border border-purple-200 text-purple-700 hover:bg-purple-100 hover:border-purple-300"
                             }
                         `}
-                        title="Ask LynxX for help"
+                        title="Ask LyncX for help"
                     >
                         <span className="text-sm">🤖</span>
                         Ask LyncX

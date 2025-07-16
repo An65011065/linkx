@@ -35,7 +35,8 @@ export default defineConfig(({ mode }) => ({
         rollupOptions: {
             input: {
                 // Remove background from here - let crx plugin handle it
-                contentScript: "src/services/contentScript.js",
+                contentScript: "src/services/contentScript.ts",
+                hoverNavbarInjector: "src/content/hoverNavbarInjector.ts",
                 popup: resolve(__dirname, "src/popup/popup.html"),
                 graph: resolve(__dirname, "src/graph/graph.html"),
                 dashboard: resolve(__dirname, "src/dashboard/dashboard.html"),
