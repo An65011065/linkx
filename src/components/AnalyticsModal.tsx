@@ -184,7 +184,7 @@ const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
                 </div>
             </div>
 
-            <style jsx>{`
+            <style>{`
                 .analytics-overlay {
                     position: fixed;
                     top: 0;

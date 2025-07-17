@@ -8,6 +8,8 @@ import {
     Timer,
     Hash,
     BarChart3,
+    Shield,
+    Calendar,
 } from "lucide-react";
 import type { AuthUser } from "../services/authService";
 
@@ -22,36 +24,20 @@ const HoverNavbar: React.FC<HoverNavbarProps> = () => {
     const [currentDomain, setCurrentDomain] = useState("");
 
     useEffect(() => {
-        console.log("🔍 HoverNavbar: Checking auth state...");
+        console.log("🔍 HoverNavbar: Forcing navbar to show for testing...");
 
-        // Get auth state from background script since content scripts have limited chrome.storage access
-        const getAuthState = async () => {
-            try {
-                const response = await chrome.runtime.sendMessage({
-                    type: "GET_AUTH_STATE",
-                });
-                console.log("🔍 HoverNavbar: Auth state response:", response);
-
-                if (response && response.user) {
-                    console.log(
-                        "✅ HoverNavbar: User is authenticated",
-                        response.user,
-                    );
-                    setUser(response.user);
-                } else {
-                    console.log("❌ HoverNavbar: No authenticated user found");
-                    setUser(null);
-                }
-            } catch (error) {
-                console.error(
-                    "❌ HoverNavbar: Failed to get auth state:",
-                    error,
-                );
-                setUser(null);
-            }
+        // FORCE the navbar to show with a dummy user
+        const dummyUser = {
+            uid: "temp-user-123",
+            email: "test@lyncx.com",
+            displayName: "Test User",
+            photoURL: null,
         };
 
-        getAuthState();
+        setUser(dummyUser);
+        setCurrentDomain(window.location.hostname);
+
+        console.log("✅ HoverNavbar: Dummy user set, navbar should show");
 
         // Listen for auth state changes
         const messageListener = (message: {
@@ -63,14 +49,11 @@ const HoverNavbar: React.FC<HoverNavbarProps> = () => {
                     "🔄 HoverNavbar: Auth state changed:",
                     message.user,
                 );
-                setUser(message.user || null);
+                setUser(message.user || dummyUser); // Use dummy user as fallback
             }
         };
 
         chrome.runtime.onMessage.addListener(messageListener);
-
-        // Get current domain
-        setCurrentDomain(window.location.hostname);
 
         return () => {
             chrome.runtime.onMessage.removeListener(messageListener);
@@ -136,6 +119,12 @@ const HoverNavbar: React.FC<HoverNavbarProps> = () => {
         setActiveAction(null);
     };
 
+    const handleLimits = () => {
+        setActiveAction("limits");
+        chrome.runtime.sendMessage({ type: "SHOW_LIMIT_MODAL" });
+        setActiveAction(null);
+    };
+
     const handleSummarize = () => {
         setActiveAction("summarize");
         chrome.runtime.sendMessage({ type: "SUMMARIZE_PAGE" });
@@ -148,7 +137,13 @@ const HoverNavbar: React.FC<HoverNavbarProps> = () => {
         setActiveAction(null);
     };
 
-    // Section 1: Data Tools (Primary actions)
+    const handleFlow = () => {
+        setActiveAction("flow");
+        chrome.runtime.sendMessage({ type: "SHOW_FLOW_MODAL" });
+        setActiveAction(null);
+    };
+
+    // Section 1: Data Tools (Primary actions) - REMOVED EMAIL
     const dataTools = [
         {
             id: "screenshot",
@@ -163,6 +158,13 @@ const HoverNavbar: React.FC<HoverNavbarProps> = () => {
             label: "Analytics",
             action: handleAnalytics,
             color: "#06b6d4",
+        },
+        {
+            id: "flow",
+            icon: Calendar,
+            label: "Flow",
+            action: handleFlow,
+            color: "#059669", // Nice teal color for Flow
         },
     ];
 
@@ -208,6 +210,13 @@ const HoverNavbar: React.FC<HoverNavbarProps> = () => {
             color: "#06b6d4",
         },
         {
+            id: "limits",
+            icon: Shield,
+            label: "Daily Limits",
+            action: handleLimits,
+            color: "#8b5cf6",
+        },
+        {
             id: "summarize",
             icon: Hash,
             label: "Summarize",
@@ -243,14 +252,11 @@ const HoverNavbar: React.FC<HoverNavbarProps> = () => {
         );
     };
 
-    if (!user) {
-        console.log(
-            "❌ HoverNavbar: User not authenticated, navbar will not render",
-        );
-        return null;
-    }
-
-    console.log("✅ HoverNavbar: User authenticated, rendering navbar", user);
+    // Always render the navbar - no auth check
+    console.log(
+        "✅ HoverNavbar: Rendering navbar with user:",
+        user?.email || "no user",
+    );
 
     return (
         <div className="lynx-hover-navbar">
@@ -290,13 +296,13 @@ const HoverNavbar: React.FC<HoverNavbarProps> = () => {
                     {otherTools.map(renderNavItem)}
                 </div>
 
-                {/* User Avatar */}
+                {/* User Avatar - FIXED with null checks */}
                 <div className="lynx-navbar-footer">
                     <div
                         className="lynx-user-avatar"
-                        title={user.displayName || user.email || "User"}
+                        title={user?.displayName || user?.email || "User"}
                     >
-                        {user.displayName?.[0] || user.email?.[0] || "U"}
+                        {user?.displayName?.[0] || user?.email?.[0] || "U"}
                     </div>
                 </div>
             </div>

@@ -43,10 +43,63 @@ export function onExecute() {
             console.error("Stack trace:", error.stack);
         });
 
+    // Import and initialize analytics injector
+    console.log("🔄 Attempting to load analytics injector...");
+    import("../content/AnalyticsModalInjector")
+        .then((module) => {
+            console.log("✅ Analytics injector loaded successfully", module);
+        })
+        .catch((error) => {
+            console.error("❌ Failed to load analytics injector:", error);
+        });
+
+    // Import and initialize notepad injector
+    console.log("🔄 Attempting to load notepad injector...");
+    import("../content/NotepadInjector")
+        .then((module) => {
+            console.log("✅ Notepad injector loaded successfully", module);
+        })
+        .catch((error) => {
+            console.error("❌ Failed to load notepad injector:", error);
+            console.error("Stack trace:", error.stack);
+        });
+
+    // Import and initialize limit modal injector
+    console.log("🔄 Attempting to load limit modal injector...");
+    import("../content/LimitModalInjector")
+        .then((module) => {
+            console.log("✅ Limit modal injector loaded successfully", module);
+        })
+        .catch((error) => {
+            console.error("❌ Failed to load limit modal injector:", error);
+            console.error("Stack trace:", error.stack);
+        });
+
+    // Import and initialize limit status injector
+    console.log("🔄 Attempting to load limit status injector...");
+    import("../content/LimitStatusInjector")
+        .then((module) => {
+            console.log("✅ Limit status injector loaded successfully", module);
+        })
+        .catch((error) => {
+            console.error("❌ Failed to load limit status injector:", error);
+            console.error("Stack trace:", error.stack);
+        });
+
+    //Flow modal injector
+    console.log("🔄 Attempting to load Flow modal injector...");
+    import("../content/FlowModalInjector")
+        .then((module) => {
+            console.log("✅ Flow modal injector loaded successfully", module);
+        })
+        .catch((error) => {
+            console.error("❌ Failed to load Flow modal injector:", error);
+            console.error("Stack trace:", error.stack);
+        });
+
     // Function to extract clean text from the page
     function extractPageText() {
         console.log("Extracting page text...");
-
         try {
             // Clone the document to avoid modifying the original
             const docClone = document.cloneNode(true) as Document;
@@ -72,7 +125,6 @@ export function onExecute() {
                 ".story-content",
                 ".page-content",
             ];
-
             let mainContent = "";
 
             // Try to find main content area
@@ -95,7 +147,6 @@ export function onExecute() {
                 console.log(
                     "No main content area found, extracting from paragraphs and headings",
                 );
-
                 const contentElements = docClone.querySelectorAll(
                     "p, h1, h2, h3, h4, h5, h6, li, blockquote, div.text, div.paragraph",
                 );
@@ -105,7 +156,6 @@ export function onExecute() {
                         .filter((text) => text.length > 20) // Filter out very short text
                         .join("\n");
                 }
-
                 // Final fallback to body
                 if (!mainContent || mainContent.trim().length < 100) {
                     mainContent = docClone.body?.textContent || "";
@@ -212,6 +262,67 @@ export function onExecute() {
         }, 3000);
     }
 
+    // Usage tracking for daily limits
+    const usageTracker = {
+        lastUpdate: Date.now(),
+        domain: window.location.hostname.replace(/^www\./, ""),
+
+        startTracking() {
+            console.log("📊 Starting usage tracking for:", this.domain);
+
+            // Track usage every 30 seconds
+            const trackingInterval = setInterval(() => {
+                this.trackUsage();
+            }, 30000);
+
+            // Track when page becomes visible/hidden
+            document.addEventListener("visibilitychange", () => {
+                if (document.visibilityState === "visible") {
+                    this.lastUpdate = Date.now();
+                } else {
+                    this.trackUsage();
+                }
+            });
+
+            // Track when page unloads
+            window.addEventListener("beforeunload", () => {
+                this.trackUsage();
+            });
+
+            // Track when page loses focus
+            window.addEventListener("blur", () => {
+                this.trackUsage();
+            });
+
+            // Track when page gains focus
+            window.addEventListener("focus", () => {
+                this.lastUpdate = Date.now();
+            });
+        },
+
+        trackUsage() {
+            if (document.visibilityState === "hidden") return;
+
+            const now = Date.now();
+            const timeSpent = (now - this.lastUpdate) / 1000 / 60; // Convert to minutes
+
+            // Only track reasonable time intervals (between 0.5 and 5 minutes)
+            if (timeSpent >= 0.5 && timeSpent <= 5) {
+                chrome.runtime
+                    .sendMessage({
+                        type: "UPDATE_USAGE",
+                        domain: this.domain,
+                        minutes: timeSpent,
+                    })
+                    .catch((error) => {
+                        console.log("Usage tracking error:", error);
+                    });
+            }
+
+            this.lastUpdate = now;
+        },
+    };
+
     // Listen for messages from popup/background script
     if (typeof chrome !== "undefined" && chrome.runtime) {
         chrome.runtime.onMessage.addListener(
@@ -247,25 +358,8 @@ export function onExecute() {
         );
     }
 
-    console.log("🔄 Attempting to load analytics injector...");
-    import("../content/AnalyticsModalInjector")
-        .then((module) => {
-            console.log("✅ Analytics injector loaded successfully", module);
-        })
-        .catch((error) => {
-            console.error("❌ Failed to load analytics injector:", error);
-        });
-
-    // Import and initialize notepad
-    console.log("🔄 Attempting to load notepad injector...");
-    import("../content/NotepadInjector")
-        .then((module) => {
-            console.log("✅ Notepad injector loaded successfully", module);
-        })
-        .catch((error) => {
-            console.error("❌ Failed to load notepad injector:", error);
-            console.error("Stack trace:", error.stack);
-        });
+    // Start usage tracking
+    usageTracker.startTracking();
 
     // Auto-extract when page loads (for potential future use)
     if (document.readyState === "loading") {
@@ -275,4 +369,6 @@ export function onExecute() {
     } else {
         console.log("Document already loaded, content script ready");
     }
+
+    console.log("✅ LyncX content script initialization complete");
 }

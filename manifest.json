@@ -17,14 +17,26 @@
         "downloads",
         "contextMenus",
         "alarms",
-        "notifications"
+        "notifications",
+        "identity.email"
     ],
-    "host_permissions": ["<all_urls>"],
+    "host_permissions": [
+        "<all_urls>",
+        "https://www.googleapis.com/",
+        "https://*.google.com/"
+    ],
     "oauth2": {
         "client_id": "606602321768-7dh5u6k0saap2lbd223pjlqqk6sflhnr.apps.googleusercontent.com",
-        "scopes": ["openid", "email", "profile"]
+        "scopes": [
+            "openid",
+            "email",
+            "profile",
+            "https://www.googleapis.com/auth/calendar.readonly",
+            "https://www.googleapis.com/auth/calendar.events",
+            "https://www.googleapis.com/auth/userinfo.email",
+            "https://www.googleapis.com/auth/userinfo.profile"
+        ]
     },
-
     "action": {
         "default_popup": "src/popup/popup.html"
     },

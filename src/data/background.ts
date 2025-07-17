@@ -57,6 +57,120 @@ interface TabSearchResult {
     context: string;
 }
 
+interface DailyLimit {
+    domain: string;
+    limit: number; // in minutes
+    used: number; // in minutes
+    enabled: boolean;
+    lastReset: string; // ISO date string
+}
+
+interface DailyUsage {
+    domain: string;
+    date: string; // YYYY-MM-DD format
+    timeSpent: number; // in minutes
+}
+
+class DailyLimitManager {
+    private static readonly LIMITS_KEY = "daily_limits";
+    private static readonly USAGE_KEY = "daily_usage";
+
+    // Get today's date in YYYY-MM-DD format
+    private static getTodayKey(): string {
+        return new Date().toISOString().split("T")[0];
+    }
+
+    // Get all daily limits
+    static async getAllLimits(): Promise<Record<string, DailyLimit>> {
+        const result = await chrome.storage.sync.get([this.LIMITS_KEY]);
+        return result[this.LIMITS_KEY] || {};
+    }
+
+    // Get limit for specific domain
+    static async getLimit(domain: string): Promise<DailyLimit | null> {
+        const limits = await this.getAllLimits();
+        const limit = limits[domain];
+
+        if (!limit) return null;
+
+        // Check if we need to reset usage for new day
+        const today = this.getTodayKey();
+        if (limit.lastReset !== today) {
+            limit.used = 0;
+            limit.lastReset = today;
+            await this.saveLimit(limit);
+        }
+
+        return limit;
+    }
+
+    // Save or update limit
+    static async saveLimit(limit: DailyLimit): Promise<void> {
+        const limits = await this.getAllLimits();
+        limits[limit.domain] = limit;
+        await chrome.storage.sync.set({ [this.LIMITS_KEY]: limits });
+    }
+
+    // Remove limit
+    static async removeLimit(domain: string): Promise<void> {
+        const limits = await this.getAllLimits();
+        delete limits[domain];
+        await chrome.storage.sync.set({ [this.LIMITS_KEY]: limits });
+    }
+
+    // Update usage for a domain
+    static async updateUsage(
+        domain: string,
+        additionalMinutes: number,
+    ): Promise<void> {
+        const limit = await this.getLimit(domain);
+        if (!limit || !limit.enabled) return;
+
+        limit.used += additionalMinutes;
+        await this.saveLimit(limit);
+
+        // Check if limit exceeded
+        if (limit.used >= limit.limit) {
+            this.notifyLimitExceeded(domain, limit);
+        }
+    }
+
+    // Get current usage for domain
+    static async getCurrentUsage(domain: string): Promise<number> {
+        const limit = await this.getLimit(domain);
+        return limit?.used || 0;
+    }
+
+    // Notify when limit is exceeded
+    private static notifyLimitExceeded(
+        domain: string,
+        limit: DailyLimit,
+    ): void {
+        const overtime = limit.used - limit.limit;
+        const overtimeFormatted = this.formatTime(overtime);
+
+        chrome.notifications.create({
+            type: "basic",
+            iconUrl: "/src/assets/icons/icon128.png",
+            title: "Daily Limit Exceeded",
+            message: `You've exceeded your ${this.formatTime(
+                limit.limit,
+            )} limit on ${domain} by ${overtimeFormatted}`,
+            priority: 2,
+        });
+    }
+
+    // Format minutes to readable time
+    private static formatTime(minutes: number): string {
+        const hours = Math.floor(minutes / 60);
+        const mins = minutes % 60;
+        if (hours > 0) {
+            return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+        }
+        return `${mins}m`;
+    }
+}
+
 class BackgroundTracker {
     private static instance: BackgroundTracker;
     private dataService: DataService;
@@ -1796,6 +1910,389 @@ async function handleSaveNote(
         });
     }
 }
+// ============================
+// DAILY LIMITS
+// ============================
+
+async function handleGetDailyLimit(
+    request: any,
+    sendResponse: (response: any) => void,
+) {
+    try {
+        console.log("📊 Getting daily limit for domain:", request.domain);
+
+        const limit = await DailyLimitManager.getLimit(request.domain);
+
+        sendResponse({
+            success: true,
+            limit: limit,
+        });
+    } catch (error) {
+        console.error("❌ Error getting daily limit:", error);
+        sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : "Unknown error",
+        });
+    }
+}
+
+async function handleSetDailyLimit(
+    request: any,
+    sendResponse: (response: any) => void,
+) {
+    try {
+        console.log("💾 Setting daily limit for domain:", request.domain);
+
+        const limit: DailyLimit = {
+            domain: request.domain,
+            limit: request.limit,
+            used: 0,
+            enabled: request.enabled,
+            lastReset: new Date().toISOString().split("T")[0],
+        };
+
+        // If there's an existing limit, preserve the current usage
+        const existingLimit = await DailyLimitManager.getLimit(request.domain);
+        if (existingLimit) {
+            limit.used = existingLimit.used;
+            limit.lastReset = existingLimit.lastReset;
+        }
+
+        await DailyLimitManager.saveLimit(limit);
+
+        // NEW: Show the status bar expanded when limit is set
+        if (limit.enabled) {
+            console.log("📊 Showing expanded status bar for new limit");
+
+            // Find the tab with the matching domain
+            const tabs = await chrome.tabs.query({});
+            const matchingTab = tabs.find((tab) => {
+                if (!tab.url) return false;
+                try {
+                    const tabDomain = new URL(tab.url).hostname.replace(
+                        /^www\./,
+                        "",
+                    );
+                    return tabDomain === request.domain;
+                } catch {
+                    return false;
+                }
+            });
+
+            if (matchingTab && matchingTab.id) {
+                // Send message to show expanded status bar
+                chrome.tabs
+                    .sendMessage(matchingTab.id, {
+                        type: "SHOW_LIMIT_STATUS",
+                        domain: request.domain,
+                        showExpanded: true,
+                    })
+                    .catch((error) => {
+                        console.log(
+                            "Could not notify tab about new limit:",
+                            error,
+                        );
+                    });
+            }
+        }
+
+        sendResponse({
+            success: true,
+            limit: limit,
+        });
+    } catch (error) {
+        console.error("❌ Error setting daily limit:", error);
+        sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : "Unknown error",
+        });
+    }
+}
+
+// Handle removing daily limit
+async function handleRemoveDailyLimit(
+    request: any,
+    sendResponse: (response: any) => void,
+) {
+    try {
+        console.log("🗑️ Removing daily limit for domain:", request.domain);
+
+        await DailyLimitManager.removeLimit(request.domain);
+
+        sendResponse({
+            success: true,
+        });
+    } catch (error) {
+        console.error("❌ Error removing daily limit:", error);
+        sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : "Unknown error",
+        });
+    }
+}
+
+// Handle updating usage
+async function handleUpdateUsage(
+    request: any,
+    sendResponse: (response: any) => void,
+) {
+    try {
+        console.log(
+            "📈 Updating usage for domain:",
+            request.domain,
+            "minutes:",
+            request.minutes,
+        );
+
+        await DailyLimitManager.updateUsage(request.domain, request.minutes);
+
+        sendResponse({
+            success: true,
+        });
+    } catch (error) {
+        console.error("❌ Error updating usage:", error);
+        sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : "Unknown error",
+        });
+    }
+}
+
+// Handle showing limit modal
+function handleShowLimitModal(sendResponse: (response: any) => void) {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0]) {
+            chrome.tabs.sendMessage(tabs[0].id!, {
+                type: "SHOW_LIMIT_MODAL",
+            });
+        }
+    });
+    sendResponse({ success: true });
+}
+
+// ===============================
+// SIDE PANEL
+// ===============================
+
+// ===============================
+// FLOW
+// ===============================
+// ===============================
+// LYNCX FLOW HANDLERS
+// ===============================
+
+// Handle showing Flow modal
+function handleShowFlowModal(sendResponse: (response: any) => void) {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0]) {
+            chrome.tabs.sendMessage(tabs[0].id!, {
+                type: "SHOW_FLOW_MODAL",
+            });
+        }
+    });
+    sendResponse({ success: true });
+}
+
+// Handle Google sign-in for Flow
+async function handleFlowGoogleSignin(sendResponse: (response: any) => void) {
+    try {
+        console.log("🔄 Flow: Starting Google sign-in...");
+
+        const authService = AuthService.getInstance();
+        const user = await authService.authenticate();
+
+        if (user) {
+            console.log("✅ Flow: Google sign-in successful");
+            sendResponse({
+                success: true,
+                user: {
+                    uid: user.uid,
+                    email: user.email,
+                    displayName: user.displayName,
+                    photoURL: user.photoURL,
+                    gmailToken: user.gmailToken,
+                },
+            });
+        } else {
+            throw new Error("Failed to authenticate user");
+        }
+    } catch (error) {
+        console.error("❌ Flow: Google sign-in failed:", error);
+        sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : "Sign-in failed",
+        });
+    }
+}
+
+// Handle sign-out for Flow
+async function handleFlowSignOut(sendResponse: (response: any) => void) {
+    try {
+        console.log("🔄 Flow: Starting sign-out...");
+
+        const authService = AuthService.getInstance();
+        await authService.signOut();
+
+        console.log("✅ Flow: Sign-out successful");
+        sendResponse({ success: true });
+    } catch (error) {
+        console.error("❌ Flow: Sign-out failed:", error);
+        sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : "Sign-out failed",
+        });
+    }
+}
+
+// Handle getting calendar events
+async function handleGetCalendarEvents(sendResponse: (response: any) => void) {
+    try {
+        console.log("🗓️ Flow: Getting calendar events...");
+
+        const authService = AuthService.getInstance();
+        const user = authService.getCurrentUser();
+
+        if (!user || !user.gmailToken) {
+            throw new Error("User not authenticated or missing Gmail token");
+        }
+
+        // Get today's date range
+        const today = new Date();
+        const startOfDay = new Date(today.setHours(0, 0, 0, 0));
+        const endOfDay = new Date(today.setHours(23, 59, 59, 999));
+
+        // Make Google Calendar API call
+        const response = await fetch(
+            `https://www.googleapis.com/calendar/v3/calendars/primary/events?` +
+                `timeMin=${startOfDay.toISOString()}&` +
+                `timeMax=${endOfDay.toISOString()}&` +
+                `singleEvents=true&` +
+                `orderBy=startTime&` +
+                `maxResults=10`,
+            {
+                headers: {
+                    Authorization: `Bearer ${user.gmailToken}`,
+                    "Content-Type": "application/json",
+                },
+            },
+        );
+
+        if (!response.ok) {
+            if (response.status === 401) {
+                // Token expired, try to refresh
+                await authService.refreshUserData();
+                throw new Error(
+                    "Authentication token expired. Please sign in again.",
+                );
+            }
+            throw new Error(`Calendar API error: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        // Transform events to our format
+        const events = (data.items || []).map((event: any) => ({
+            id: event.id,
+            title: event.summary || "Untitled Event",
+            start: event.start?.dateTime || event.start?.date,
+            end: event.end?.dateTime || event.end?.date,
+            description: event.description,
+            location: event.location,
+        }));
+
+        console.log(`✅ Flow: Retrieved ${events.length} calendar events`);
+        sendResponse({ success: true, events });
+    } catch (error) {
+        console.error("❌ Flow: Failed to get calendar events:", error);
+        sendResponse({
+            success: false,
+            error:
+                error instanceof Error
+                    ? error.message
+                    : "Failed to get calendar events",
+            events: [],
+        });
+    }
+}
+
+// Handle creating calendar events (optional feature)
+async function handleCreateCalendarEvent(
+    request: {
+        title: string;
+        description?: string;
+        start: string;
+        end: string;
+        location?: string;
+    },
+    sendResponse: (response: any) => void,
+) {
+    try {
+        console.log("🗓️ Flow: Creating calendar event...");
+
+        const authService = AuthService.getInstance();
+        const user = authService.getCurrentUser();
+
+        if (!user || !user.gmailToken) {
+            throw new Error("User not authenticated or missing Gmail token");
+        }
+
+        const eventData = {
+            summary: request.title,
+            description: request.description,
+            start: {
+                dateTime: request.start,
+                timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            },
+            end: {
+                dateTime: request.end,
+                timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            },
+            location: request.location,
+        };
+
+        const response = await fetch(
+            "https://www.googleapis.com/calendar/v3/calendars/primary/events",
+            {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${user.gmailToken}`,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(eventData),
+            },
+        );
+
+        if (!response.ok) {
+            throw new Error(
+                `Failed to create calendar event: ${response.status}`,
+            );
+        }
+
+        const event = await response.json();
+
+        console.log("✅ Flow: Calendar event created successfully");
+        sendResponse({
+            success: true,
+            event: {
+                id: event.id,
+                title: event.summary,
+                start: event.start?.dateTime || event.start?.date,
+                end: event.end?.dateTime || event.end?.date,
+                description: event.description,
+                location: event.location,
+            },
+        });
+    } catch (error) {
+        console.error("❌ Flow: Failed to create calendar event:", error);
+        sendResponse({
+            success: false,
+            error:
+                error instanceof Error
+                    ? error.message
+                    : "Failed to create calendar event",
+        });
+    }
+}
 
 // ===============================
 // UNIFIED MESSAGE HANDLER
@@ -1914,7 +2411,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return true;
     }
 
-    // Analytics message (add this if you want analytics to work)
+    // Analytics message
     if (request.type === "OPEN_ANALYTICS") {
         handleOpenAnalytics(sendResponse);
         return true;
@@ -1942,11 +2439,61 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return true;
     }
 
-    // Existing SHOW_NOTEPAD handler (already exists in your background.ts)
     if (request.type === "SHOW_NOTEPAD") {
         handleOpenNotepad(request, sendResponse);
         return true;
     }
+
+    if (request.type === "GET_DAILY_LIMIT") {
+        handleGetDailyLimit(request, sendResponse);
+        return true;
+    }
+
+    if (request.type === "SET_DAILY_LIMIT") {
+        handleSetDailyLimit(request, sendResponse);
+        return true;
+    }
+
+    if (request.type === "REMOVE_DAILY_LIMIT") {
+        handleRemoveDailyLimit(request, sendResponse);
+        return true;
+    }
+
+    if (request.type === "UPDATE_USAGE") {
+        handleUpdateUsage(request, sendResponse);
+        return true;
+    }
+
+    if (request.type === "SHOW_LIMIT_MODAL") {
+        handleShowLimitModal(sendResponse);
+        return true;
+    }
+    // Flow modal messages
+    if (request.type === "SHOW_FLOW_MODAL") {
+        handleShowFlowModal(sendResponse);
+        return true;
+    }
+
+    if (request.type === "FLOW_GOOGLE_SIGNIN") {
+        handleFlowGoogleSignin(sendResponse);
+        return true;
+    }
+
+    if (request.type === "FLOW_SIGN_OUT") {
+        handleFlowSignOut(sendResponse);
+        return true;
+    }
+
+    if (request.type === "GET_CALENDAR_EVENTS") {
+        handleGetCalendarEvents(sendResponse);
+        return true;
+    }
+
+    if (request.type === "CREATE_CALENDAR_EVENT") {
+        handleCreateCalendarEvent(request, sendResponse);
+        return true;
+    }
+
     // Return false for unhandled messages
     console.log("❓ Unknown message type:", request.type || request.action);
     return false;

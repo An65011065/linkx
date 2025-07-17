@@ -7,6 +7,8 @@ export interface AuthUser {
     displayName: string | null;
     photoURL: string | null;
     plan?: UserPlan;
+    gmailToken?: string;
+    gmailScopes?: string[];
 }
 
 export interface UserPlan {
@@ -16,6 +18,73 @@ export interface UserPlan {
     subscriptionEnd: Date | null;
     stripeCustomerId?: string;
     lastUpdated: Date;
+}
+
+// Add Gmail-specific types
+export interface GmailApiResponse<T> {
+    data: T;
+    error?: string;
+    nextPageToken?: string;
+}
+
+export interface GmailListResponse {
+    messages: Array<{ id: string }>;
+    nextPageToken?: string;
+    resultSizeEstimate?: number;
+}
+
+export interface GmailMessagePart {
+    partId?: string;
+    mimeType: string;
+    filename?: string;
+    headers: Array<{
+        name: string;
+        value: string;
+    }>;
+    body: {
+        data?: string;
+        size?: number;
+        attachmentId?: string;
+    };
+    parts?: GmailMessagePart[];
+}
+
+export interface GmailMessage {
+    id: string;
+    threadId: string;
+    labelIds: string[];
+    snippet: string;
+    historyId?: string;
+    internalDate: string;
+    payload: GmailMessagePart;
+    sizeEstimate?: number;
+    raw?: string;
+}
+
+// Add type for API request body
+export interface ApiRequestBody {
+    googleToken?: string;
+    planType?: string;
+    subscriptionEnd?: string | null;
+    stripeCustomerId?: string;
+    raw?: string;
+    [key: string]: unknown;
+}
+
+// Add type for debug info
+export interface DebugInfo {
+    isSignedIn: boolean;
+    user: {
+        uid: string;
+        email: string | null;
+        plan: string;
+    } | null;
+    apiBaseUrl: string;
+    sessionSync: {
+        isActive: boolean;
+        lastSync: string;
+        minutesSinceLastSync: number | null;
+    };
 }
 
 class AuthService {
@@ -583,7 +652,7 @@ class AuthService {
     private async apiCall(
         method: "GET" | "POST" | "PUT" | "DELETE",
         endpoint: string,
-        body?: any,
+        body?: ApiRequestBody,
     ): Promise<Response> {
         const authToken = await this.getAuthToken();
         if (!authToken) {
@@ -620,7 +689,7 @@ class AuthService {
     public async makeApiCall(
         method: "GET" | "POST" | "PUT" | "DELETE",
         endpoint: string,
-        body?: any,
+        body?: ApiRequestBody,
     ): Promise<Response> {
         return this.apiCall(method, endpoint, body);
     }
@@ -704,10 +773,10 @@ class AuthService {
     }
 
     // ========== UTILITY METHODS (UNCHANGED) ==========
-    private parseApiPlan(apiPlan: any): UserPlan {
+    private parseApiPlan(apiPlan: Partial<UserPlan>): UserPlan {
         return {
-            type: apiPlan.type,
-            status: apiPlan.status,
+            type: apiPlan.type || "free",
+            status: apiPlan.status || "active",
             subscriptionStart: apiPlan.subscriptionStart
                 ? new Date(apiPlan.subscriptionStart)
                 : null,
@@ -715,7 +784,7 @@ class AuthService {
                 ? new Date(apiPlan.subscriptionEnd)
                 : null,
             stripeCustomerId: apiPlan.stripeCustomerId,
-            lastUpdated: new Date(apiPlan.lastUpdated),
+            lastUpdated: new Date(apiPlan.lastUpdated || Date.now()),
         };
     }
 
@@ -826,7 +895,7 @@ class AuthService {
         }
     }
 
-    public getDebugInfo(): any {
+    public getDebugInfo(): DebugInfo {
         const syncStatus = this.getSyncStatus();
 
         return {
@@ -849,6 +918,186 @@ class AuthService {
                     : null,
             },
         };
+    }
+
+    private readonly GMAIL_SCOPES = [
+        "https://www.googleapis.com/auth/gmail.readonly",
+        "https://www.googleapis.com/auth/gmail.modify",
+        "https://www.googleapis.com/auth/gmail.send",
+    ];
+
+    async authenticate(): Promise<AuthUser> {
+        return new Promise((resolve, reject) => {
+            chrome.identity.getAuthToken(
+                {
+                    interactive: true,
+                    scopes: [
+                        ...this.GMAIL_SCOPES,
+                        "openid",
+                        "email",
+                        "profile",
+                    ],
+                },
+                async (token) => {
+                    if (chrome.runtime.lastError) {
+                        reject(chrome.runtime.lastError);
+                        return;
+                    }
+
+                    try {
+                        // Process token and get user info
+                        const user = await this.processGoogleToken(
+                            token as string,
+                        );
+
+                        // Add Gmail-specific data
+                        const gmailUser: AuthUser = {
+                            ...user,
+                            gmailToken: token as string,
+                            gmailScopes: this.GMAIL_SCOPES,
+                        };
+
+                        await this.setCurrentUser(gmailUser);
+                        resolve(gmailUser);
+                    } catch (error) {
+                        reject(error);
+                    }
+                },
+            );
+        });
+    }
+
+    // Add Gmail API helper methods
+    private async makeGmailApiCall<T>(
+        endpoint: string,
+        options: RequestInit = {},
+    ): Promise<GmailApiResponse<T>> {
+        const user = this.getCurrentUser();
+        if (!user?.gmailToken) {
+            throw new Error("No Gmail token available");
+        }
+
+        try {
+            const response = await fetch(
+                `https://www.googleapis.com/gmail/v1/users/me/${endpoint}`,
+                {
+                    ...options,
+                    headers: {
+                        ...options.headers,
+                        Authorization: `Bearer ${user.gmailToken}`,
+                        "Content-Type": "application/json",
+                    },
+                },
+            );
+
+            if (!response.ok) {
+                if (response.status === 401) {
+                    // Token expired, refresh and retry
+                    await this.refreshGmailToken();
+                    return this.makeGmailApiCall(endpoint, options);
+                }
+                throw new Error(`Gmail API error: ${response.status}`);
+            }
+
+            const data = await response.json();
+            return { data: data as T };
+        } catch (error) {
+            console.error("Gmail API call failed:", error);
+            throw new Error(
+                `Gmail API call failed: ${
+                    error instanceof Error ? error.message : "Unknown error"
+                }`,
+            );
+        }
+    }
+
+    private async refreshGmailToken(): Promise<void> {
+        return new Promise((resolve, reject) => {
+            chrome.identity.getAuthToken(
+                { interactive: false },
+                async (token) => {
+                    if (chrome.runtime.lastError) {
+                        reject(chrome.runtime.lastError);
+                        return;
+                    }
+
+                    const user = this.getCurrentUser();
+                    if (user) {
+                        await this.setCurrentUser({
+                            ...user,
+                            gmailToken: token as string,
+                        });
+                    }
+                    resolve();
+                },
+            );
+        });
+    }
+
+    // Add Gmail-specific API methods
+    public async getGmailMessages(
+        labelIds: string[] = ["INBOX"],
+    ): Promise<GmailMessage[]> {
+        try {
+            // First, get list of message IDs
+            const listResponse = await this.makeGmailApiCall<GmailListResponse>(
+                `messages?labelIds=${labelIds.join(",")}&maxResults=20`,
+            );
+
+            if (!listResponse?.data?.messages) {
+                return [];
+            }
+
+            // Then fetch full message details for each ID
+            const messages: GmailMessage[] = [];
+            for (const { id } of listResponse.data.messages) {
+                try {
+                    const messageResponse =
+                        await this.makeGmailApiCall<GmailMessage>(
+                            `messages/${id}?format=full`,
+                        );
+                    if (messageResponse?.data) {
+                        messages.push(messageResponse.data);
+                    }
+                } catch (error) {
+                    console.error(`Failed to fetch message ${id}:`, error);
+                    // Continue with other messages even if one fails
+                    continue;
+                }
+            }
+
+            return messages;
+        } catch (error) {
+            console.error("Failed to fetch Gmail messages:", error);
+            throw new Error("Failed to fetch Gmail messages");
+        }
+    }
+
+    public async sendGmailMessage(
+        to: string,
+        subject: string,
+        body: string,
+    ): Promise<void> {
+        const email = [
+            "Content-Type: text/html; charset=utf-8",
+            "MIME-Version: 1.0",
+            `To: ${to}`,
+            `Subject: ${subject}`,
+            "",
+            body,
+        ].join("\r\n");
+
+        const encodedEmail = btoa(email)
+            .replace(/\+/g, "-")
+            .replace(/\//g, "_")
+            .replace(/=+$/, "");
+
+        await this.makeGmailApiCall("messages/send", {
+            method: "POST",
+            body: JSON.stringify({
+                raw: encodedEmail,
+            }),
+        });
     }
 }
 
