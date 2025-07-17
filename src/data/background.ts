@@ -1633,6 +1633,170 @@ async function handleGetAllTabs(sendResponse: (response: any) => void) {
     }
 }
 
+async function handleLoadNote(
+    request: { domain: string },
+    sendResponse: (response: any) => void,
+): Promise<void> {
+    try {
+        console.log(`📝 Loading note for domain: ${request.domain}`);
+
+        const authService = AuthService.getInstance();
+        const response = await authService.makeApiCall(
+            "GET",
+            `/notes/${encodeURIComponent(request.domain)}`,
+        );
+
+        if (response.ok) {
+            const noteData = await response.json();
+            console.log(`✅ Loaded note from backend for ${request.domain}`);
+
+            const note = {
+                id: noteData.id,
+                domain: noteData.domain,
+                content: noteData.content,
+                lastModified: new Date(noteData.lastModified).getTime(),
+                createdAt: new Date(noteData.createdAt).getTime(),
+            };
+
+            sendResponse({
+                success: true,
+                note: note,
+            });
+        } else if (response.status === 404) {
+            // No note exists for this domain yet
+            console.log(`📝 No existing note for ${request.domain}`);
+            sendResponse({
+                success: true,
+                note: null,
+            });
+        } else {
+            throw new Error(`Failed to load note: ${response.status}`);
+        }
+    } catch (error) {
+        console.error("❌ Error loading note:", error);
+        sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : "Unknown error",
+        });
+    }
+}
+
+// Handle loading all notes for the sidebar
+async function handleLoadAllNotes(
+    sendResponse: (response: any) => void,
+): Promise<void> {
+    try {
+        console.log("📚 Loading all notes from backend - START");
+
+        const authService = AuthService.getInstance();
+        console.log("🔐 Auth service instance obtained");
+
+        console.log("🔄 Making API call to /notes");
+        const response = await authService.makeApiCall("GET", "/notes");
+        console.log("📡 API Response status:", response.status);
+
+        if (response.ok) {
+            const notesData = await response.json();
+            console.log("🔍 API Response type:", typeof notesData);
+            console.log("🔍 Is Array?", Array.isArray(notesData));
+            console.log(
+                "🔍 Raw response structure:",
+                JSON.stringify(notesData, null, 2),
+            );
+
+            let processedNotes;
+            if (!Array.isArray(notesData)) {
+                console.log("📦 Processing object response");
+                // Handle response format: { notes: [...] }
+                processedNotes = (notesData.notes || []).map(
+                    (noteData: any) => ({
+                        domain: noteData.domain,
+                        content: noteData.content,
+                        lastModified: new Date(noteData.lastModified).getTime(),
+                        createdAt: new Date(noteData.createdAt).getTime(),
+                    }),
+                );
+            } else {
+                console.log("📦 Processing array response");
+                // Handle response format: [...]
+                processedNotes = notesData.map((noteData: any) => ({
+                    domain: noteData.domain,
+                    content: noteData.content,
+                    lastModified: new Date(noteData.lastModified).getTime(),
+                    createdAt: new Date(noteData.createdAt).getTime(),
+                }));
+            }
+
+            console.log("✨ Final processed notes:", processedNotes);
+            sendResponse({
+                success: true,
+                notes: processedNotes,
+            });
+        } else {
+            console.error("❌ API call failed with status:", response.status);
+            const errorText = await response
+                .text()
+                .catch(() => "No error details available");
+            console.error("Error details:", errorText);
+            throw new Error(`Failed to load notes: ${response.status}`);
+        }
+    } catch (error) {
+        console.error("❌ Error in handleLoadAllNotes:", error);
+        console.error(
+            "Error stack:",
+            error instanceof Error ? error.stack : "No stack trace",
+        );
+        sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : "Unknown error",
+            notes: [],
+        });
+    }
+}
+
+// Handle saving a note
+async function handleSaveNote(
+    request: { domain: string; content: string },
+    sendResponse: (response: any) => void,
+): Promise<void> {
+    try {
+        console.log(`💾 Saving note for domain: ${request.domain}`);
+
+        const authService = AuthService.getInstance();
+        const response = await authService.makeApiCall("POST", "/notes", {
+            domain: request.domain,
+            content: request.content,
+        });
+
+        if (response.ok) {
+            const noteData = await response.json();
+            console.log(`✅ Note saved successfully for ${request.domain}`);
+
+            const note = {
+                id: noteData.id,
+                domain: noteData.domain,
+                content: noteData.content,
+                lastModified: new Date(noteData.lastModified).getTime(),
+                createdAt: new Date(noteData.createdAt).getTime(),
+            };
+
+            sendResponse({
+                success: true,
+                note: note,
+            });
+        } else {
+            const errorData = await response.json();
+            throw new Error(errorData.error || "Failed to save note");
+        }
+    } catch (error) {
+        console.error("❌ Error saving note:", error);
+        sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : "Unknown error",
+        });
+    }
+}
+
 // ===============================
 // UNIFIED MESSAGE HANDLER
 // ===============================
@@ -1649,6 +1813,34 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
     if (request.type === "SWITCH_TO_TAB") {
         handleSwitchToTab(request.tabId, sendResponse);
+        return true;
+    }
+
+    // Note loading/saving messages
+    if (request.type === "LOAD_NOTE") {
+        handleLoadNote(request, sendResponse);
+        return true;
+    }
+
+    if (request.type === "LOAD_ALL_NOTES") {
+        handleLoadAllNotes(sendResponse);
+        return true;
+    }
+
+    if (request.type === "SAVE_NOTE") {
+        handleSaveNote(request, sendResponse);
+        return true;
+    }
+
+    if (request.type === "SHOW_TIMER") {
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+            if (tabs[0]) {
+                chrome.tabs.sendMessage(tabs[0].id!, {
+                    type: "SHOW_TIMER",
+                });
+            }
+        });
+        sendResponse({ success: true });
         return true;
     }
 
@@ -1724,8 +1916,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
     // Analytics message (add this if you want analytics to work)
     if (request.type === "OPEN_ANALYTICS") {
-        // You can implement this later or just acknowledge it for now
-        sendResponse({ success: true });
+        handleOpenAnalytics(sendResponse);
         return true;
     }
 
@@ -1746,6 +1937,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return true;
     }
 
+    if (request.type === "GET_DOMAIN_ANALYTICS") {
+        handleGetDomainAnalytics(request, sendResponse);
+        return true;
+    }
+
+    // Existing SHOW_NOTEPAD handler (already exists in your background.ts)
+    if (request.type === "SHOW_NOTEPAD") {
+        handleOpenNotepad(request, sendResponse);
+        return true;
+    }
     // Return false for unhandled messages
     console.log("❓ Unknown message type:", request.type || request.action);
     return false;
@@ -2041,6 +2242,99 @@ authService.onAuthStateChanged((user) => {
         });
     });
 });
+
+// ===============================
+// ANALYTICS MODAL HANDLER
+// ===============================
+function handleOpenAnalytics(sendResponse: (response: any) => void) {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0]) {
+            chrome.tabs.sendMessage(tabs[0].id!, {
+                type: "SHOW_ANALYTICS",
+            });
+        }
+    });
+    sendResponse({ success: true });
+}
+
+// Handle getting domain analytics data
+async function handleGetDomainAnalytics(
+    request: { domain: string },
+    sendResponse: (response: any) => void,
+): Promise<void> {
+    try {
+        console.log(`📊 Getting analytics for domain: ${request.domain}`);
+
+        const dataService = DataService.getInstance();
+
+        // Get current session data
+        const currentSession = await dataService.getCurrentSession();
+        const analytics = await dataService.getSessionAnalytics();
+
+        // Calculate domain-specific stats
+        const allVisits = currentSession.tabSessions.flatMap(
+            (ts) => ts.urlVisits,
+        );
+        const domainVisits = allVisits.filter(
+            (visit) => visit.domain === request.domain,
+        );
+
+        // Calculate domain stats
+        const domainTimeSpent = domainVisits.reduce(
+            (total, visit) => total + visit.activeTime,
+            0,
+        );
+        const domainVisitCount = domainVisits.length;
+
+        // Calculate percentage of total time
+        const totalTimeToday = currentSession.stats.totalTime;
+        const domainPercentage =
+            totalTimeToday > 0
+                ? Math.round((domainTimeSpent / totalTimeToday) * 100)
+                : 0;
+
+        // Determine category
+        const domainCategory =
+            domainVisits.length > 0 ? domainVisits[0].category : "other";
+
+        // Calculate total screen time (sum of all categories)
+        const totalScreenTime = currentSession.stats.totalTime;
+
+        // Calculate LyncX usage count (approximate based on tab sessions and visits)
+        const totalLyncxUse =
+            currentSession.tabSessions.length +
+            Math.floor(allVisits.length / 3);
+
+        const domainStats = {
+            timeSpent: domainTimeSpent,
+            percentage: domainPercentage,
+            category: domainCategory,
+            visits: domainVisitCount,
+        };
+
+        console.log(
+            `✅ Analytics calculated for ${request.domain}:`,
+            domainStats,
+        );
+
+        sendResponse({
+            success: true,
+            domainStats,
+            totalScreenTime,
+            totalLyncxUse,
+        });
+    } catch (error) {
+        console.error("❌ Error getting domain analytics:", error);
+        sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : "Unknown error",
+        });
+    }
+}
+
+// ===============================
+// Notepad
+// ===============================
 
 // Clean up when the extension is about to be terminated
 chrome.runtime.onSuspend.addListener(() => {

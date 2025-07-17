@@ -32,6 +32,17 @@ export function onExecute() {
             console.error("Stack trace:", error.stack);
         });
 
+    // Import and initialize timer injector
+    console.log("🔄 Attempting to load timer injector...");
+    import("../content/TimebarInjector")
+        .then((module) => {
+            console.log("✅ Timer injector loaded successfully", module);
+        })
+        .catch((error) => {
+            console.error("❌ Failed to load timer injector:", error);
+            console.error("Stack trace:", error.stack);
+        });
+
     // Function to extract clean text from the page
     function extractPageText() {
         console.log("Extracting page text...");
@@ -235,6 +246,26 @@ export function onExecute() {
             },
         );
     }
+
+    console.log("🔄 Attempting to load analytics injector...");
+    import("../content/AnalyticsModalInjector")
+        .then((module) => {
+            console.log("✅ Analytics injector loaded successfully", module);
+        })
+        .catch((error) => {
+            console.error("❌ Failed to load analytics injector:", error);
+        });
+
+    // Import and initialize notepad
+    console.log("🔄 Attempting to load notepad injector...");
+    import("../content/NotepadInjector")
+        .then((module) => {
+            console.log("✅ Notepad injector loaded successfully", module);
+        })
+        .catch((error) => {
+            console.error("❌ Failed to load notepad injector:", error);
+            console.error("Stack trace:", error.stack);
+        });
 
     // Auto-extract when page loads (for potential future use)
     if (document.readyState === "loading") {

@@ -102,7 +102,7 @@ const HoverNavbar: React.FC<HoverNavbarProps> = () => {
     const handleNotepad = () => {
         setActiveAction("notepad");
         chrome.runtime.sendMessage({
-            type: "OPEN_NOTEPAD",
+            type: "SHOW_NOTEPAD",
             domain: currentDomain,
         });
         setActiveAction(null);
@@ -132,7 +132,7 @@ const HoverNavbar: React.FC<HoverNavbarProps> = () => {
 
     const handleTimer = () => {
         setActiveAction("timer");
-        chrome.runtime.sendMessage({ type: "OPEN_TIMER" });
+        chrome.runtime.sendMessage({ type: "SHOW_TIMER" });
         setActiveAction(null);
     };
 
