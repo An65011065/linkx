@@ -55,7 +55,7 @@ const NotesOverview: React.FC<NotesOverviewProps> = ({
 
     const loadNotesLimits = async () => {
         try {
-            const response = await authService.apiCall(
+            const response = await authService.makeApiCall(
                 "GET",
                 "/notes/info/limits",
             );
@@ -76,7 +76,7 @@ const NotesOverview: React.FC<NotesOverviewProps> = ({
             setLoading(true);
             console.log("🔄 Loading notes from API...");
 
-            const response = await authService.apiCall(
+            const response = await authService.makeApiCall(
                 "GET",
                 `/notes${
                     searchQuery
@@ -137,7 +137,7 @@ const NotesOverview: React.FC<NotesOverviewProps> = ({
 
     const handleDeleteNote = async (domain: string) => {
         try {
-            const response = await authService.apiCall(
+            const response = await authService.makeApiCall(
                 "DELETE",
                 `/notes/${encodeURIComponent(domain)}`,
             );
@@ -152,7 +152,7 @@ const NotesOverview: React.FC<NotesOverviewProps> = ({
 
     const handleSaveNote = async (domain: string, content: string) => {
         try {
-            const response = await authService.apiCall("POST", "/notes", {
+            const response = await authService.makeApiCall("POST", "/notes", {
                 domain,
                 content,
             });
@@ -186,7 +186,7 @@ const NotesOverview: React.FC<NotesOverviewProps> = ({
             const firstWord = content.trim().split(/\s+/)[0];
             const domain = firstWord.toLowerCase();
 
-            const response = await authService.apiCall("POST", "/notes", {
+            const response = await authService.makeApiCall("POST", "/notes", {
                 domain,
                 content,
             });

@@ -5,6 +5,6 @@ import PopupApp from "./popup/components/MainContent";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
     <React.StrictMode>
-        <PopupApp />
+        <PopupApp user={null} onSignOut={() => {}} />
     </React.StrictMode>,
 );

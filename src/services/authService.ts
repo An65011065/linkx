@@ -23,7 +23,7 @@ class AuthService {
     private currentUser: AuthUser | null = null;
     private authListeners: ((user: AuthUser | null) => void)[] = [];
     private readonly apiBaseUrl = "https://lyncx-server.vercel.app/api";
-    private tokenRefreshTimer: NodeJS.Timeout | null = null;
+    private tokenRefreshTimer: number | null = null;
 
     private constructor() {
         this.loadCachedUser();
@@ -85,7 +85,7 @@ class AuthService {
                         console.log("✅ Chrome Identity API successful");
                         try {
                             const user = await this.processGoogleToken(
-                                googleToken,
+                                googleToken as string,
                             );
                             resolve(user);
                         } catch (error) {
@@ -673,7 +673,7 @@ class AuthService {
                 if (chrome.runtime.lastError || !token) {
                     resolve(null);
                 } else {
-                    resolve(token);
+                    resolve(token as string);
                 }
             });
         });

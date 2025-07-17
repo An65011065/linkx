@@ -42,6 +42,21 @@ interface LinkCreationInfo {
     sourceVisitId?: string;
 }
 
+interface SearchMatch {
+    tabId: number;
+    title: string;
+    url: string;
+    domain: string;
+    favicon: string;
+    matchCount: number;
+    context: string;
+}
+
+interface TabSearchResult {
+    matchCount: number;
+    context: string;
+}
+
 class BackgroundTracker {
     private static instance: BackgroundTracker;
     private dataService: DataService;
@@ -423,7 +438,6 @@ class BackgroundTracker {
                 sourceInfo,
                 creationMode,
             );
-
             state.previousUrl = tab.url;
             this.tabStates.set(tabId, state);
 
@@ -523,7 +537,7 @@ class BackgroundTracker {
 
     // Periodically sync all active visits to prevent data loss
     private async syncAllVisits(): Promise<void> {
-        for (const [_, state] of this.tabStates) {
+        for (const [, state] of this.tabStates) {
             if (state.currentVisit) {
                 this.updateActiveTime(state.currentVisit);
                 await this.dataService.addUrlVisit(state.currentVisit);
@@ -581,6 +595,7 @@ class BackgroundTracker {
                     action: "summarize-selection",
                     text: info.selectionText,
                 });
+
                 return;
             }
 
@@ -614,7 +629,7 @@ class BackgroundTracker {
                             const noteData = await response.json();
                             existingContent = noteData.content || "";
                         }
-                    } catch (err) {
+                    } catch {
                         console.log("No existing note found, creating new one");
                     }
 
@@ -1040,22 +1055,257 @@ async function handleGetActiveTimers(sendResponse: (response?: any) => void) {
 // SCREENSHOT HANDLER
 // ===============================
 
-async function handleCaptureScreenshot(sendResponse: (response?: any) => void) {
+interface ScreenshotResponse {
+    success: boolean;
+    error?: string;
+}
+
+async function handleCaptureScreenshot(
+    sendResponse: (response: ScreenshotResponse) => void,
+): Promise<void> {
     try {
         console.log("📸 Background: Starting screenshot capture...");
-        
-        // Import ScreenshotService dynamically to avoid circular dependencies
-        const { ScreenshotService } = await import("../services/screenshotService");
-        
-        await ScreenshotService.captureFullPage();
-        
+
+        // Get the current active tab
+        const [tab] = await chrome.tabs.query({
+            active: true,
+            currentWindow: true,
+        });
+
+        if (!tab?.id || !tab.windowId) {
+            throw new Error("No active tab found");
+        }
+
+        // Check if we can access this URL
+        if (
+            tab.url &&
+            (tab.url.startsWith("chrome://") ||
+                tab.url.startsWith("chrome-extension://") ||
+                tab.url.startsWith("about:") ||
+                tab.url.startsWith("edge://") ||
+                tab.url.startsWith("brave://") ||
+                tab.url.startsWith("opera://"))
+        ) {
+            throw new Error(
+                "Cannot capture screenshots of browser pages. Please try on a regular webpage.",
+            );
+        }
+
+        // Get page dimensions first
+        const [dimensionsResult] = await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            func: () => {
+                window.scrollTo(0, 0); // Scroll to top first
+                return {
+                    totalHeight: Math.max(
+                        document.documentElement.scrollHeight,
+                        document.body.scrollHeight,
+                    ),
+                    viewportHeight: window.innerHeight,
+                    viewportWidth: window.innerWidth,
+                };
+            },
+        });
+
+        if (!dimensionsResult?.result) {
+            throw new Error("Failed to get page dimensions");
+        }
+
+        const { totalHeight, viewportHeight, viewportWidth } =
+            dimensionsResult.result;
+        console.log("Page dimensions:", {
+            totalHeight,
+            viewportHeight,
+            viewportWidth,
+        });
+
+        // Collect all screenshot data by scrolling and capturing
+        const screenshots: Array<{
+            dataUrl: string;
+            step: number;
+            viewportHeight: number;
+            viewportWidth: number;
+        }> = [];
+
+        const totalSteps = Math.ceil(totalHeight / viewportHeight);
+        console.log("Will take", totalSteps, "screenshots");
+
+        for (let step = 0; step < totalSteps; step++) {
+            console.log(`Taking screenshot ${step + 1}/${totalSteps}`);
+
+            // Scroll to the correct position
+            await chrome.scripting.executeScript({
+                target: { tabId: tab.id },
+                func: (step: number, viewportHeight: number) => {
+                    window.scrollTo(0, step * viewportHeight);
+                    return new Promise((resolve) => setTimeout(resolve, 150));
+                },
+                args: [step, viewportHeight],
+            });
+
+            // Additional wait for any lazy-loaded content and animations
+            await new Promise((resolve) => setTimeout(resolve, 150));
+
+            // Capture the visible tab
+            const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
+                format: "png",
+            });
+
+            screenshots.push({
+                dataUrl,
+                step,
+                viewportHeight,
+                viewportWidth,
+            });
+        }
+
+        console.log("All screenshots captured, processing canvas...");
+
+        // Create filename
+        const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+        const tabTitle = tab.title || "untitled";
+        const camelCaseTitle = tabTitle
+            .replace(/[^a-zA-Z0-9 ]/g, "")
+            .split(" ")
+            .map((word, index) => {
+                if (index === 0) {
+                    return word.toLowerCase();
+                }
+                return (
+                    word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+                );
+            })
+            .join("");
+
+        const domain = new URL(tab.url!).hostname.replace("www.", "");
+        const filename = `${camelCaseTitle}-${domain}-${timestamp}.png`;
+
+        // Inject script to create canvas, combine screenshots, and download
+        await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            func: (
+                screenshots: Array<{
+                    dataUrl: string;
+                    step: number;
+                    viewportHeight: number;
+                    viewportWidth: number;
+                }>,
+                totalHeight: number,
+                filename: string,
+            ) => {
+                console.log("Creating canvas and combining screenshots...");
+
+                // Create canvas in the page context where document exists
+                const canvas = document.createElement("canvas");
+                const ctx = canvas.getContext("2d");
+                if (!ctx) {
+                    throw new Error("Failed to get canvas context");
+                }
+
+                canvas.width = screenshots[0].viewportWidth;
+                canvas.height = totalHeight;
+
+                let loadedCount = 0;
+                const totalScreenshots = screenshots.length;
+
+                return new Promise<void>((resolve, reject) => {
+                    screenshots.forEach((screenshot, index) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            // Draw the image at the correct vertical position
+                            ctx.drawImage(
+                                img,
+                                0,
+                                screenshot.step * screenshot.viewportHeight,
+                                screenshot.viewportWidth,
+                                screenshot.viewportHeight,
+                            );
+
+                            loadedCount++;
+                            if (loadedCount === totalScreenshots) {
+                                // All images loaded, now download
+                                console.log(
+                                    "All images loaded, creating download...",
+                                );
+
+                                try {
+                                    const finalDataUrl =
+                                        canvas.toDataURL("image/png");
+
+                                    // Create and trigger download
+                                    const link = document.createElement("a");
+                                    link.download = filename;
+                                    link.href = finalDataUrl;
+                                    link.style.display = "none";
+
+                                    document.body.appendChild(link);
+                                    link.click();
+                                    document.body.removeChild(link);
+
+                                    console.log(
+                                        "Download triggered for:",
+                                        filename,
+                                    );
+
+                                    // Show success notification
+                                    const notification =
+                                        document.createElement("div");
+                                    notification.style.cssText = `
+                                        position: fixed;
+                                        top: 20px;
+                                        right: 20px;
+                                        background: #4CAF50;
+                                        color: white;
+                                        padding: 12px 20px;
+                                        border-radius: 8px;
+                                        z-index: 999999;
+                                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                                        font-size: 14px;
+                                        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                                    `;
+                                    notification.textContent =
+                                        "Full page screenshot downloaded!";
+
+                                    document.body.appendChild(notification);
+                                    setTimeout(() => {
+                                        if (notification.parentElement) {
+                                            notification.remove();
+                                        }
+                                    }, 3000);
+
+                                    resolve();
+                                } catch (error) {
+                                    reject(error);
+                                }
+                            }
+                        };
+                        img.onerror = () =>
+                            reject(
+                                new Error(`Failed to load screenshot ${index}`),
+                            );
+                        img.src = screenshot.dataUrl;
+                    });
+                });
+            },
+            args: [screenshots, totalHeight, filename],
+        });
+
+        // Reset scroll position
+        await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            func: () => window.scrollTo(0, 0),
+        });
+
         console.log("✅ Background: Screenshot captured successfully");
         sendResponse({ success: true });
     } catch (error) {
         console.error("❌ Background: Screenshot failed:", error);
-        sendResponse({ 
-            success: false, 
-            error: error instanceof Error ? error.message : "Screenshot capture failed" 
+        sendResponse({
+            success: false,
+            error:
+                error instanceof Error
+                    ? error.message
+                    : "Screenshot capture failed",
         });
     }
 }
@@ -1064,17 +1314,322 @@ async function handleCaptureScreenshot(sendResponse: (response?: any) => void) {
 // AUTH STATE HANDLER
 // ===============================
 
-async function handleGetAuthState(sendResponse: (response?: any) => void) {
+interface AuthStateResponse {
+    user: any; // AuthUser type from AuthService
+    error?: string;
+}
+
+async function handleGetAuthState(
+    sendResponse: (response: AuthStateResponse) => void,
+): Promise<void> {
     try {
         console.log("🔍 Background: Getting auth state for hover navbar");
+
         const authService = AuthService.getInstance();
         const user = await authService.getCachedUser();
-        
-        console.log("🔍 Background: Auth state result:", user ? "authenticated" : "not authenticated");
+
+        console.log(
+            "🔍 Background: Auth state result:",
+            user ? "authenticated" : "not authenticated",
+        );
+
         sendResponse({ user });
     } catch (error) {
         console.error("❌ Background: Failed to get auth state:", error);
-        sendResponse({ user: null, error: error instanceof Error ? error.message : "Unknown error" });
+        sendResponse({
+            user: null,
+            error: error instanceof Error ? error.message : "Unknown error",
+        });
+    }
+}
+
+// ===============================
+// NAVBAR ACTION HANDLERS
+// ===============================
+
+// Handle opening notepad from navbar
+function handleOpenNotepad(
+    request: any,
+    sendResponse: (response: any) => void,
+) {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0]) {
+            chrome.tabs.sendMessage(tabs[0].id!, {
+                type: "SHOW_NOTEPAD",
+                domain: request.domain || new URL(tabs[0].url || "").hostname,
+            });
+        }
+    });
+    sendResponse({ success: true });
+}
+
+// Handle opening reminders from navbar
+function handleOpenReminders(sendResponse: (response: any) => void) {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0]) {
+            chrome.tabs.sendMessage(tabs[0].id!, {
+                type: "SHOW_REMINDERS",
+            });
+        }
+    });
+    sendResponse({ success: true });
+}
+
+// Handle opening search from navbar
+function handleOpenSearch(sendResponse: (response: any) => void) {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0]) {
+            chrome.tabs.sendMessage(tabs[0].id!, {
+                type: "SHOW_SEARCH",
+            });
+        }
+    });
+    sendResponse({ success: true });
+}
+
+// Handle showing spotlight search from navbar
+function handleShowSpotlightSearch(sendResponse: (response: any) => void) {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0]) {
+            chrome.tabs.sendMessage(tabs[0].id!, {
+                type: "SHOW_SPOTLIGHT_SEARCH",
+            });
+        }
+    });
+    sendResponse({ success: true });
+}
+
+// Handle toggling bookmark from navbar
+function handleToggleBookmark(
+    request: any,
+    sendResponse: (response: any) => void,
+) {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0]) {
+            chrome.tabs.sendMessage(tabs[0].id!, {
+                type: "TOGGLE_BOOKMARK",
+                url: request.url || tabs[0].url,
+            });
+        }
+    });
+    sendResponse({ success: true });
+}
+
+// Handle opening timer from navbar
+function handleOpenTimer(sendResponse: (response: any) => void) {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0]) {
+            chrome.tabs.sendMessage(tabs[0].id!, {
+                type: "SHOW_TIMER",
+            });
+        }
+    });
+    sendResponse({ success: true });
+}
+
+// Handle summarizing page from navbar
+function handleSummarizePage(sendResponse: (response: any) => void) {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0]) {
+            chrome.tabs.sendMessage(tabs[0].id!, {
+                type: "SUMMARIZE_PAGE",
+            });
+        }
+    });
+    sendResponse({ success: true });
+}
+
+// ===============================
+// CROSS-TAB SEARCH HANDLERS
+// ===============================
+
+// Function to search page content (injected into each tab)
+function searchPageContent(searchTerm: string): TabSearchResult {
+    const content = document.body.innerText.toLowerCase();
+    const searchLower = searchTerm.toLowerCase();
+
+    const matches = (content.match(new RegExp(searchLower, "g")) || []).length;
+
+    if (matches === 0) {
+        return { matchCount: 0, context: "" };
+    }
+
+    // Find context around first match
+    const firstMatchIndex = content.indexOf(searchLower);
+    const contextStart = Math.max(0, firstMatchIndex - 50);
+    const contextEnd = Math.min(
+        content.length,
+        firstMatchIndex + searchLower.length + 50,
+    );
+    const rawContext = content.substring(contextStart, contextEnd);
+
+    // Highlight the search term in context
+    const highlightedContext = rawContext.replace(
+        new RegExp(`(${searchLower})`, "gi"),
+        "<mark>$1</mark>",
+    );
+
+    return {
+        matchCount: matches,
+        context: highlightedContext.trim(),
+    };
+}
+
+// Handle cross-tab search in background script
+async function handleCrossTabSearch(
+    request: { searchTerm: string },
+    sendResponse: (response: any) => void,
+): Promise<void> {
+    const { searchTerm } = request;
+
+    if (!searchTerm || searchTerm.length < 3) {
+        sendResponse({ success: true, matches: [] });
+        return;
+    }
+
+    try {
+        console.log(`🔍 Starting cross-tab search for: "${searchTerm}"`);
+
+        // Get all tabs
+        const tabs = await chrome.tabs.query({});
+        const validTabs = tabs.filter(
+            (tab) =>
+                tab.url &&
+                tab.id &&
+                !tab.url.startsWith("chrome://") &&
+                !tab.url.startsWith("chrome-extension://") &&
+                !tab.url.startsWith("about:") &&
+                tab.status === "complete",
+        );
+
+        console.log(`📋 Searching across ${validTabs.length} valid tabs`);
+
+        const searchMatches: SearchMatch[] = [];
+
+        // Search each tab
+        for (const tab of validTabs) {
+            if (!tab.id || !tab.url) continue;
+
+            try {
+                // First check if tab title/URL matches (faster)
+                const titleMatch = tab.title
+                    ?.toLowerCase()
+                    .includes(searchTerm.toLowerCase());
+                const urlMatch = tab.url
+                    .toLowerCase()
+                    .includes(searchTerm.toLowerCase());
+
+                if (titleMatch || urlMatch) {
+                    const domain = new URL(tab.url).hostname.replace(
+                        /^www\./,
+                        "",
+                    );
+                    searchMatches.push({
+                        tabId: tab.id,
+                        title: tab.title || tab.url,
+                        url: tab.url,
+                        domain,
+                        favicon:
+                            tab.favIconUrl ||
+                            `https://www.google.com/s2/favicons?domain=${domain}&sz=16`,
+                        matchCount: titleMatch ? 1 : 0,
+                        context: titleMatch
+                            ? "Found in page title"
+                            : "Found in URL",
+                    });
+                    continue;
+                }
+
+                // Then search page content
+                const results = await chrome.scripting.executeScript({
+                    target: { tabId: tab.id },
+                    func: searchPageContent,
+                    args: [searchTerm],
+                });
+
+                if (results[0]?.result) {
+                    const { matchCount, context } = results[0].result;
+
+                    if (matchCount > 0) {
+                        const domain = new URL(tab.url).hostname.replace(
+                            /^www\./,
+                            "",
+                        );
+                        searchMatches.push({
+                            tabId: tab.id,
+                            title: tab.title || tab.url,
+                            url: tab.url,
+                            domain,
+                            favicon:
+                                tab.favIconUrl ||
+                                `https://www.google.com/s2/favicons?domain=${domain}&sz=16`,
+                            matchCount,
+                            context,
+                        });
+                    }
+                }
+            } catch (error) {
+                // Skip tabs that can't be accessed (protected pages, etc.)
+                console.log(`Skipping tab ${tab.id}: ${error}`);
+            }
+        }
+
+        // Sort by match count (most matches first)
+        searchMatches.sort((a, b) => b.matchCount - a.matchCount);
+
+        console.log(`✅ Found ${searchMatches.length} tabs with matches`);
+        sendResponse({ success: true, matches: searchMatches });
+    } catch (error) {
+        console.error("❌ Error in cross-tab search:", error);
+    }
+}
+
+// Handle tab switching
+async function handleSwitchToTab(
+    tabId: number,
+    sendResponse: (response: any) => void,
+): Promise<void> {
+    try {
+        // Get tab info and switch to it
+        const tab = await chrome.tabs.get(tabId);
+        await chrome.tabs.update(tabId, { active: true });
+
+        // Focus the window containing the tab
+        if (tab.windowId) {
+            await chrome.windows.update(tab.windowId, { focused: true });
+        }
+
+        console.log(`✅ Switched to tab: ${tab.title}`);
+        sendResponse({ success: true });
+    } catch (error) {
+        console.error("❌ Error switching to tab:", error);
+    }
+}
+
+// Legacy function for backward compatibility
+async function handleGetAllTabs(sendResponse: (response: any) => void) {
+    try {
+        console.log("🔍 Getting all tabs...");
+        const tabs = await chrome.tabs.query({});
+        const validTabs = tabs.filter(
+            (tab) =>
+                tab.url &&
+                !tab.url.startsWith("chrome://") &&
+                !tab.url.startsWith("chrome-extension://") &&
+                !tab.url.startsWith("moz-extension://") &&
+                tab.status === "complete",
+        );
+        console.log(`✅ Found ${validTabs.length} valid tabs`);
+        sendResponse({
+            success: true,
+            tabs: validTabs,
+        });
+    } catch (error) {
+        console.error("❌ Error getting tabs:", error);
+        sendResponse({
+            success: false,
+            tabs: [],
+        });
     }
 }
 
@@ -1083,20 +1638,29 @@ async function handleGetAuthState(sendResponse: (response?: any) => void) {
 // ===============================
 
 // Centralized message listener - handles ALL messages
-chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     console.log("Background received message:", request);
+
+    // Cross-tab search messages
+    if (request.type === "CROSS_TAB_SEARCH") {
+        handleCrossTabSearch(request, sendResponse);
+        return true;
+    }
+
+    if (request.type === "SWITCH_TO_TAB") {
+        handleSwitchToTab(request.tabId, sendResponse);
+        return true;
+    }
 
     // Timer messages
     if (request.action === "createTimer") {
         handleCreateTimer(request, sendResponse);
         return true;
     }
-
     if (request.action === "cancelTimer") {
         handleCancelTimer(request, sendResponse);
         return true;
     }
-
     if (request.action === "getActiveTimers") {
         handleGetActiveTimers(sendResponse);
         return true;
@@ -1121,27 +1685,26 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
         handleOpenNotepad(request, sendResponse);
         return true;
     }
-
     if (request.type === "OPEN_REMINDERS") {
         handleOpenReminders(sendResponse);
         return true;
     }
-
     if (request.type === "OPEN_SEARCH") {
         handleOpenSearch(sendResponse);
         return true;
     }
-
+    if (request.type === "SHOW_SPOTLIGHT_SEARCH") {
+        handleShowSpotlightSearch(sendResponse);
+        return true;
+    }
     if (request.type === "TOGGLE_BOOKMARK") {
         handleToggleBookmark(request, sendResponse);
         return true;
     }
-
     if (request.type === "OPEN_TIMER") {
         handleOpenTimer(sendResponse);
         return true;
     }
-
     if (request.type === "SUMMARIZE_PAGE") {
         handleSummarizePage(sendResponse);
         return true;
@@ -1159,6 +1722,24 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
         return true;
     }
 
+    // Analytics message (add this if you want analytics to work)
+    if (request.type === "OPEN_ANALYTICS") {
+        // You can implement this later or just acknowledge it for now
+        sendResponse({ success: true });
+        return true;
+    }
+
+    // Legacy tab search messages (for backward compatibility)
+    if (request.type === "GET_ALL_TABS") {
+        handleGetAllTabs(sendResponse);
+        return true;
+    }
+    if (request.type === "SEARCH_TABS") {
+        // Redirect old search to new cross-tab search
+        handleCrossTabSearch({ searchTerm: request.searchTerm }, sendResponse);
+        return true;
+    }
+
     // Other messages
     if (request.action === "getSelectedText") {
         sendResponse({ success: true });
@@ -1166,6 +1747,7 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
     }
 
     // Return false for unhandled messages
+    console.log("❓ Unknown message type:", request.type || request.action);
     return false;
 });
 
@@ -1177,7 +1759,6 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
 chrome.alarms.onAlarm.addListener(async (alarm) => {
     if (alarm.name.startsWith("timer_")) {
         const domain = alarm.name.replace("timer_", "");
-
         console.log(`Timer completed for domain: ${domain}`);
 
         try {
@@ -1254,7 +1835,7 @@ chrome.notifications.onButtonClicked.addListener(
                 await chrome.notifications.clear(notificationId);
                 try {
                     await chrome.action.openPopup();
-                } catch (error) {
+                } catch {
                     console.log("Could not open popup automatically");
                 }
             }
@@ -1284,7 +1865,7 @@ chrome.webNavigation.onCompleted.addListener(async (details) => {
                 try {
                     await chrome.scripting.executeScript({
                         target: { tabId: details.tabId },
-                        func: showTimerCompleteOverlay,
+                        func: showPeacefulTimerComplete,
                         args: [completedTimer.minutes, domain],
                     });
 
@@ -1436,99 +2017,26 @@ chrome.runtime.onInstalled.addListener(async () => {
     chrome.alarms.create("cleanupExpiredBlocks", { periodInMinutes: 5 });
 });
 
-// ===============================
-// NAVBAR ACTION HANDLERS
-// ===============================
-
-// Handle opening notepad from navbar
-function handleOpenNotepad(request: any, sendResponse: (response: any) => void) {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]) {
-            chrome.tabs.sendMessage(tabs[0].id!, {
-                type: "SHOW_NOTEPAD",
-                domain: request.domain || new URL(tabs[0].url || "").hostname
-            });
-        }
-    });
-    sendResponse({ success: true });
-}
-
-// Handle opening reminders from navbar
-function handleOpenReminders(sendResponse: (response: any) => void) {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]) {
-            chrome.tabs.sendMessage(tabs[0].id!, {
-                type: "SHOW_REMINDERS"
-            });
-        }
-    });
-    sendResponse({ success: true });
-}
-
-// Handle opening search from navbar
-function handleOpenSearch(sendResponse: (response: any) => void) {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]) {
-            chrome.tabs.sendMessage(tabs[0].id!, {
-                type: "SHOW_SEARCH"
-            });
-        }
-    });
-    sendResponse({ success: true });
-}
-
-// Handle toggling bookmark from navbar
-function handleToggleBookmark(request: any, sendResponse: (response: any) => void) {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]) {
-            chrome.tabs.sendMessage(tabs[0].id!, {
-                type: "TOGGLE_BOOKMARK",
-                url: request.url || tabs[0].url
-            });
-        }
-    });
-    sendResponse({ success: true });
-}
-
-// Handle opening timer from navbar
-function handleOpenTimer(sendResponse: (response: any) => void) {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]) {
-            chrome.tabs.sendMessage(tabs[0].id!, {
-                type: "SHOW_TIMER"
-            });
-        }
-    });
-    sendResponse({ success: true });
-}
-
-// Handle summarizing page from navbar
-function handleSummarizePage(sendResponse: (response: any) => void) {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]) {
-            chrome.tabs.sendMessage(tabs[0].id!, {
-                type: "SUMMARIZE_PAGE"
-            });
-        }
-    });
-    sendResponse({ success: true });
-}
-
 // Set up auth state change listener for hover navbar
 const authService = AuthService.getInstance();
 authService.onAuthStateChanged((user) => {
-    console.log("🔄 Background: Auth state changed, notifying content scripts:", user ? "authenticated" : "not authenticated");
-    
+    console.log(
+        "🔄 Background: Auth state changed, notifying content scripts:",
+        user ? "authenticated" : "not authenticated",
+    );
+
     // Notify all content scripts about auth state changes
     chrome.tabs.query({}, (tabs) => {
         tabs.forEach((tab) => {
             if (tab.id) {
-                chrome.tabs.sendMessage(tab.id, {
-                    type: "AUTH_STATE_CHANGED",
-                    user: user
-                }).catch(() => {
-                    // Ignore errors - content script may not be loaded
-                });
+                chrome.tabs
+                    .sendMessage(tab.id, {
+                        type: "AUTH_STATE_CHANGED",
+                        user: user,
+                    })
+                    .catch(() => {
+                        // Ignore errors - content script may not be loaded
+                    });
             }
         });
     });

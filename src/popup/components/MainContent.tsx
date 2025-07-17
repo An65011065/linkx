@@ -136,7 +136,11 @@ const MainContent: React.FC<MainContentProps> = () => {
             if (!currentDomain) return;
             try {
                 const note = await handleLoadNote(currentDomain);
-                setHasNote(note?.content?.trim().length ? note.content.trim().length > 0 : false);
+                setHasNote(
+                    note?.content?.trim().length
+                        ? note.content.trim().length > 0
+                        : false,
+                );
             } catch (err) {
                 console.error("Error checking for note:", err);
                 setHasNote(false);
@@ -154,7 +158,11 @@ const MainContent: React.FC<MainContentProps> = () => {
         const refreshNoteStatus = async () => {
             try {
                 const note = await handleLoadNote(currentDomain);
-                setHasNote(note?.content?.trim().length ? note.content.trim().length > 0 : false);
+                setHasNote(
+                    note?.content?.trim().length
+                        ? note.content.trim().length > 0
+                        : false,
+                );
             } catch (err) {
                 console.error("Error refreshing note status:", err);
             }
@@ -336,7 +344,7 @@ const MainContent: React.FC<MainContentProps> = () => {
         setTimeout(async () => {
             try {
                 const note = await handleLoadNote(currentDomain);
-                setHasNote(Boolean(note?.content.trim().length > 0));
+                setHasNote(Boolean(note?.content?.trim().length > 0));
             } catch (err) {
                 console.error("Error refreshing note status:", err);
             }

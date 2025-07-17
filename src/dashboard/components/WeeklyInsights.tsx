@@ -36,7 +36,7 @@ const WeeklyInsights: React.FC<WeeklyInsightsProps> = ({
             setError(null);
             console.log("🔄 Loading weekly insights from API...");
 
-            const response = await authService.apiCall(
+            const response = await authService.makeApiCall(
                 "GET",
                 "/insights/weekly?days=7",
             );

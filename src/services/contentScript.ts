@@ -15,6 +15,23 @@ export function onExecute() {
             console.error("Stack trace:", error.stack);
         });
 
+    // Import and initialize spotlight search
+    console.log("🔄 Attempting to load spotlight search injector...");
+    import("../content/SpotlightSearchInjector")
+        .then((module) => {
+            console.log(
+                "✅ Spotlight search injector loaded successfully",
+                module,
+            );
+        })
+        .catch((error) => {
+            console.error(
+                "❌ Failed to load spotlight search injector:",
+                error,
+            );
+            console.error("Stack trace:", error.stack);
+        });
+
     // Function to extract clean text from the page
     function extractPageText() {
         console.log("Extracting page text...");

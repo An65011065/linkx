@@ -149,7 +149,7 @@ const StoriesComponent: React.FC<StoriesComponentProps> = ({
                 ))}
             </div>
 
-            <style jsx>{`
+            <style>{`
                 div::-webkit-scrollbar {
                     display: none;
                 }

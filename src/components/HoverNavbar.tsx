@@ -7,8 +7,8 @@ import {
     Bookmark,
     Timer,
     Hash,
+    BarChart3,
 } from "lucide-react";
-import AuthService from "../services/authService";
 import type { AuthUser } from "../services/authService";
 
 interface HoverNavbarProps {
@@ -54,13 +54,16 @@ const HoverNavbar: React.FC<HoverNavbarProps> = () => {
         getAuthState();
 
         // Listen for auth state changes
-        const messageListener = (message: any) => {
+        const messageListener = (message: {
+            type: string;
+            user?: AuthUser | null;
+        }) => {
             if (message.type === "AUTH_STATE_CHANGED") {
                 console.log(
                     "🔄 HoverNavbar: Auth state changed:",
                     message.user,
                 );
-                setUser(message.user);
+                setUser(message.user || null);
             }
         };
 
@@ -79,13 +82,16 @@ const HoverNavbar: React.FC<HoverNavbarProps> = () => {
         try {
             console.log("📸 HoverNavbar: Starting screenshot capture...");
             const response = await chrome.runtime.sendMessage({
-                type: "CAPTURE_SCREENSHOT"
+                type: "CAPTURE_SCREENSHOT",
             });
-            
+
             if (response && response.success) {
                 console.log("✅ Screenshot captured successfully");
             } else {
-                console.error("❌ Screenshot failed:", response?.error || "Unknown error");
+                console.error(
+                    "❌ Screenshot failed:",
+                    response?.error || "Unknown error",
+                );
             }
         } catch (error) {
             console.error("❌ Screenshot failed:", error);
@@ -95,7 +101,6 @@ const HoverNavbar: React.FC<HoverNavbarProps> = () => {
 
     const handleNotepad = () => {
         setActiveAction("notepad");
-        // Send message to open notepad
         chrome.runtime.sendMessage({
             type: "OPEN_NOTEPAD",
             domain: currentDomain,
@@ -111,7 +116,8 @@ const HoverNavbar: React.FC<HoverNavbarProps> = () => {
 
     const handleSearch = () => {
         setActiveAction("search");
-        chrome.runtime.sendMessage({ type: "OPEN_SEARCH" });
+        // Send message to show spotlight search
+        chrome.runtime.sendMessage({ type: "SHOW_SPOTLIGHT_SEARCH" });
         setActiveAction(null);
     };
 
@@ -136,13 +142,38 @@ const HoverNavbar: React.FC<HoverNavbarProps> = () => {
         setActiveAction(null);
     };
 
-    const navItems = [
+    const handleAnalytics = () => {
+        setActiveAction("analytics");
+        chrome.runtime.sendMessage({ type: "OPEN_ANALYTICS" });
+        setActiveAction(null);
+    };
+
+    // Section 1: Data Tools (Primary actions)
+    const dataTools = [
         {
             id: "screenshot",
             icon: Camera,
             label: "Screenshot",
             action: handleScreenshot,
             color: "#3b82f6",
+        },
+        {
+            id: "analytics",
+            icon: BarChart3,
+            label: "Analytics",
+            action: handleAnalytics,
+            color: "#06b6d4",
+        },
+    ];
+
+    // Section 2: Quick Actions (Current emoji set equivalent)
+    const quickActions = [
+        {
+            id: "search",
+            icon: Search,
+            label: "Search",
+            action: handleSearch,
+            color: "#8b5cf6",
         },
         {
             id: "notepad",
@@ -152,25 +183,22 @@ const HoverNavbar: React.FC<HoverNavbarProps> = () => {
             color: "#10b981",
         },
         {
-            id: "reminders",
-            icon: Bell,
-            label: "Reminders",
-            action: handleReminders,
-            color: "#f59e0b",
-        },
-        {
-            id: "search",
-            icon: Search,
-            label: "Search",
-            action: handleSearch,
-            color: "#8b5cf6",
-        },
-        {
             id: "bookmark",
             icon: Bookmark,
             label: "Bookmark",
             action: handleBookmark,
             color: "#ef4444",
+        },
+    ];
+
+    // Section 3: Other Tools (Secondary actions)
+    const otherTools = [
+        {
+            id: "reminders",
+            icon: Bell,
+            label: "Reminders",
+            action: handleReminders,
+            color: "#f59e0b",
         },
         {
             id: "timer",
@@ -187,6 +215,33 @@ const HoverNavbar: React.FC<HoverNavbarProps> = () => {
             color: "#ec4899",
         },
     ];
+
+    const renderNavItem = (item: {
+        id: string;
+        icon: React.ComponentType;
+        label: string;
+        action: () => void;
+        color: string;
+    }) => {
+        const Icon = item.icon;
+        const isActive = activeAction === item.id;
+
+        return (
+            <div
+                key={item.id}
+                className={`lynx-nav-item ${isActive ? "active" : ""}`}
+                onClick={item.action}
+                style={
+                    {
+                        "--item-color": item.color,
+                    } as React.CSSProperties
+                }
+                title={item.label}
+            >
+                <Icon />
+            </div>
+        );
+    };
 
     if (!user) {
         console.log(
@@ -220,33 +275,27 @@ const HoverNavbar: React.FC<HoverNavbarProps> = () => {
                     setIsVisible(false);
                 }}
             >
-                <div className="lynx-navbar-items">
-                    {navItems.map((item) => {
-                        const Icon = item.icon;
-                        const isActive = activeAction === item.id;
-
-                        return (
-                            <div
-                                key={item.id}
-                                className={`lynx-nav-item ${
-                                    isActive ? "active" : ""
-                                }`}
-                                onClick={item.action}
-                                style={
-                                    {
-                                        "--item-color": item.color,
-                                    } as React.CSSProperties
-                                }
-                                title={item.label}
-                            >
-                                <Icon size={22} />
-                            </div>
-                        );
-                    })}
+                {/* Section 1: Data Tools */}
+                <div className="lynx-navbar-section-data">
+                    {dataTools.map(renderNavItem)}
                 </div>
 
+                {/* Section 2: Quick Actions */}
+                <div className="lynx-navbar-section-quick">
+                    {quickActions.map(renderNavItem)}
+                </div>
+
+                {/* Section 3: Other Tools */}
+                <div className="lynx-navbar-section-tools">
+                    {otherTools.map(renderNavItem)}
+                </div>
+
+                {/* User Avatar */}
                 <div className="lynx-navbar-footer">
-                    <div className="lynx-user-avatar" title={user.displayName || user.email || "User"}>
+                    <div
+                        className="lynx-user-avatar"
+                        title={user.displayName || user.email || "User"}
+                    >
                         {user.displayName?.[0] || user.email?.[0] || "U"}
                     </div>
                 </div>

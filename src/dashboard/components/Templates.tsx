@@ -465,7 +465,7 @@ const Templates: React.FC<TemplatesProps> = ({ isDarkMode = false }) => {
 
     const loadTemplateLimits = async () => {
         try {
-            const response = await authService.apiCall(
+            const response = await authService.makeApiCall(
                 "GET",
                 "/templates/info/limits",
             );
@@ -486,7 +486,7 @@ const Templates: React.FC<TemplatesProps> = ({ isDarkMode = false }) => {
             setLoading(true);
             console.log("🔄 Loading templates from API...");
 
-            const response = await authService.apiCall("GET", "/templates");
+            const response = await authService.makeApiCall("GET", "/templates");
 
             if (response.ok) {
                 const data = await response.json();
@@ -530,7 +530,7 @@ const Templates: React.FC<TemplatesProps> = ({ isDarkMode = false }) => {
         try {
             console.log("💾 Saving template:", template);
 
-            const response = await authService.apiCall("POST", "/templates", {
+            const response = await authService.makeApiCall("POST", "/templates", {
                 name: template.name,
                 urls: template.urls,
                 backgroundColor: template.backgroundColor,
@@ -588,7 +588,7 @@ const Templates: React.FC<TemplatesProps> = ({ isDarkMode = false }) => {
         try {
             console.log("🗑️ Deleting template:", template.name);
 
-            const response = await authService.apiCall(
+            const response = await authService.makeApiCall(
                 "DELETE",
                 `/templates/${template.id}`,
             );

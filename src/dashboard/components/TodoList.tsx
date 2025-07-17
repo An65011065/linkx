@@ -91,7 +91,7 @@ const TodoList: React.FC<TodoListProps> = ({
             setErrorMessage("");
 
             // Create task with parsed time
-            const newTask = await dataService.addTask(cleanText, time);
+            const newTask = await dataService.addTask(cleanText, time || undefined);
 
             const updatedTasks = [...tasks, newTask];
             setTasks(updatedTasks);
