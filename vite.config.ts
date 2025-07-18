@@ -34,14 +34,13 @@ export default defineConfig(({ mode }) => ({
         watch: mode === "development" ? {} : undefined,
         rollupOptions: {
             input: {
-                // Remove background from here - let crx plugin handle it
-                contentScript: "src/services/contentScript.ts",
-                hoverNavbarInjector: "src/content/hoverNavbarInjector.ts",
+                // Let crx plugin handle content scripts automatically
+                // Only specify page entries here
                 popup: resolve(__dirname, "src/popup/popup.html"),
                 graph: resolve(__dirname, "src/graph/graph.html"),
                 dashboard: resolve(__dirname, "src/dashboard/dashboard.html"),
                 main: resolve(__dirname, "src/main/main.html"),
-                waterfall: resolve(__dirname, "waterfall.html"), // Add this
+                waterfall: resolve(__dirname, "waterfall.html"),
             },
         },
     },

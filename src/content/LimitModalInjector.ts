@@ -38,12 +38,11 @@ class LimitModalInjector {
 
         if (!this.isInjected) {
             console.log("💉 Modal not injected yet, calling injectModal()");
-            this.injectModal();
+            this.injectModal(true); // show immediately
         } else {
             console.log("♻️ Modal already injected, just updating visibility");
+            this.updateModalVisibility(true);
         }
-
-        this.updateModalVisibility(true);
     }
 
     public hideModal() {
@@ -51,7 +50,7 @@ class LimitModalInjector {
         this.updateModalVisibility(false);
     }
 
-    private injectModal() {
+    private injectModal(showImmediately = false) {
         if (this.isInjected) {
             console.log("⚠️ Modal already injected, skipping");
             return;
@@ -93,8 +92,10 @@ class LimitModalInjector {
             this.root = ReactDOM.createRoot(reactContainer);
             console.log("🌳 React root created:", this.root);
 
-            this.renderModal(false);
-            console.log("🎨 Initial render called with isVisible=false");
+            this.renderModal(showImmediately);
+            console.log(
+                `🎨 Initial render called with isVisible=${showImmediately}`,
+            );
 
             this.isInjected = true;
             console.log(

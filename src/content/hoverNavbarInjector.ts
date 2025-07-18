@@ -84,7 +84,7 @@ class HoverNavbarInjector {
         const isDarkBackground = this.isDarkBackground();
 
         return `
-    /* Minimal Illustrator-Style Navbar */
+    /* Themed Workflow-Based Navbar */
     .lynx-hover-navbar {
         position: fixed;
         top: 0;
@@ -110,7 +110,7 @@ class HoverNavbarInjector {
         position: absolute;
         top: 0;
         left: 0;
-        width: 48px;
+        width: 52px;
         height: 100vh;
         background: ${
             isDarkBackground
@@ -136,39 +136,56 @@ class HoverNavbarInjector {
         transform: translateX(0);
     }
 
-    /* Section 1: Data Tools */
-    .lynx-navbar-section-data {
+    /* Section 1: Capture Tools */
+    .lynx-navbar-section-capture {
         padding: 16px 0 12px 0;
         display: flex;
         flex-direction: column;
-        gap: 4px;
+        gap: 6px;
         align-items: center;
         border-bottom: 1px solid ${
             isDarkBackground ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.1)"
         };
+        position: relative;
     }
 
-    /* Section 2: Quick Actions */
-    .lynx-navbar-section-quick {
-        flex: 1;
+    /* Section 2: Focus Tools */
+    .lynx-navbar-section-focus {
         padding: 12px 0;
         display: flex;
         flex-direction: column;
-        gap: 4px;
+        gap: 6px;
         align-items: center;
-        justify-content: center;
         border-bottom: 1px solid ${
             isDarkBackground ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.1)"
         };
+        position: relative;
     }
 
-    /* Section 3: Other Tools */
-    .lynx-navbar-section-tools {
-        padding: 12px 0 16px 0;
+    /* Section 3: Analyze Tools */
+    .lynx-navbar-section-analyze {
+        padding: 12px 0;
         display: flex;
         flex-direction: column;
-        gap: 4px;
+        gap: 6px;
         align-items: center;
+        border-bottom: 1px solid ${
+            isDarkBackground ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.1)"
+        };
+        position: relative;
+    }
+
+    /* Section 4: Manage Tools */
+    .lynx-navbar-section-manage {
+        padding: 12px 0;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        align-items: center;
+        border-bottom: 1px solid ${
+            isDarkBackground ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.1)"
+        };
+        position: relative;
     }
 
     .lynx-nav-item {
@@ -215,25 +232,36 @@ class HoverNavbarInjector {
         box-shadow: 0 0 4px var(--item-color, #3b82f6);
     }
 
-    /* Data section icons (slightly larger for hierarchy) */
-    .lynx-navbar-section-data .lynx-nav-item {
+    /* Capture section icons (primary hierarchy) */
+    .lynx-navbar-section-capture .lynx-nav-item {
         width: 36px;
         height: 36px;
     }
 
-    .lynx-navbar-section-data .lynx-nav-item svg {
+    .lynx-navbar-section-capture .lynx-nav-item svg {
         min-width: 20px;
         min-height: 20px;
     }
 
-    /* Quick actions (medium size) */
-    .lynx-navbar-section-quick .lynx-nav-item svg {
+    /* Focus section icons (high priority) */
+    .lynx-navbar-section-focus .lynx-nav-item {
+        width: 34px;
+        height: 34px;
+    }
+
+    .lynx-navbar-section-focus .lynx-nav-item svg {
         min-width: 18px;
         min-height: 18px;
     }
 
-    /* Tools section (smaller) */
-    .lynx-navbar-section-tools .lynx-nav-item svg {
+    /* Analyze section icons (medium priority) */
+    .lynx-navbar-section-analyze .lynx-nav-item svg {
+        min-width: 17px;
+        min-height: 17px;
+    }
+
+    /* Manage section icons (secondary) */
+    .lynx-navbar-section-manage .lynx-nav-item svg {
         min-width: 16px;
         min-height: 16px;
     }
@@ -248,14 +276,121 @@ class HoverNavbarInjector {
         transform: scale(1.1);
     }
 
-    /* User avatar at bottom */
+    /* Footer with theme selector and user avatar */
     .lynx-navbar-footer {
         padding: 12px 0 16px 0;
         display: flex;
+        flex-direction: column;
         align-items: center;
         justify-content: center;
+        gap: 8px;
         border-top: 1px solid ${
             isDarkBackground ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.1)"
+        };
+        margin-top: auto;
+    }
+
+    .lynx-theme-selector {
+        position: relative;
+    }
+
+    .lynx-theme-button {
+        width: 28px;
+        height: 28px;
+        border-radius: 6px;
+        background: ${
+            isDarkBackground
+                ? "rgba(255, 255, 255, 0.1)"
+                : "rgba(0, 0, 0, 0.1)"
+        };
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: ${
+            isDarkBackground ? "rgba(255, 255, 255, 0.8)" : "rgba(0, 0, 0, 0.8)"
+        };
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border: none;
+    }
+
+    .lynx-theme-button:hover {
+        transform: scale(1.05);
+        background: ${
+            isDarkBackground
+                ? "rgba(255, 255, 255, 0.15)"
+                : "rgba(0, 0, 0, 0.15)"
+        };
+        color: ${isDarkBackground ? "#ffffff" : "#000000"};
+    }
+
+    .lynx-theme-dropdown {
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        background: ${
+            isDarkBackground
+                ? "rgba(20, 20, 20, 0.95)"
+                : "rgba(250, 250, 250, 0.95)"
+        };
+        backdrop-filter: blur(20px);
+        border: 1px solid ${
+            isDarkBackground
+                ? "rgba(255, 255, 255, 0.1)"
+                : "rgba(0, 0, 0, 0.1)"
+        };
+        border-radius: 8px;
+        padding: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        min-width: 120px;
+        margin-bottom: 8px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        z-index: 1000;
+    }
+
+    .lynx-theme-option {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-size: 12px;
+        color: ${
+            isDarkBackground ? "rgba(255, 255, 255, 0.8)" : "rgba(0, 0, 0, 0.8)"
+        };
+    }
+
+    .lynx-theme-option:hover {
+        background: ${
+            isDarkBackground
+                ? "rgba(255, 255, 255, 0.1)"
+                : "rgba(0, 0, 0, 0.1)"
+        };
+        color: ${isDarkBackground ? "#ffffff" : "#000000"};
+    }
+
+    .lynx-theme-option.active {
+        background: ${
+            isDarkBackground
+                ? "rgba(255, 255, 255, 0.15)"
+                : "rgba(0, 0, 0, 0.15)"
+        };
+        color: ${isDarkBackground ? "#ffffff" : "#000000"};
+    }
+
+    .lynx-theme-preview {
+        width: 12px;
+        height: 12px;
+        border-radius: 3px;
+        border: 1px solid ${
+            isDarkBackground
+                ? "rgba(255, 255, 255, 0.2)"
+                : "rgba(0, 0, 0, 0.2)"
         };
     }
 
@@ -300,61 +435,82 @@ class HoverNavbarInjector {
         opacity: 1;
     }
 
-    /* Section labels (subtle visual cues) */
-    .lynx-navbar-section-data::before {
+    /* Section labels (subtle visual cues for workflow organization) */
+    .lynx-navbar-section-capture::before {
         content: '';
         position: absolute;
         left: 2px;
         top: 8px;
-        width: 44px;
+        width: 48px;
         height: 2px;
         background: linear-gradient(90deg, transparent, #3b82f6, transparent);
-        opacity: 0.3;
+        opacity: 0.4;
     }
 
-    .lynx-navbar-section-quick::before {
+    .lynx-navbar-section-focus::before {
         content: '';
         position: absolute;
         left: 2px;
         top: 0;
-        width: 44px;
+        width: 48px;
         height: 1px;
-        background: linear-gradient(90deg, transparent, #10b981, transparent);
-        opacity: 0.3;
+        background: linear-gradient(90deg, transparent, #059669, transparent);
+        opacity: 0.4;
     }
 
-    .lynx-navbar-section-tools::before {
+    .lynx-navbar-section-analyze::before {
         content: '';
         position: absolute;
         left: 2px;
         top: 0;
-        width: 44px;
+        width: 48px;
         height: 1px;
         background: linear-gradient(90deg, transparent, #8b5cf6, transparent);
-        opacity: 0.3;
+        opacity: 0.4;
+    }
+
+    .lynx-navbar-section-manage::before {
+        content: '';
+        position: absolute;
+        left: 2px;
+        top: 0;
+        width: 48px;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, #f59e0b, transparent);
+        opacity: 0.4;
     }
 
     @media (max-width: 768px) {
         .lynx-navbar-container {
-            width: 44px;
+            width: 48px;
         }
         
-        .lynx-navbar-section-data .lynx-nav-item {
+        .lynx-navbar-section-capture .lynx-nav-item {
             width: 32px;
             height: 32px;
         }
         
-        .lynx-navbar-section-data .lynx-nav-item svg {
+        .lynx-navbar-section-capture .lynx-nav-item svg {
             min-width: 18px;
             min-height: 18px;
         }
 
-        .lynx-navbar-section-quick .lynx-nav-item svg {
+        .lynx-navbar-section-focus .lynx-nav-item {
+            width: 30px;
+            height: 30px;
+        }
+
+        .lynx-navbar-section-focus .lynx-nav-item svg {
             min-width: 16px;
             min-height: 16px;
         }
 
-        .lynx-navbar-section-tools .lynx-nav-item svg {
+        .lynx-navbar-section-analyze .lynx-nav-item svg {
+            min-width: 15px;
+            min-height: 15px;
+        }
+
+        .lynx-navbar-section-manage .lynx-nav-item svg {
             min-width: 14px;
             min-height: 14px;
         }
@@ -363,6 +519,11 @@ class HoverNavbarInjector {
             width: 24px;
             height: 24px;
             font-size: 10px;
+        }
+
+        .lynx-theme-button {
+            width: 24px;
+            height: 24px;
         }
     }
 `;

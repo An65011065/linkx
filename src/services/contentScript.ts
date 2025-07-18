@@ -1,101 +1,77 @@
-// src/services/contentScript.js
+// src/services/contentScript.ts
 // This script runs on web pages to extract text content when requested
 
 export function onExecute() {
     console.log("LyncX content script loaded on:", window.location.hostname);
 
-    // Import and initialize hover navbar
-    console.log("🔄 Attempting to load hover navbar injector...");
+    // Initialize only essential injectors by default
+    console.log("🔄 Initializing essential injectors...");
+
+    // Always load hover navbar (lightweight and essential)
     import("../content/hoverNavbarInjector")
-        .then((module) => {
-            console.log("✅ Hover navbar injector loaded successfully", module);
-        })
-        .catch((error) => {
-            console.error("❌ Failed to load hover navbar injector:", error);
-            console.error("Stack trace:", error.stack);
-        });
+        .then(() => console.log("✅ Hover navbar loaded"))
+        .catch((error) => console.error("❌ Hover navbar failed:", error));
 
-    // Import and initialize spotlight search
-    console.log("🔄 Attempting to load spotlight search injector...");
-    import("../content/SpotlightSearchInjector")
-        .then((module) => {
-            console.log(
-                "✅ Spotlight search injector loaded successfully",
-                module,
-            );
-        })
-        .catch((error) => {
-            console.error(
-                "❌ Failed to load spotlight search injector:",
-                error,
-            );
-            console.error("Stack trace:", error.stack);
-        });
-
-    // Import and initialize timer injector
-    console.log("🔄 Attempting to load timer injector...");
-    import("../content/TimebarInjector")
-        .then((module) => {
-            console.log("✅ Timer injector loaded successfully", module);
-        })
-        .catch((error) => {
-            console.error("❌ Failed to load timer injector:", error);
-            console.error("Stack trace:", error.stack);
-        });
-
-    // Import and initialize analytics injector
-    console.log("🔄 Attempting to load analytics injector...");
-    import("../content/AnalyticsModalInjector")
-        .then((module) => {
-            console.log("✅ Analytics injector loaded successfully", module);
-        })
-        .catch((error) => {
-            console.error("❌ Failed to load analytics injector:", error);
-        });
-
-    // Import and initialize notepad injector
-    console.log("🔄 Attempting to load notepad injector...");
-    import("../content/NotepadInjector")
-        .then((module) => {
-            console.log("✅ Notepad injector loaded successfully", module);
-        })
-        .catch((error) => {
-            console.error("❌ Failed to load notepad injector:", error);
-            console.error("Stack trace:", error.stack);
-        });
-
-    // Import and initialize limit modal injector
-    console.log("🔄 Attempting to load limit modal injector...");
-    import("../content/LimitModalInjector")
-        .then((module) => {
-            console.log("✅ Limit modal injector loaded successfully", module);
-        })
-        .catch((error) => {
-            console.error("❌ Failed to load limit modal injector:", error);
-            console.error("Stack trace:", error.stack);
-        });
-
-    // Import and initialize limit status injector
-    console.log("🔄 Attempting to load limit status injector...");
+    // Load limit status (lightweight)
     import("../content/LimitStatusInjector")
-        .then((module) => {
-            console.log("✅ Limit status injector loaded successfully", module);
-        })
-        .catch((error) => {
-            console.error("❌ Failed to load limit status injector:", error);
-            console.error("Stack trace:", error.stack);
-        });
+        .then(() => console.log("✅ Limit status loaded"))
+        .catch((error) => console.error("❌ Limit status failed:", error));
 
-    //Flow modal injector
-    console.log("🔄 Attempting to load Flow modal injector...");
-    import("../content/FlowModalInjector")
-        .then((module) => {
-            console.log("✅ Flow modal injector loaded successfully", module);
-        })
-        .catch((error) => {
-            console.error("❌ Failed to load Flow modal injector:", error);
-            console.error("Stack trace:", error.stack);
-        });
+    // Load timebar (lightweight)
+    import("../content/TimebarInjector")
+        .then(() => console.log("✅ Timebar loaded"))
+        .catch((error) => console.error("❌ Timebar failed:", error));
+
+    // Listen for messages from background script
+    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+        // Load heavier components on demand
+        if (message.type === "SHOW_ANALYTICS") {
+            import("../content/AnalyticsModalInjector")
+                .then(() => sendResponse({ success: true }))
+                .catch((error) =>
+                    sendResponse({ success: false, error: error.message }),
+                );
+            return true;
+        }
+
+        if (message.type === "SHOW_SPOTLIGHT_SEARCH") {
+            import("../content/SpotlightSearchInjector")
+                .then(() => sendResponse({ success: true }))
+                .catch((error) =>
+                    sendResponse({ success: false, error: error.message }),
+                );
+            return true;
+        }
+
+        if (message.type === "SHOW_LIMIT_MODAL") {
+            import("../content/LimitModalInjector")
+                .then(() => sendResponse({ success: true }))
+                .catch((error) =>
+                    sendResponse({ success: false, error: error.message }),
+                );
+            return true;
+        }
+
+        if (message.type === "SHOW_FLOW_MODAL") {
+            import("../content/FlowModalInjector")
+                .then(() => sendResponse({ success: true }))
+                .catch((error) =>
+                    sendResponse({ success: false, error: error.message }),
+                );
+            return true;
+        }
+
+        if (message.type === "SHOW_NOTEPAD") {
+            import("../content/NotepadInjector")
+                .then(() => sendResponse({ success: true }))
+                .catch((error) =>
+                    sendResponse({ success: false, error: error.message }),
+                );
+            return true;
+        }
+
+        // ... handle other messages
+    });
 
     // Function to extract clean text from the page
     function extractPageText() {
@@ -125,6 +101,7 @@ export function onExecute() {
                 ".story-content",
                 ".page-content",
             ];
+
             let mainContent = "";
 
             // Try to find main content area
@@ -156,6 +133,7 @@ export function onExecute() {
                         .filter((text) => text.length > 20) // Filter out very short text
                         .join("\n");
                 }
+
                 // Final fallback to body
                 if (!mainContent || mainContent.trim().length < 100) {
                     mainContent = docClone.body?.textContent || "";
@@ -271,7 +249,7 @@ export function onExecute() {
             console.log("📊 Starting usage tracking for:", this.domain);
 
             // Track usage every 30 seconds
-            const trackingInterval = setInterval(() => {
+            setInterval(() => {
                 this.trackUsage();
             }, 30000);
 
@@ -372,3 +350,6 @@ export function onExecute() {
 
     console.log("✅ LyncX content script initialization complete");
 }
+
+// Auto-initialize
+onExecute();
