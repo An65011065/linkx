@@ -2294,6 +2294,93 @@ async function handleCreateCalendarEvent(
     }
 }
 
+function handleShowSearchModal(sendResponse: (response: any) => void) {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0]) {
+            chrome.tabs.sendMessage(tabs[0].id!, {
+                type: "SHOW_SEARCH_MODAL",
+            });
+        }
+    });
+    sendResponse({ success: true });
+}
+
+// Handle search modal queries
+async function handleSearchModalQuery(
+    request: {
+        query: string;
+        url: string;
+        title: string;
+    },
+    sendResponse: (response: any) => void,
+) {
+    try {
+        console.log("🔍 Processing search modal query:", request.query);
+
+        // Here you can integrate with your AI service (OpenAI, Claude API, etc.)
+        // For now, I'll show a mock implementation
+
+        // Mock AI response - replace with actual AI integration
+        const mockResponse = await simulateAIResponse(
+            request.query,
+            request.url,
+            request.title,
+        );
+
+        // Store the search result for display
+        await chrome.storage.local.set({
+            [`search_result_${Date.now()}`]: {
+                query: request.query,
+                response: mockResponse,
+                url: request.url,
+                title: request.title,
+                timestamp: Date.now(),
+            },
+        });
+
+        // Show notification with result
+        chrome.notifications.create({
+            type: "basic",
+            iconUrl: "/src/assets/icons/icon128.png",
+            title: "Search Result",
+            message: mockResponse.substring(0, 100) + "...",
+            priority: 1,
+        });
+
+        sendResponse({
+            success: true,
+            response: mockResponse,
+        });
+    } catch (error) {
+        console.error("❌ Error processing search:", error);
+        sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : "Search failed",
+        });
+    }
+}
+
+// Mock AI response function - replace with actual AI integration
+async function simulateAIResponse(
+    query: string,
+    url: string,
+    title: string,
+): Promise<string> {
+    // Simulate API delay
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    // Mock responses based on query type
+    if (query.toLowerCase().includes("summarize")) {
+        return `Based on the page "${title}", here's a summary: This page contains information about ${
+            url.split("/").pop() || "the topic"
+        }. The content appears to focus on providing detailed information and resources related to the subject matter.`;
+    } else if (query.toLowerCase().includes("explain")) {
+        return `Let me explain this for you: The page "${title}" provides comprehensive information. The key points include various aspects of the topic that are covered in detail throughout the content.`;
+    } else {
+        return `I understand you're asking about: "${query}". Based on the current page "${title}", I can help provide relevant information and insights related to your question.`;
+    }
+}
+
 // ===============================
 // UNIFIED MESSAGE HANDLER
 // ===============================
@@ -2301,6 +2388,16 @@ async function handleCreateCalendarEvent(
 // Centralized message listener - handles ALL messages
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     console.log("Background received message:", request);
+
+    if (request.type === "SHOW_SEARCH_MODAL") {
+        handleShowSearchModal(sendResponse);
+        return true;
+    }
+
+    if (request.type === "SEARCH_MODAL_QUERY") {
+        handleSearchModalQuery(request, sendResponse);
+        return true;
+    }
 
     // Cross-tab search messages
     if (request.type === "CROSS_TAB_SEARCH") {

@@ -70,7 +70,62 @@ export function onExecute() {
             return true;
         }
 
-        // ... handle other messages
+        // 🆕 Add search modal handler
+        if (message.type === "SHOW_SEARCH_MODAL") {
+            import("../content/SearchInjector")
+                .then(() => sendResponse({ success: true }))
+                .catch((error) =>
+                    sendResponse({ success: false, error: error.message }),
+                );
+            return true;
+        }
+
+        // Existing handlers for other actions
+        if (message.action === "extractPageText") {
+            try {
+                const pageData = extractPageText();
+                console.log("Sending page data back to popup");
+                sendResponse({ success: true, data: pageData });
+            } catch (error) {
+                console.error("Error extracting page text:", error);
+                sendResponse({
+                    success: false,
+                    error:
+                        error instanceof Error
+                            ? error.message
+                            : "Unknown error",
+                });
+            }
+            return true;
+        }
+
+        if (message.action === "showNotification") {
+            showNotification(message.message);
+            sendResponse({ success: true });
+            return false;
+        }
+
+        return false;
+    });
+
+    // 🆕 Add keyboard shortcut listener (optional but nice UX)
+    document.addEventListener("keydown", (event) => {
+        // Trigger search with Cmd/Ctrl + K
+        if ((event.metaKey || event.ctrlKey) && event.key === "k") {
+            event.preventDefault();
+
+            // Import and show search modal
+            import("../content/SearchInjector")
+                .then(() => {
+                    // The injector will handle showing the search modal
+                    console.log(
+                        "🔍 Search modal triggered via keyboard shortcut",
+                    );
+                })
+                .catch((error) => {
+                    console.error("❌ Failed to load search modal:", error);
+                });
+        }
     });
 
     // Function to extract clean text from the page
@@ -300,41 +355,6 @@ export function onExecute() {
             this.lastUpdate = now;
         },
     };
-
-    // Listen for messages from popup/background script
-    if (typeof chrome !== "undefined" && chrome.runtime) {
-        chrome.runtime.onMessage.addListener(
-            (request, _sender, sendResponse) => {
-                console.log("Content script received message:", request);
-
-                if (request.action === "extractPageText") {
-                    try {
-                        const pageData = extractPageText();
-                        console.log("Sending page data back to popup");
-                        sendResponse({ success: true, data: pageData });
-                    } catch (error) {
-                        console.error("Error extracting page text:", error);
-                        sendResponse({
-                            success: false,
-                            error:
-                                error instanceof Error
-                                    ? error.message
-                                    : "Unknown error",
-                        });
-                    }
-                    return true; // Keep message channel open for async response
-                }
-
-                if (request.action === "showNotification") {
-                    showNotification(request.message);
-                    sendResponse({ success: true });
-                    return false;
-                }
-
-                return false; // Don't keep channel open for other messages
-            },
-        );
-    }
 
     // Start usage tracking
     usageTracker.startTracking();
