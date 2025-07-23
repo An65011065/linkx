@@ -1,7 +1,7 @@
 // SearchInjector.ts - Injects the search modal into any webpage
 import React from "react";
 import ReactDOM from "react-dom/client";
-import SearchModal from "../components/SearchModal";
+import SearchModal from "../components/ExploreModal";
 
 class SearchInjector {
     private container: HTMLDivElement | null = null;
@@ -44,7 +44,7 @@ class SearchInjector {
             return;
         }
 
-        console.log("🔍 Injecting search modal...");
+        console.log("🔍 Injecting explore modal...");
 
         try {
             // Create container

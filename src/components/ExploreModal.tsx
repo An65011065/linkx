@@ -31,7 +31,7 @@ interface PageCache {
     };
 }
 
-const SearchModal: React.FC<SearchModalProps> = ({ isVisible, onClose }) => {
+const ExploreModal: React.FC<SearchModalProps> = ({ isVisible, onClose }) => {
     const [message, setMessage] = useState("");
     const [isTyping, setIsTyping] = useState(false);
     const [messages, setMessages] = useState<Message[]>([]);
@@ -1237,4 +1237,4 @@ const SearchModal: React.FC<SearchModalProps> = ({ isVisible, onClose }) => {
     );
 };
 
-export default SearchModal;
+export default ExploreModal;

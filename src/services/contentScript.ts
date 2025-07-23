@@ -126,7 +126,7 @@ export function onExecute() {
 
         // 🆕 Add search modal handler
         if (message.type === "SHOW_SEARCH_MODAL") {
-            import("../content/SearchInjector")
+            import("../content/ExploreInjector")
                 .then(() => sendResponse({ success: true }))
                 .catch((error) =>
                     sendResponse({ success: false, error: error.message }),
@@ -178,7 +178,7 @@ export function onExecute() {
             event.preventDefault();
 
             // Import and show search modal
-            import("../content/SearchInjector")
+            import("../content/ExploreInjector")
                 .then(() => {
                     // The injector will handle showing the search modal
                     console.log(

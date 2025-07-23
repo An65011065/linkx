@@ -3,14 +3,17 @@ import {
     ArrowLeft,
     User,
     CreditCard,
-    Shield,
-    Save,
     Check,
     ChevronRight,
-    Eye,
-    EyeOff,
     LogOut,
+    Download,
 } from "lucide-react";
+// Import the actual HoverNavbar component
+import HoverNavbar from "../components/HoverNavbar";
+// Import AIService for data download
+import AIService from "../main/services/AIService";
+// Import theme hook instead of managing local state
+import { useTheme } from "../hooks/useTheme";
 
 interface AuthUser {
     uid: string;
@@ -19,113 +22,20 @@ interface AuthUser {
     photoURL: string | null;
 }
 
-interface Theme {
-    id: string;
-    name: string;
-    primary: string;
-    secondary: string;
-    accent: string;
-    background: string;
-    surface: string;
-    text: string;
-    textSecondary: string;
-}
-
-const themes: Theme[] = [
-    {
-        id: "mono",
-        name: "Mono",
-        primary: "rgb(255, 255, 255)",
-        secondary: "rgb(229, 231, 235)",
-        accent: "rgb(243, 244, 246)",
-        background: "rgba(0, 0, 0, 0.95)",
-        surface: "rgba(255, 255, 255, 0.08)",
-        text: "rgb(248, 250, 252)",
-        textSecondary: "rgb(226, 232, 240)",
-    },
-    {
-        id: "rose",
-        name: "Rose",
-        primary: "rgb(225, 29, 72)",
-        secondary: "rgb(244, 63, 94)",
-        accent: "rgb(190, 18, 60)",
-        background: "rgba(15, 23, 42, 0.95)",
-        surface: "rgba(225, 29, 72, 0.04)",
-        text: "rgb(159, 18, 57)",
-        textSecondary: "rgb(225, 29, 72)",
-    },
-    {
-        id: "amber",
-        name: "Amber",
-        primary: "rgb(245, 158, 11)",
-        secondary: "rgb(251, 191, 36)",
-        accent: "rgb(217, 119, 6)",
-        background: "rgba(15, 23, 42, 0.95)",
-        surface: "rgba(245, 158, 11, 0.04)",
-        text: "rgb(146, 64, 14)",
-        textSecondary: "rgb(245, 158, 11)",
-    },
-    {
-        id: "pearl",
-        name: "Pearl",
-        primary: "rgb(71, 85, 105)",
-        secondary: "rgb(100, 116, 139)",
-        accent: "rgb(0, 0, 0)",
-        background: "rgba(248, 250, 252, 0.95)",
-        surface: "rgba(71, 85, 105, 0.06)",
-        text: "rgb(15, 23, 42)",
-        textSecondary: "rgb(71, 85, 105)",
-    },
-    {
-        id: "cream",
-        name: "Cream",
-        primary: "rgb(120, 53, 15)",
-        secondary: "rgb(146, 64, 14)",
-        accent: "rgb(92, 38, 4)",
-        background: "rgba(254, 252, 232, 0.95)",
-        surface: "rgba(120, 53, 15, 0.06)",
-        text: "rgb(92, 38, 4)",
-        textSecondary: "rgb(120, 53, 15)",
-    },
-    {
-        id: "sage",
-        name: "Sage",
-        primary: "rgb(22, 101, 52)",
-        secondary: "rgb(34, 134, 58)",
-        accent: "rgb(20, 83, 45)",
-        background: "rgba(247, 254, 231, 0.95)",
-        surface: "rgba(22, 101, 52, 0.06)",
-        text: "rgb(20, 83, 45)",
-        textSecondary: "rgb(22, 101, 52)",
-    },
-    {
-        id: "lavender",
-        name: "Lavender",
-        primary: "rgb(107, 33, 168)",
-        secondary: "rgb(126, 34, 206)",
-        accent: "rgb(88, 28, 135)",
-        background: "rgba(250, 245, 255, 0.95)",
-        surface: "rgba(107, 33, 168, 0.06)",
-        text: "rgb(88, 28, 135)",
-        textSecondary: "rgb(107, 33, 168)",
-    },
-];
-
 const SettingsPage = () => {
-    const [currentTheme, setCurrentTheme] = useState<Theme>(themes[4]); // Default to cream
+    // Use global theme instead of local state
+    const { theme: currentTheme, themes, updateTheme } = useTheme();
+
     const [activeSection, setActiveSection] = useState("account");
     const [user] = useState<AuthUser>({
         uid: "temp-user-123",
-        email: "john.doe@lyncx.com",
-        displayName: "John Doe",
+        email: "anAdhikari@lyncx.com",
+        displayName: "An Adhikari",
         photoURL: null,
     });
 
     const [settings, setSettings] = useState({
-        notifications: true,
-        autoSync: true,
-        privacy: true,
-        analytics: false,
+        showExploreOnLaunch: true,
     });
 
     const [billing] = useState({
@@ -135,23 +45,13 @@ const SettingsPage = () => {
         status: "active",
     });
 
-    const [showPassword, setShowPassword] = useState(false);
-    const [hasChanges, setHasChanges] = useState(false);
-
     const sections = [
         { id: "account", label: "Account", icon: User },
         { id: "billing", label: "Billing", icon: CreditCard },
-        { id: "privacy", label: "Privacy", icon: Shield },
     ];
 
     const handleSettingChange = (key: string, value: any) => {
         setSettings((prev) => ({ ...prev, [key]: value }));
-        setHasChanges(true);
-    };
-
-    const handleSave = () => {
-        console.log("Saving settings:", settings);
-        setHasChanges(false);
     };
 
     const handleGoBack = () => {
@@ -162,9 +62,110 @@ const SettingsPage = () => {
         console.log("Logging out...");
     };
 
+    const handleDownloadData = async () => {
+        try {
+            console.log("📊 Preparing browsing data for download...");
+
+            // Get the same data that's sent to the assistant
+            const aiService = AIService.getInstance();
+            const browsingContext = await aiService.getAllBrowsingData();
+
+            if (!browsingContext) {
+                console.error("No browsing data available");
+                alert("No browsing data available to download");
+                return;
+            }
+
+            // Create CSV content (same as Firebase function)
+            const visits = browsingContext.today.allVisits || [];
+            const sortedVisits = [...visits].sort(
+                (a, b) => b.startTime - a.startTime,
+            );
+
+            const headers = [
+                "domain",
+                "title",
+                "date",
+                "readableTime",
+                "activeTimeMinutes",
+            ];
+
+            const rows = sortedVisits.map((visit) => {
+                const date = new Date(visit.startTime);
+                const timeDisplay =
+                    visit.readableTime ||
+                    date.toLocaleTimeString("en-US", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        hour12: false,
+                    });
+
+                return [
+                    visit.domain || "",
+                    (visit.title || "").replace(/"/g, '""'),
+                    date.toISOString().split("T")[0],
+                    timeDisplay,
+                    visit.activeTimeMinutes || 0,
+                ];
+            });
+
+            // Add summary row (5 columns to match headers)
+            const summaryRow = [
+                "SUMMARY_DATA",
+                `Total visits: ${sortedVisits.length}, Active minutes: ${browsingContext.today.totalActiveMinutes}, Sessions: ${browsingContext.today.tabSessions}`,
+                browsingContext.today.date,
+                "Summary",
+                browsingContext.today.totalActiveMinutes,
+            ];
+
+            const csvLines = [
+                headers.join(","),
+                summaryRow.map((cell) => `"${cell}"`).join(","),
+                ...rows.map((row) => row.map((cell) => `"${cell}"`).join(",")),
+            ];
+
+            const csvContent = csvLines.join("\n");
+
+            // Create and download file
+            const blob = new Blob([csvContent], { type: "text/csv" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `browsing-data-${browsingContext.today.date}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            console.log("✅ CSV downloaded successfully");
+        } catch (error) {
+            console.error("❌ Error downloading browsing data:", error);
+            alert("Error downloading data. Check console for details.");
+        }
+    };
+
+    // Theme change handler using ThemeService
+    const handleThemeChange = async (theme: any) => {
+        console.log("🎨 Settings theme change requested:", theme.name);
+        await updateTheme(theme);
+    };
+
     const renderAccount = () => (
         <div className="content-section">
             <h2>Account</h2>
+
+            <div className="section-group">
+                <h3>Profile</h3>
+                <div className="profile-info">
+                    <div className="profile-avatar">
+                        {user.displayName?.[0] || user.email?.[0] || "U"}
+                    </div>
+                    <div className="profile-details">
+                        <div className="profile-name">{user.displayName}</div>
+                        <div className="profile-email">{user.email}</div>
+                    </div>
+                </div>
+            </div>
 
             <div className="section-group">
                 <h3>Theme</h3>
@@ -173,18 +174,18 @@ const SettingsPage = () => {
                         <div
                             key={theme.id}
                             className={`theme-circle ${
-                                currentTheme.id === theme.id ? "active" : ""
+                                currentTheme?.id === theme.id ? "active" : ""
                             }`}
-                            onClick={() => setCurrentTheme(theme)}
+                            onClick={() => handleThemeChange(theme)}
                             style={{
                                 background: theme.primary,
                                 border:
-                                    currentTheme.id === theme.id
+                                    currentTheme?.id === theme.id
                                         ? `2px solid ${theme.primary}`
                                         : "2px solid transparent",
                             }}
                         >
-                            {currentTheme.id === theme.id && (
+                            {currentTheme?.id === theme.id && (
                                 <Check
                                     size={12}
                                     style={{
@@ -201,64 +202,62 @@ const SettingsPage = () => {
             </div>
 
             <div className="section-group">
-                <h3>Profile</h3>
-                <div className="profile-row">
-                    <div className="profile-avatar">
-                        {user.displayName?.[0] || user.email?.[0] || "U"}
-                    </div>
-                    <div className="profile-fields">
-                        <div className="field-group">
-                            <label>Name</label>
-                            <input
-                                type="text"
-                                defaultValue={user.displayName || ""}
-                                placeholder="Enter your name"
-                            />
+                <h3>Preferences</h3>
+                <div className="setting-row">
+                    <div className="setting-info">
+                        <div className="setting-label">
+                            Show Explore on Launch
                         </div>
-                        <div className="field-group">
-                            <label>Email</label>
-                            <input
-                                type="email"
-                                defaultValue={user.email}
-                                disabled
-                                className="disabled"
-                            />
+                        <div className="setting-desc">
+                            Open explorer when loading a page.
                         </div>
                     </div>
+                    <label className="toggle">
+                        <input
+                            type="checkbox"
+                            checked={settings.showExploreOnLaunch}
+                            onChange={(e) =>
+                                handleSettingChange(
+                                    "showExploreOnLaunch",
+                                    e.target.checked,
+                                )
+                            }
+                        />
+                        <span className="toggle-slider" />
+                    </label>
                 </div>
             </div>
 
             <div className="section-group">
-                <h3>Security</h3>
-                <div className="field-group">
-                    <label>Password</label>
-                    <div className="password-field">
-                        <input
-                            type={showPassword ? "text" : "password"}
-                            placeholder="Enter current password"
-                        />
-                        <button
-                            type="button"
-                            className="password-toggle"
-                            onClick={() => setShowPassword(!showPassword)}
-                        >
-                            {showPassword ? (
-                                <EyeOff size={16} />
-                            ) : (
-                                <Eye size={16} />
-                            )}
-                        </button>
+                <h3>Data</h3>
+                <div className="data-action">
+                    <div className="action-info">
+                        <div className="action-label">Download Your Data</div>
+                        <div className="action-desc">
+                            Your data stays on your device. Download it anytime
+                            for your explorations.
+                        </div>
                     </div>
+                    <button
+                        className="download-btn"
+                        onClick={handleDownloadData}
+                    >
+                        <Download size={16} />
+                        Download
+                    </button>
                 </div>
-                <button className="link-btn">Change Password</button>
             </div>
 
             <div className="section-group">
                 <div className="logout-row">
                     <div className="logout-info">
-                        <div>Log out of all devices</div>
+                        <div className="logout-label">Logout</div>
+                        <div className="logout-desc">
+                            This will sign you out.
+                        </div>
                     </div>
                     <button className="logout-btn" onClick={handleLogout}>
+                        <LogOut size={16} />
                         Log out
                     </button>
                 </div>
@@ -286,155 +285,6 @@ const SettingsPage = () => {
                     </button>
                 </div>
             </div>
-
-            <div className="section-group">
-                <h3>Payment Method</h3>
-                <div className="payment-row">
-                    <div className="payment-details">
-                        <CreditCard size={18} />
-                        <div>
-                            <div className="card-number">
-                                •••• •••• •••• 4242
-                            </div>
-                            <div className="card-expiry">Expires 12/26</div>
-                        </div>
-                    </div>
-                    <button className="link-btn">Update</button>
-                </div>
-            </div>
-
-            <div className="section-group">
-                <h3>Billing History</h3>
-                <div className="history-list">
-                    {[
-                        {
-                            date: "Nov 15, 2024",
-                            amount: "$9.99",
-                            status: "Paid",
-                        },
-                        {
-                            date: "Oct 15, 2024",
-                            amount: "$9.99",
-                            status: "Paid",
-                        },
-                        {
-                            date: "Sep 15, 2024",
-                            amount: "$9.99",
-                            status: "Paid",
-                        },
-                    ].map((invoice, index) => (
-                        <div key={index} className="history-item">
-                            <div className="history-date">{invoice.date}</div>
-                            <div className="history-amount">
-                                {invoice.amount}
-                            </div>
-                            <div className="history-status">
-                                {invoice.status}
-                            </div>
-                            <button className="link-btn">Download</button>
-                        </div>
-                    ))}
-                </div>
-            </div>
-        </div>
-    );
-
-    const renderPrivacy = () => (
-        <div className="content-section">
-            <h2>Privacy</h2>
-
-            <div className="section-group">
-                <h3>Notifications</h3>
-                <div className="setting-row">
-                    <div className="setting-info">
-                        <div className="setting-label">Push Notifications</div>
-                        <div className="setting-desc">
-                            Get notified about important updates
-                        </div>
-                    </div>
-                    <label className="toggle">
-                        <input
-                            type="checkbox"
-                            checked={settings.notifications}
-                            onChange={(e) =>
-                                handleSettingChange(
-                                    "notifications",
-                                    e.target.checked,
-                                )
-                            }
-                        />
-                        <span className="toggle-slider" />
-                    </label>
-                </div>
-            </div>
-
-            <div className="section-group">
-                <h3>Sync & Storage</h3>
-                <div className="setting-row">
-                    <div className="setting-info">
-                        <div className="setting-label">Auto Sync</div>
-                        <div className="setting-desc">
-                            Automatically sync data across devices
-                        </div>
-                    </div>
-                    <label className="toggle">
-                        <input
-                            type="checkbox"
-                            checked={settings.autoSync}
-                            onChange={(e) =>
-                                handleSettingChange(
-                                    "autoSync",
-                                    e.target.checked,
-                                )
-                            }
-                        />
-                        <span className="toggle-slider" />
-                    </label>
-                </div>
-            </div>
-
-            <div className="section-group">
-                <h3>Privacy Controls</h3>
-                <div className="setting-row">
-                    <div className="setting-info">
-                        <div className="setting-label">Enhanced Privacy</div>
-                        <div className="setting-desc">
-                            Block tracking and improve privacy
-                        </div>
-                    </div>
-                    <label className="toggle">
-                        <input
-                            type="checkbox"
-                            checked={settings.privacy}
-                            onChange={(e) =>
-                                handleSettingChange("privacy", e.target.checked)
-                            }
-                        />
-                        <span className="toggle-slider" />
-                    </label>
-                </div>
-                <div className="setting-row">
-                    <div className="setting-info">
-                        <div className="setting-label">Usage Analytics</div>
-                        <div className="setting-desc">
-                            Help improve LyncX by sharing usage data
-                        </div>
-                    </div>
-                    <label className="toggle">
-                        <input
-                            type="checkbox"
-                            checked={settings.analytics}
-                            onChange={(e) =>
-                                handleSettingChange(
-                                    "analytics",
-                                    e.target.checked,
-                                )
-                            }
-                        />
-                        <span className="toggle-slider" />
-                    </label>
-                </div>
-            </div>
         </div>
     );
 
@@ -442,32 +292,29 @@ const SettingsPage = () => {
         <div
             className="settings-page"
             style={{
-                "--primary": currentTheme.primary,
-                "--secondary": currentTheme.secondary,
-                "--accent": currentTheme.accent,
-                "--background": currentTheme.background,
-                "--surface": currentTheme.surface,
-                "--text": currentTheme.text,
-                "--text-secondary": currentTheme.textSecondary,
+                "--primary": currentTheme?.primary,
+                "--secondary": currentTheme?.secondary,
+                "--accent": currentTheme?.accent,
+                "--background": currentTheme?.background,
+                "--surface": currentTheme?.surface,
+                "--text": currentTheme?.text,
+                "--text-secondary": currentTheme?.textSecondary,
             }}
         >
+            {/* Import the actual HoverNavbar component - no currentTheme prop needed */}
+            <HoverNavbar alwaysVisible={true} />
+
             {/* Header */}
             <div className="settings-header">
                 <button className="back-btn" onClick={handleGoBack}>
                     <ArrowLeft size={18} />
                 </button>
                 <h1>Settings</h1>
-                {hasChanges && (
-                    <button className="save-btn" onClick={handleSave}>
-                        <Save size={14} />
-                        Save
-                    </button>
-                )}
             </div>
 
             {/* Main Layout */}
             <div className="settings-layout">
-                {/* Left Sidebar (30%) */}
+                {/* Left Sidebar */}
                 <div className="settings-sidebar">
                     {sections.map((section) => {
                         const Icon = section.icon;
@@ -486,11 +333,10 @@ const SettingsPage = () => {
                     })}
                 </div>
 
-                {/* Content Area (70%) */}
+                {/* Content Area */}
                 <div className="settings-content">
                     {activeSection === "account" && renderAccount()}
                     {activeSection === "billing" && renderBilling()}
-                    {activeSection === "privacy" && renderPrivacy()}
                 </div>
             </div>
 
@@ -539,25 +385,6 @@ const SettingsPage = () => {
                     flex: 1;
                 }
 
-                .save-btn {
-                    display: flex;
-                    align-items: center;
-                    gap: 6px;
-                    background: var(--primary);
-                    color: white;
-                    border: none;
-                    padding: 8px 12px;
-                    border-radius: 8px;
-                    cursor: pointer;
-                    font-weight: 500;
-                    font-size: 13px;
-                    transition: all 0.2s ease;
-                }
-
-                .save-btn:hover {
-                    transform: scale(1.02);
-                }
-
                 .settings-layout {
                     display: flex;
                     gap: 40px;
@@ -566,7 +393,7 @@ const SettingsPage = () => {
                     min-height: calc(100vh - 120px);
                 }
 
-                /* Sidebar (30%) */
+                /* Sidebar */
                 .settings-sidebar {
                     width: 30%;
                     min-width: 200px;
@@ -601,10 +428,9 @@ const SettingsPage = () => {
                     background: var(--surface);
                     color: var(--text);
                     border-left: 2px solid var(--primary);
-                    background: var(--surface);
                 }
 
-                /* Content Area (70%) */
+                /* Content Area */
                 .settings-content {
                     flex: 1;
                     min-width: 0;
@@ -667,261 +493,45 @@ const SettingsPage = () => {
                     box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--primary);
                 }
 
-                /* Profile */
-                .profile-row {
+                /* Profile Info */
+                .profile-info {
                     display: flex;
-                    gap: 20px;
-                    align-items: flex-start;
+                    align-items: center;
+                    gap: 16px;
                 }
 
                 .profile-avatar {
-                    width: 64px;
-                    height: 64px;
-                    border-radius: 16px;
+                    width: 48px;
+                    height: 48px;
+                    border-radius: 12px;
                     background: var(--primary);
                     display: flex;
                     align-items: center;
                     justify-content: center;
                     font-weight: 600;
                     color: white;
-                    font-size: 24px;
+                    font-size: 18px;
                     flex-shrink: 0;
                 }
 
-                .profile-fields {
-                    flex: 1;
+                .profile-details {
                     display: flex;
                     flex-direction: column;
-                    gap: 16px;
+                    gap: 2px;
                 }
 
-                .field-group {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 6px;
-                }
-
-                .field-group label {
-                    font-size: 14px;
-                    font-weight: 500;
-                    color: var(--text-secondary);
-                }
-
-                .field-group input {
-                    padding: 10px 12px;
-                    background: var(--surface);
-                    border: 1px solid transparent;
-                    border-radius: 8px;
-                    color: var(--text);
-                    font-size: 14px;
-                    transition: all 0.2s ease;
-                    font-family: inherit;
-                }
-
-                .field-group input:focus {
-                    outline: none;
-                    border-color: var(--primary);
-                    background: var(--background);
-                }
-
-                .field-group input.disabled {
-                    opacity: 0.6;
-                    cursor: not-allowed;
-                }
-
-                .password-field {
-                    position: relative;
-                }
-
-                .password-toggle {
-                    position: absolute;
-                    right: 10px;
-                    top: 50%;
-                    transform: translateY(-50%);
-                    background: none;
-                    border: none;
-                    color: var(--text-secondary);
-                    cursor: pointer;
-                    padding: 4px;
-                    border-radius: 4px;
-                    transition: all 0.2s ease;
-                }
-
-                .password-toggle:hover {
-                    background: var(--surface);
-                }
-
-                .link-btn {
-                    background: none;
-                    border: none;
-                    color: var(--primary);
-                    cursor: pointer;
-                    font-weight: 500;
-                    padding: 0;
-                    font-size: 14px;
-                    transition: all 0.2s ease;
-                    align-self: flex-start;
-                    margin-top: 8px;
-                }
-
-                .link-btn:hover {
-                    opacity: 0.8;
-                }
-
-                /* Logout */
-                .logout-row {
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                }
-
-                .logout-info div {
-                    font-size: 14px;
-                    color: var(--text);
-                }
-
-                .logout-btn {
-                    background: #ef4444;
-                    color: white;
-                    border: none;
-                    padding: 8px 16px;
-                    border-radius: 6px;
-                    cursor: pointer;
-                    font-weight: 500;
-                    font-size: 14px;
-                    transition: all 0.2s ease;
-                }
-
-                .logout-btn:hover {
-                    background: #dc2626;
-                    transform: scale(1.02);
-                }
-
-                /* Billing */
-                .billing-card {
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                    padding: 20px;
-                    background: var(--surface);
-                    border-radius: 12px;
-                    border: 1px solid var(--primary);
-                }
-
-                .plan-name {
-                    font-size: 18px;
+                .profile-name {
+                    font-size: 16px;
                     font-weight: 600;
                     color: var(--text);
-                    margin-bottom: 4px;
                 }
 
-                .plan-price {
-                    font-size: 24px;
-                    font-weight: 700;
-                    color: var(--primary);
-                    margin-bottom: 6px;
-                }
-
-                .plan-status {
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    color: var(--text-secondary);
-                    font-size: 13px;
-                }
-
-                .status-dot {
-                    width: 6px;
-                    height: 6px;
-                    border-radius: 50%;
-                    background: #22c55e;
-                }
-
-                .manage-btn {
-                    display: flex;
-                    align-items: center;
-                    gap: 6px;
-                    background: var(--primary);
-                    color: white;
-                    border: none;
-                    padding: 10px 16px;
-                    border-radius: 8px;
-                    cursor: pointer;
-                    font-weight: 500;
+                .profile-email {
                     font-size: 14px;
-                    transition: all 0.2s ease;
-                }
-
-                .manage-btn:hover {
-                    transform: scale(1.02);
-                }
-
-                .payment-row {
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                    padding: 16px;
-                    background: var(--surface);
-                    border-radius: 10px;
-                }
-
-                .payment-details {
-                    display: flex;
-                    align-items: center;
-                    gap: 12px;
-                }
-
-                .card-number {
-                    font-weight: 500;
-                    color: var(--text);
-                    font-size: 14px;
-                }
-
-                .card-expiry {
-                    font-size: 12px;
                     color: var(--text-secondary);
                 }
 
-                .history-list {
-                    background: var(--surface);
-                    border-radius: 10px;
-                    overflow: hidden;
-                }
-
-                .history-item {
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                    padding: 16px 20px;
-                    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-                }
-
-                .history-item:last-child {
-                    border-bottom: none;
-                }
-
-                .history-date {
-                    font-weight: 500;
-                    color: var(--text);
-                    flex: 1;
-                    font-size: 14px;
-                }
-
-                .history-amount {
-                    font-weight: 600;
-                    color: var(--text);
-                    margin: 0 20px;
-                    font-size: 14px;
-                }
-
-                .history-status {
-                    color: #22c55e;
-                    font-weight: 500;
-                    font-size: 12px;
-                    margin: 0 20px;
-                }
-
-                /* Privacy Settings */
+                /* Settings Rows */
                 .setting-row {
                     display: flex;
                     align-items: center;
@@ -998,6 +608,155 @@ const SettingsPage = () => {
                     background: white;
                 }
 
+                /* Data Action */
+                .data-action {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                }
+
+                .action-info {
+                    flex: 1;
+                }
+
+                .action-label {
+                    font-weight: 500;
+                    color: var(--text);
+                    margin-bottom: 4px;
+                    font-size: 14px;
+                }
+
+                .action-desc {
+                    font-size: 13px;
+                    color: var(--text-secondary);
+                    opacity: 0.8;
+                }
+
+                .download-btn {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    background: var(--surface);
+                    color: var(--text);
+                    border: 1px solid var(--surface);
+                    padding: 10px 16px;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    font-weight: 500;
+                    font-size: 14px;
+                    transition: all 0.2s ease;
+                }
+
+                .download-btn:hover {
+                    background: var(--primary);
+                    color: white;
+                    border-color: var(--primary);
+                    transform: scale(1.02);
+                }
+
+                /* Logout */
+                .logout-row {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                }
+
+                .logout-info {
+                    flex: 1;
+                }
+
+                .logout-label {
+                    font-weight: 500;
+                    color: var(--text);
+                    margin-bottom: 4px;
+                    font-size: 14px;
+                }
+
+                .logout-desc {
+                    font-size: 13px;
+                    color: var(--text-secondary);
+                    opacity: 0.8;
+                }
+
+                .logout-btn {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    background: #ef4444;
+                    color: white;
+                    border: none;
+                    padding: 10px 16px;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    font-weight: 500;
+                    font-size: 14px;
+                    transition: all 0.2s ease;
+                }
+
+                .logout-btn:hover {
+                    background: #dc2626;
+                    transform: scale(1.02);
+                }
+
+                /* Billing */
+                .billing-card {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    padding: 20px;
+                    background: var(--surface);
+                    border-radius: 12px;
+                    border: 1px solid var(--primary);
+                }
+
+                .plan-name {
+                    font-size: 18px;
+                    font-weight: 600;
+                    color: var(--text);
+                    margin-bottom: 4px;
+                }
+
+                .plan-price {
+                    font-size: 24px;
+                    font-weight: 700;
+                    color: var(--primary);
+                    margin-bottom: 6px;
+                }
+
+                .plan-status {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    color: var(--text-secondary);
+                    font-size: 13px;
+                }
+
+                .status-dot {
+                    width: 6px;
+                    height: 6px;
+                    border-radius: 50%;
+                    background: #22c55e;
+                }
+
+                .manage-btn {
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    background: var(--primary);
+                    color: white;
+                    border: none;
+                    padding: 10px 16px;
+                    border-radius: 8px;
+                    cursor: pointer;
+                    font-weight: 500;
+                    font-size: 14px;
+                    transition: all 0.2s ease;
+                }
+
+                .manage-btn:hover {
+                    transform: scale(1.02);
+                }
+
                 /* Responsive */
                 @media (max-width: 768px) {
                     .settings-layout {
@@ -1018,7 +777,7 @@ const SettingsPage = () => {
                         justify-content: center;
                     }
                     
-                    .profile-row {
+                    .profile-info {
                         flex-direction: column;
                         align-items: center;
                         text-align: center;
@@ -1030,18 +789,7 @@ const SettingsPage = () => {
                         text-align: center;
                     }
                     
-                    .history-item {
-                        flex-direction: column;
-                        gap: 8px;
-                        text-align: center;
-                    }
-                    
-                    .history-date,
-                    .history-amount {
-                        margin: 0;
-                    }
-                    
-                    .logout-row {
+                    .logout-row, .data-action {
                         flex-direction: column;
                         gap: 12px;
                         text-align: center;

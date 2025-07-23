@@ -12,6 +12,7 @@ import {
     Calendar,
     CircleDot,
 } from "lucide-react";
+import { useTheme } from "../hooks/useTheme";
 
 // Proper interface for Lucide React icon props
 interface LucideIconProps {
@@ -25,6 +26,7 @@ interface LucideIconProps {
 
 interface HoverNavbarProps {
     onClose?: () => void;
+    alwaysVisible?: boolean;
 }
 
 interface AuthUser {
@@ -32,109 +34,31 @@ interface AuthUser {
     email: string;
     displayName: string | null;
     photoURL: string | null;
+    plan?: {
+        type: string;
+        status: string;
+    };
 }
 
-interface Theme {
-    id: string;
-    name: string;
-    primary: string;
-    secondary: string;
-    accent: string;
-    background: string;
-    surface: string;
-    text: string;
-    textSecondary: string;
-}
+const HoverNavbar: React.FC<HoverNavbarProps> = ({
+    onClose,
+    alwaysVisible = false,
+}) => {
+    // Use global theme instead of local state
+    const { theme: currentTheme } = useTheme();
 
-const themes: Theme[] = [
-    {
-        id: "mono",
-        name: "Mono",
-        primary: "rgb(255, 255, 255)",
-        secondary: "rgb(229, 231, 235)",
-        accent: "rgb(243, 244, 246)",
-        background: "rgb(15, 23, 42)",
-        surface: "rgb(30, 41, 59)", // Solid surface instead of rgba
-        text: "rgb(248, 250, 252)",
-        textSecondary: "rgb(226, 232, 240)",
-    },
-    {
-        id: "rose",
-        name: "Rose",
-        primary: "rgb(225, 29, 72)",
-        secondary: "rgb(244, 63, 94)",
-        accent: "rgb(190, 18, 60)",
-        background: "rgb(15, 23, 42)",
-        surface: "rgb(30, 41, 59)", // Same dark base for consistency
-        text: "rgb(248, 250, 252)", // Fixed: should be light on dark background
-        textSecondary: "rgb(225, 29, 72)",
-    },
-    {
-        id: "amber",
-        name: "Amber",
-        primary: "rgb(245, 158, 11)",
-        secondary: "rgb(251, 191, 36)",
-        accent: "rgb(217, 119, 6)",
-        background: "rgb(15, 23, 42)",
-        surface: "rgb(30, 41, 59)", // Same dark base for consistency
-        text: "rgb(248, 250, 252)", // Fixed: should be light on dark background
-        textSecondary: "rgb(245, 158, 11)",
-    },
-    {
-        id: "pearl",
-        name: "Pearl",
-        primary: "rgb(71, 85, 105)",
-        secondary: "rgb(100, 116, 139)",
-        accent: "rgb(0, 0, 0)",
-        background: "rgb(248, 250, 252)",
-        surface: "rgb(226, 232, 240)", // Solid light surface
-        text: "rgb(15, 23, 42)",
-        textSecondary: "rgb(71, 85, 105)",
-    },
-    {
-        id: "cream",
-        name: "Cream",
-        primary: "rgb(120, 53, 15)",
-        secondary: "rgb(146, 64, 14)",
-        accent: "rgb(92, 38, 4)",
-        background: "rgb(254, 252, 232)",
-        surface: "rgb(245, 243, 206)", // Solid cream surface
-        text: "rgb(92, 38, 4)",
-        textSecondary: "rgb(120, 53, 15)",
-    },
-    {
-        id: "sage",
-        name: "Sage",
-        primary: "rgb(22, 101, 52)",
-        secondary: "rgb(34, 134, 58)",
-        accent: "rgb(20, 83, 45)",
-        background: "rgb(247, 254, 231)",
-        surface: "rgb(236, 253, 211)", // Solid sage surface
-        text: "rgb(20, 83, 45)",
-        textSecondary: "rgb(22, 101, 52)",
-    },
-    {
-        id: "lavender",
-        name: "Lavender",
-        primary: "rgb(107, 33, 168)",
-        secondary: "rgb(126, 34, 206)",
-        accent: "rgb(88, 28, 135)",
-        background: "rgb(250, 245, 255)",
-        surface: "rgb(237, 220, 255)", // Solid lavender surface
-        text: "rgb(88, 28, 135)",
-        textSecondary: "rgb(107, 33, 168)",
-    },
-];
-
-const HoverNavbar: React.FC<HoverNavbarProps> = () => {
     const [user, setUser] = useState<AuthUser | null>(null);
-    const [isVisible, setIsVisible] = useState(false);
-    const [currentTheme, setCurrentTheme] = useState<Theme>(themes[0]); // Default to mono
-    const [showThemeSelector, setShowThemeSelector] = useState(false);
+    const [isVisible, setIsVisible] = useState(alwaysVisible);
+    const [hoveredItem, setHoveredItem] = useState<string | null>(null);
+    const [showProfileSelector, setShowProfileSelector] = useState(false);
 
     // Debug theme changes
     useEffect(() => {
-        console.log("🎨 Theme changed to:", currentTheme.name, currentTheme);
+        console.log(
+            "🎨 HoverNavbar theme changed to:",
+            currentTheme?.name,
+            currentTheme,
+        );
     }, [currentTheme]);
 
     useEffect(() => {
@@ -145,6 +69,10 @@ const HoverNavbar: React.FC<HoverNavbarProps> = () => {
             email: "test@lyncx.com",
             displayName: "Test User",
             photoURL: null,
+            plan: {
+                type: "Pro",
+                status: "active",
+            },
         };
 
         setUser(dummyUser);
@@ -183,18 +111,48 @@ const HoverNavbar: React.FC<HoverNavbarProps> = () => {
         }
     };
     const handleReminders = () => {};
+
     const handleSearch = () => {
         if (typeof chrome !== "undefined" && chrome.runtime) {
             chrome.runtime.sendMessage({ type: "SHOW_SPOTLIGHT_SEARCH" });
         }
     };
     const handleBookmark = () => {};
+
+    const handleExplore = () => {
+        if (typeof chrome !== "undefined" && chrome.runtime) {
+            chrome.runtime.sendMessage({ type: "SHOW_SEARCH_MODAL" });
+        }
+    };
+
     const handleTimer = () => {
         if (typeof chrome !== "undefined" && chrome.runtime) {
             chrome.runtime.sendMessage({ type: "SHOW_TIMER" });
         }
     };
     const handleSummarize = () => {};
+    const handleSettings = () => {
+        if (typeof chrome !== "undefined" && chrome.runtime) {
+            chrome.runtime.sendMessage({ type: "OPEN_SETTINGS_PAGE" });
+        }
+    };
+    const handleUpgradePlan = () => {
+        if (typeof chrome !== "undefined" && chrome.runtime) {
+            chrome.runtime.sendMessage({ type: "SHOW_UPGRADE_PLAN" });
+        }
+    };
+    const handleLearnMore = () => {
+        if (typeof chrome !== "undefined" && chrome.runtime) {
+            chrome.runtime.sendMessage({ type: "SHOW_LEARN_MORE" });
+        }
+    };
+
+    // Theme change handler using ThemeService
+    const handleThemeChange = async (theme: any) => {
+        console.log("🎨 Theme change requested:", theme.name);
+        await updateTheme(theme);
+        setShowThemeSelector(false);
+    };
 
     // Section 1: Data Tools (Primary actions)
     const dataTools = [
@@ -233,10 +191,10 @@ const HoverNavbar: React.FC<HoverNavbarProps> = () => {
             action: handleNotepad,
         },
         {
-            id: "bookmark",
-            icon: Bookmark,
-            label: "Bookmark",
-            action: handleBookmark,
+            id: "search",
+            icon: CircleDot,
+            label: "Explore",
+            action: handleExplore,
         },
     ];
 
@@ -281,9 +239,22 @@ const HoverNavbar: React.FC<HoverNavbarProps> = () => {
                 key={item.id}
                 className="lynx-nav-item"
                 onClick={item.action}
-                title={item.label}
+                onMouseEnter={() => setHoveredItem(item.id)}
+                onMouseLeave={() => setHoveredItem(null)}
             >
-                <Icon color={currentTheme.text} size={18} strokeWidth={2} />
+                <Icon color={currentTheme?.text} size={18} strokeWidth={2} />
+                {hoveredItem === item.id && (
+                    <div
+                        className="nav-tooltip"
+                        style={{
+                            backgroundColor: currentTheme?.background,
+                            color: currentTheme?.text,
+                            borderColor: currentTheme?.surface,
+                        }}
+                    >
+                        {item.label}
+                    </div>
+                )}
             </div>
         );
     };
@@ -297,104 +268,58 @@ const HoverNavbar: React.FC<HoverNavbarProps> = () => {
         }>,
     ) => <div className="lynx-navbar-section">{items.map(renderNavItem)}</div>;
 
-    console.log("✅ HoverNavbar: Rendering with theme:", currentTheme.name);
+    console.log("✅ HoverNavbar: Rendering with theme:", currentTheme?.name);
 
     return (
-        <div className="lynx-hover-navbar">
-            {/* Hover trigger area */}
-            <div
-                className="lynx-hover-trigger"
-                onMouseEnter={() => setIsVisible(true)}
-            />
+        <div
+            className="lynx-hover-navbar"
+            onClick={(e) => {
+                // Close selectors when clicking outside
+                if (e.target === e.currentTarget) {
+                    setShowProfileSelector(false);
+                }
+            }}
+        >
+            {/* Hover trigger area - only show if not always visible */}
+            {!alwaysVisible && (
+                <div
+                    className="lynx-hover-trigger"
+                    onMouseEnter={() => setIsVisible(true)}
+                    onMouseLeave={() => {
+                        // Don't hide if selectors are open
+                        if (!showProfileSelector) {
+                            setIsVisible(false);
+                        }
+                    }}
+                />
+            )}
 
             {/* Main navbar - always rendered but visibility controlled by CSS */}
             <div
                 className={`lynx-navbar-container ${
-                    isVisible ? "visible" : ""
+                    isVisible || showProfileSelector || alwaysVisible
+                        ? "visible"
+                        : ""
                 }`}
-                onMouseEnter={() => setIsVisible(true)}
-                onMouseLeave={() => setIsVisible(false)}
+                onMouseEnter={() => !alwaysVisible && setIsVisible(true)}
+                onMouseLeave={() => {
+                    // Don't hide if selectors are open or if always visible
+                    if (!alwaysVisible && !showProfileSelector) {
+                        setIsVisible(false);
+                    }
+                }}
                 style={{
-                    background: currentTheme.background,
-                    borderRightColor: currentTheme.surface,
+                    background: currentTheme?.background,
+                    borderRightColor: currentTheme?.surface,
                 }}
             >
-                {/* Theme selector */}
-                <div className="theme-controls">
-                    <div
-                        className="theme-toggle"
-                        onClick={() => {
-                            console.log(
-                                "🎨 Theme selector clicked, current:",
-                                showThemeSelector,
-                            );
-                            setShowThemeSelector(!showThemeSelector);
-                        }}
-                        title="Change theme"
-                    >
-                        <CircleDot
-                            color={currentTheme.text}
-                            size={12}
-                            strokeWidth={2}
-                        />
-                    </div>
-                    {showThemeSelector && (
-                        <div
-                            className="theme-selector"
-                            style={{
-                                background: currentTheme.background,
-                                borderColor: currentTheme.surface,
-                            }}
-                        >
-                            <div className="theme-grid">
-                                {themes.map((theme) => (
-                                    <div
-                                        key={theme.id}
-                                        className={`theme-option ${
-                                            currentTheme.id === theme.id
-                                                ? "active"
-                                                : ""
-                                        }`}
-                                        onClick={() => {
-                                            console.log(
-                                                "🎨 Switching to theme:",
-                                                theme.name,
-                                            );
-                                            setCurrentTheme(theme);
-                                            setShowThemeSelector(false);
-                                        }}
-                                        title={theme.name}
-                                        style={{
-                                            backgroundColor:
-                                                currentTheme.id === theme.id
-                                                    ? currentTheme.surface
-                                                    : "transparent",
-                                            borderColor:
-                                                currentTheme.id === theme.id
-                                                    ? currentTheme.primary
-                                                    : "transparent",
-                                        }}
-                                    >
-                                        <div
-                                            className="theme-preview"
-                                            style={{
-                                                background: theme.primary,
-                                            }}
-                                        />
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                </div>
-
                 {/* Main sections */}
                 <div className="lynx-navbar-content">
                     {renderSection(dataTools)}
                     <div
                         className="lynx-navbar-separator"
                         style={{
-                            background: currentTheme.textSecondary,
+                            background: currentTheme?.textSecondary,
                             opacity: 0.3,
                         }}
                     />
@@ -402,7 +327,7 @@ const HoverNavbar: React.FC<HoverNavbarProps> = () => {
                     <div
                         className="lynx-navbar-separator"
                         style={{
-                            background: currentTheme.textSecondary,
+                            background: currentTheme?.textSecondary,
                             opacity: 0.3,
                         }}
                     />
@@ -414,20 +339,90 @@ const HoverNavbar: React.FC<HoverNavbarProps> = () => {
                     <div
                         className="lynx-user-avatar"
                         title={user?.displayName || user?.email || "User"}
+                        onClick={() =>
+                            setShowProfileSelector(!showProfileSelector)
+                        }
                         style={{
-                            color: currentTheme.text,
+                            color: currentTheme?.text,
                         }}
                     >
                         {user?.displayName?.[0] || user?.email?.[0] || "U"}
                     </div>
+
+                    {/* Profile Selector */}
+                    {showProfileSelector && (
+                        <div
+                            className="profile-selector"
+                            style={{
+                                background: currentTheme?.background,
+                                borderColor: currentTheme?.surface,
+                            }}
+                        >
+                            {/* Email and Plan Section */}
+                            <div className="profile-info-section">
+                                <div
+                                    className="profile-email"
+                                    style={{ color: currentTheme?.text }}
+                                >
+                                    {user?.email}
+                                </div>
+                                <div
+                                    className="profile-plan"
+                                    style={{
+                                        color: currentTheme?.textSecondary,
+                                    }}
+                                >
+                                    {user?.plan?.type || "Free"} Plan
+                                </div>
+                            </div>
+
+                            {/* Separator */}
+                            <div
+                                className="profile-separator"
+                                style={{
+                                    backgroundColor: currentTheme?.surface,
+                                }}
+                            />
+
+                            {/* Actions Section */}
+                            <div className="profile-actions-section">
+                                <div
+                                    className="profile-action"
+                                    onClick={() => {
+                                        setShowProfileSelector(false);
+                                        handleLearnMore();
+                                    }}
+                                    style={{ color: currentTheme?.text }}
+                                >
+                                    Learn More
+                                </div>
+                                <div
+                                    className="profile-action"
+                                    onClick={() => {
+                                        setShowProfileSelector(false);
+                                        handleSettings();
+                                    }}
+                                    style={{ color: currentTheme?.text }}
+                                >
+                                    Settings
+                                </div>
+                                <div
+                                    className="profile-action upgrade"
+                                    onClick={() => {
+                                        setShowProfileSelector(false);
+                                        handleUpgradePlan();
+                                    }}
+                                    style={{ color: currentTheme?.primary }}
+                                >
+                                    Upgrade Plan
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
 
             <style>{`
-                * {
-                    color: inherit !important;
-                }
-
                 .lynx-hover-navbar {
                     position: fixed;
                     top: 0;
@@ -451,11 +446,12 @@ const HoverNavbar: React.FC<HoverNavbarProps> = () => {
 
                 .lynx-navbar-container {
                     position: absolute;
-                    top: 0;
+                    top: 50%;
                     left: 0;
                     width: 52px;
-                    height: 100vh;
-                    transform: translateX(-100%);
+                    height: auto;
+                    max-height: 80vh;
+                    transform: translateX(-100%) translateY(-50%);
                     transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
                     pointer-events: auto;
                     display: flex;
@@ -464,10 +460,87 @@ const HoverNavbar: React.FC<HoverNavbarProps> = () => {
                     box-shadow: 2px 0 8px rgba(0, 0, 0, 0.3);
                     padding: 16px 0;
                     opacity: 1;
+                    border-radius: 0 12px 12px 0;
                 }
 
                 .lynx-navbar-container.visible {
-                    transform: translateX(0);
+                    transform: translateX(0) translateY(-50%);
+                }
+
+                .theme-controls {
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    margin-bottom: 12px;
+                    position: relative;
+                }
+
+                .theme-toggle {
+                    width: 32px;
+                    height: 32px;
+                    border: none;
+                    background: transparent;
+                    border-radius: 12px;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    opacity: 1;
+                    transition: background 0.2s, transform 0.2s;
+                }
+
+                .theme-toggle:hover {
+                    background: rgba(255, 255, 255, 0.1);
+                    transform: scale(1.05);
+                }
+
+                .theme-selector {
+                    position: absolute;
+                    top: 0;
+                    left: 56px;
+                    border: 1px solid;
+                    border-radius: 16px;
+                    padding: 12px;
+                    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
+                    z-index: 10001;
+                    animation: slideIn 0.24s cubic-bezier(0.25, 0.8, 0.25, 1);
+                    overflow: visible;
+                    white-space: nowrap;
+                    opacity: 1;
+                }
+
+                .theme-grid {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 8px;
+                    width: 104px;
+                }
+
+                .theme-option {
+                    width: 40px;
+                    height: 40px;
+                    border-radius: 12px;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    background: transparent;
+                    border: 2px solid transparent;
+                    transition: border 0.2s, transform 0.2s;
+                    opacity: 1;
+                }
+
+                .theme-option:hover {
+                    transform: scale(1.08);
+                    border-color: rgba(255, 255, 255, 0.12);
+                }
+
+                .theme-preview {
+                    width: 20px;
+                    height: 20px;
+                    border-radius: 50%;
+                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+                    opacity: 1;
                 }
 
                 .theme-controls {
@@ -583,6 +656,7 @@ const HoverNavbar: React.FC<HoverNavbarProps> = () => {
                     transition: all 0.2s ease;
                     filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
                     opacity: 1;
+                    position: relative;
                 }
 
                 .lynx-nav-item:hover {
@@ -605,6 +679,24 @@ const HoverNavbar: React.FC<HoverNavbarProps> = () => {
                 .lynx-nav-item:hover svg {
                     transform: scale(1.1);
                     opacity: 1;
+                }
+
+                .nav-tooltip {
+                    position: absolute !important;
+                    left: 50px !important;
+                    top: 50% !important;
+                    transform: translateY(-50%) !important;
+                    padding: 6px 10px !important;
+                    border-radius: 6px !important;
+                    font-size: 12px !important;
+                    font-weight: 500 !important;
+                    white-space: nowrap !important;
+                    z-index: 10002 !important;
+                    animation: tooltipSlide 0.15s ease-out !important;
+                    pointer-events: none !important;
+                    border: 1px solid !important;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif !important;
                 }
 
                 .lynx-navbar-footer {
@@ -630,12 +722,72 @@ const HoverNavbar: React.FC<HoverNavbarProps> = () => {
                     cursor: pointer;
                     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
                     opacity: 1;
+                    position: relative;
                 }
 
                 .lynx-user-avatar:hover {
                     transform: scale(1.05);
                     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
                     opacity: 1;
+                }
+
+                .profile-selector {
+                    position: absolute;
+                    bottom: 0;
+                    left: 56px;
+                    min-width: 200px;
+                    border: 1px solid;
+                    border-radius: 12px;
+                    padding: 0;
+                    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
+                    z-index: 10001;
+                    animation: slideIn 0.24s cubic-bezier(0.25, 0.8, 0.25, 1);
+                    overflow: hidden;
+                }
+
+                .profile-info-section {
+                    padding: 12px 16px;
+                }
+
+                .profile-email {
+                    font-size: 14px;
+                    font-weight: 500;
+                    margin-bottom: 2px;
+                    word-break: break-all;
+                }
+
+                .profile-plan {
+                    font-size: 12px;
+                    opacity: 0.8;
+                }
+
+                .profile-separator {
+                    height: 1px;
+                    width: 100%;
+                }
+
+                .profile-actions-section {
+                    padding: 4px 0;
+                }
+
+                .profile-action {
+                    padding: 10px 16px;
+                    font-size: 14px;
+                    cursor: pointer;
+                    transition: background 0.2s ease;
+                    font-weight: 500;
+                }
+
+                .profile-action:hover {
+                    background: rgba(255, 255, 255, 0.05);
+                }
+
+                .profile-action.upgrade {
+                    font-weight: 600;
+                }
+
+                .profile-action:onClick {
+                    background: rgba(255, 255, 255, 0.1);
                 }
 
                 /* Hover indicator */
@@ -665,6 +817,17 @@ const HoverNavbar: React.FC<HoverNavbarProps> = () => {
                     to { 
                         opacity: 1; 
                         transform: translateX(0) scale(1); 
+                    }
+                }
+
+                @keyframes tooltipSlide {
+                    from {
+                        opacity: 0;
+                        transform: translateY(-50%) translateX(-4px);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateY(-50%) translateX(0);
                     }
                 }
 
