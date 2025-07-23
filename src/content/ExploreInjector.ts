@@ -1,46 +1,51 @@
-// SearchInjector.ts - Injects the search modal into any webpage
+// ExploreInjector.ts - Injects the explore modal into any webpage and auto-shows it
 import React from "react";
 import ReactDOM from "react-dom/client";
-import SearchModal from "../components/ExploreModal";
+import ExploreModal from "../components/ExploreModal";
 
-class SearchInjector {
+class ExploreInjector {
     private container: HTMLDivElement | null = null;
     private root: ReactDOM.Root | null = null;
     private isInjected = false;
 
     constructor() {
-        // Listen for search modal requests
+        console.log("🔍 ExploreInjector: Auto-initializing modal...");
+
+        // 🆕 AUTO-SHOW ON INITIALIZATION
+        this.showExploreModal();
+
+        // Listen for explore modal requests
         chrome.runtime.onMessage.addListener(
             (message, sender, sendResponse) => {
-                if (message.type === "SHOW_SEARCH_MODAL") {
-                    this.showSearchModal();
+                if (message.type === "SHOW_EXPLORE_MODAL") {
+                    this.showExploreModal();
                     sendResponse({ success: true });
                 }
-                if (message.type === "HIDE_SEARCH_MODAL") {
-                    this.hideSearchModal();
+                if (message.type === "HIDE_EXPLORE_MODAL") {
+                    this.hideExploreModal();
                     sendResponse({ success: true });
                 }
             },
         );
     }
 
-    private showSearchModal() {
+    private showExploreModal() {
         if (!this.isInjected) {
-            this.injectSearchModal();
+            this.injectExploreModal();
         } else {
-            this.updateSearchModalVisibility(true);
+            this.updateExploreModalVisibility(true);
         }
     }
 
-    private hideSearchModal() {
+    private hideExploreModal() {
         if (this.isInjected) {
-            this.updateSearchModalVisibility(false);
+            this.updateExploreModalVisibility(false);
         }
     }
 
-    private injectSearchModal() {
+    private injectExploreModal() {
         if (this.isInjected) {
-            console.log("⚠️ Search modal already injected");
+            console.log("⚠️ Explore modal already injected");
             return;
         }
 
@@ -49,7 +54,7 @@ class SearchInjector {
         try {
             // Create container
             this.container = document.createElement("div");
-            this.container.id = "lyncx-search-modal-root";
+            this.container.id = "lyncx-explore-modal-root";
             this.container.style.cssText = `
                 position: fixed !important;
                 bottom: 0 !important;
@@ -73,35 +78,32 @@ class SearchInjector {
 
             // Create React root and render
             this.root = ReactDOM.createRoot(reactContainer);
-            this.renderSearchModal(true);
+            this.renderExploreModal(true); // AUTO-SHOW AS VISIBLE
 
             this.isInjected = true;
-            console.log("✅ Search modal injected successfully");
+            console.log(
+                "✅ Explore modal injected and auto-shown successfully",
+            );
         } catch (error) {
-            console.error("❌ Failed to inject search modal:", error);
+            console.error("❌ Failed to inject explore modal:", error);
         }
     }
 
-    private updateSearchModalVisibility(isVisible: boolean) {
+    private updateExploreModalVisibility(isVisible: boolean) {
         if (this.root) {
-            this.renderSearchModal(isVisible);
+            this.renderExploreModal(isVisible);
         }
     }
 
-    private renderSearchModal(isVisible: boolean) {
+    private renderExploreModal(isVisible: boolean) {
         if (this.root) {
             this.root.render(
-                React.createElement(SearchModal, {
+                React.createElement(ExploreModal, {
                     isVisible,
-                    onClose: () => this.updateSearchModalVisibility(false),
+                    onClose: () => this.updateExploreModalVisibility(false),
                 }),
             );
         }
-    }
-
-    private async handleSearchSubmit(message: string) {
-        // This method is no longer needed since the modal handles submission internally
-        console.log("🔍 Search submitted:", message);
     }
 
     public destroy() {
@@ -114,15 +116,15 @@ class SearchInjector {
     }
 }
 
-// Initialize the search injector
-const searchInjector = new SearchInjector();
+// Initialize the explore injector - this will auto-show the modal
+const exploreInjector = new ExploreInjector();
 
 // Listen for cleanup messages
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.type === "CLEANUP_SEARCH_MODAL") {
-        searchInjector.destroy();
+    if (message.type === "CLEANUP_EXPLORE_MODAL") {
+        exploreInjector.destroy();
         sendResponse({ success: true });
     }
 });
 
-export default SearchInjector;
+export default ExploreInjector;

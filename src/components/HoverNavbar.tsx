@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react"; // Adjust path as needed
+import ThemeAwareSphereIcon from "./ThemeAwareSphereIcon";
+
 import {
     Camera,
     FileText,
@@ -110,7 +112,6 @@ const HoverNavbar: React.FC<HoverNavbarProps> = ({
             chrome.runtime.sendMessage({ type: "CAPTURE_SCREENSHOT" });
         }
     };
-    const handleReminders = () => {};
 
     const handleSearch = () => {
         if (typeof chrome !== "undefined" && chrome.runtime) {
@@ -121,7 +122,7 @@ const HoverNavbar: React.FC<HoverNavbarProps> = ({
 
     const handleExplore = () => {
         if (typeof chrome !== "undefined" && chrome.runtime) {
-            chrome.runtime.sendMessage({ type: "SHOW_SEARCH_MODAL" });
+            chrome.runtime.sendMessage({ type: "SHOW_EXPLORE_MODAL" });
         }
     };
 
@@ -130,7 +131,6 @@ const HoverNavbar: React.FC<HoverNavbarProps> = ({
             chrome.runtime.sendMessage({ type: "SHOW_TIMER" });
         }
     };
-    const handleSummarize = () => {};
     const handleSettings = () => {
         if (typeof chrome !== "undefined" && chrome.runtime) {
             chrome.runtime.sendMessage({ type: "OPEN_SETTINGS_PAGE" });
@@ -185,27 +185,21 @@ const HoverNavbar: React.FC<HoverNavbarProps> = ({
             action: handleSearch,
         },
         {
+            id: "explore",
+            icon: ThemeAwareSphereIcon,
+            label: "Explore",
+            action: handleExplore,
+        },
+        {
             id: "notepad",
             icon: FileText,
             label: "Notes",
             action: handleNotepad,
         },
-        {
-            id: "search",
-            icon: CircleDot,
-            label: "Explore",
-            action: handleExplore,
-        },
     ];
 
     // Section 3: Other Tools
     const otherTools = [
-        {
-            id: "reminders",
-            icon: Bell,
-            label: "Reminders",
-            action: handleReminders,
-        },
         {
             id: "timer",
             icon: Timer,
@@ -218,20 +212,9 @@ const HoverNavbar: React.FC<HoverNavbarProps> = ({
             label: "Daily Limits",
             action: handleLimits,
         },
-        {
-            id: "summarize",
-            icon: Hash,
-            label: "Summarize",
-            action: handleSummarize,
-        },
     ];
 
-    const renderNavItem = (item: {
-        id: string;
-        icon: React.ComponentType<LucideIconProps>;
-        label: string;
-        action: () => void;
-    }) => {
+    const renderNavItem = (item: NavItem) => {
         const Icon = item.icon;
 
         return (
@@ -242,7 +225,17 @@ const HoverNavbar: React.FC<HoverNavbarProps> = ({
                 onMouseEnter={() => setHoveredItem(item.id)}
                 onMouseLeave={() => setHoveredItem(null)}
             >
-                <Icon color={currentTheme?.text} size={18} strokeWidth={2} />
+                {item.isCustomIcon ? (
+                    // Theme-aware custom icon - no manual theme props needed
+                    <Icon size={18} />
+                ) : (
+                    // Standard Lucide icon
+                    <Icon
+                        color={currentTheme?.text}
+                        size={18}
+                        strokeWidth={2}
+                    />
+                )}
                 {hoveredItem === item.id && (
                     <div
                         className="nav-tooltip"
@@ -694,8 +687,7 @@ const HoverNavbar: React.FC<HoverNavbarProps> = ({
                     z-index: 10002 !important;
                     animation: tooltipSlide 0.15s ease-out !important;
                     pointer-events: none !important;
-                    border: 1px solid !important;
-                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+                    border: 0.25px solid !important;              
                     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif !important;
                 }
 

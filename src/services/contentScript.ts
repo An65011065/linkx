@@ -66,6 +66,11 @@ export function onExecute() {
         .then(() => console.log("✅ Hover navbar loaded"))
         .catch((error) => console.error("❌ Hover navbar failed:", error));
     // Load clipboard injector (always ready for Shift+Shift)
+
+    import("../content/ExploreInjector")
+        .then(() => console.log("✅ Explore modal auto-loaded and visible"))
+        .catch((error) => console.error("❌ Explore modal failed:", error));
+
     import("../content/ClipboardInjector")
         .then(() => console.log("✅ Clipboard injector loaded"))
         .catch((error) =>
@@ -124,8 +129,7 @@ export function onExecute() {
             return true;
         }
 
-        // 🆕 Add search modal handler
-        if (message.type === "SHOW_SEARCH_MODAL") {
+        if (message.type === "SHOW_EXPLORE_MODAL") {
             import("../content/ExploreInjector")
                 .then(() => sendResponse({ success: true }))
                 .catch((error) =>

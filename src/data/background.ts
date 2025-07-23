@@ -2569,6 +2569,22 @@ async function handleSignOut(sendResponse: (response: any) => void) {
     }
 }
 
+// Add this function
+async function handleShowExploreModal(sendResponse: (response: any) => void) {
+    try {
+        const [tab] = await chrome.tabs.query({
+            active: true,
+            currentWindow: true,
+        });
+        if (tab.id) {
+            chrome.tabs.sendMessage(tab.id, { type: "SHOW_EXPLORE_MODAL" });
+            sendResponse({ success: true });
+        }
+    } catch (error) {
+        console.error("❌ Failed to show explore modal:", error);
+        sendResponse({ success: false, error: error.message });
+    }
+}
 // ===============================
 // UNIFIED MESSAGE HANDLER
 // ===============================
@@ -2582,6 +2598,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             url: chrome.runtime.getURL("src/settings/settings.html"),
         });
         return;
+    }
+
+    if (request.type === "SHOW_EXPLORE_MODAL") {
+        handleShowExploreModal(sendResponse);
+        return true;
     }
 
     if (request.type === "SHOW_SEARCH_MODAL") {
