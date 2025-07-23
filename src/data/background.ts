@@ -2724,12 +2724,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return true;
     }
 
-    // Analytics message
-    if (request.type === "OPEN_ANALYTICS") {
-        handleOpenAnalytics(sendResponse);
-        return true;
-    }
-
     // Legacy tab search messages (for backward compatibility)
     if (request.type === "GET_ALL_TABS") {
         handleGetAllTabs(sendResponse);
@@ -2812,6 +2806,34 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             sendResponse({ success: false, error: "No tab available" });
         }
         return true;
+    }
+    if (request.type === "SHOW_ANALYTICS") {
+        console.log(
+            "📊 Background: Forwarding SHOW_ANALYTICS to content script",
+        );
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+            if (tabs[0] && tabs[0].id) {
+                chrome.tabs.sendMessage(
+                    tabs[0].id,
+                    { type: "SHOW_ANALYTICS" },
+                    (response) => {
+                        console.log(
+                            "📊 Background: Content script response:",
+                            response,
+                        );
+                        sendResponse(
+                            response || {
+                                success: false,
+                                error: "No response from content script",
+                            },
+                        );
+                    },
+                );
+            } else {
+                sendResponse({ success: false, error: "No active tab found" });
+            }
+        });
+        return true; // Keep the message port open for async response
     }
 
     // Return false for unhandled messages

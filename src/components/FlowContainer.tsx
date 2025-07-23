@@ -28,59 +28,8 @@ const FlowContainer: React.FC = () => {
     const [isVisible, setIsVisible] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
 
-    useEffect(() => {
-        const container = document.getElementById("lyncx-flow-root");
-        if (container) {
-            // Instead of blocking all pointer events, we'll handle this in CSS
-            // This allows the navbar hover trigger to work
-            container.style.pointerEvents = isVisible ? "auto" : "none";
-
-            // Add CSS class to handle navbar interaction
-            if (isVisible) {
-                container.classList.add("flow-visible");
-            } else {
-                container.classList.remove("flow-visible");
-            }
-        }
-    }, [isVisible]);
-
-    // Add CSS styles to the document head
-    useEffect(() => {
-        const styleId = "flow-navbar-fix";
-        let existingStyle = document.getElementById(styleId);
-
-        if (!existingStyle) {
-            const style = document.createElement("style");
-            style.id = styleId;
-            style.textContent = `
-                #lyncx-flow-root.flow-visible {
-                    pointer-events: none !important;
-                }
-                
-                #lyncx-flow-root.flow-visible > * {
-                    pointer-events: auto;
-                }
-                
-                /* Ensure navbar trigger area remains accessible */
-                .lynx-hover-trigger {
-                    pointer-events: auto !important;
-                    z-index: 10000002 !important;
-                }
-                
-                .lynx-navbar-container {
-                    pointer-events: auto !important;
-                }
-            `;
-            document.head.appendChild(style);
-        }
-
-        return () => {
-            const style = document.getElementById(styleId);
-            if (style) {
-                style.remove();
-            }
-        };
-    }, []);
+    // REMOVED ALL THE OVERLAY CSS MANIPULATION LOGIC!
+    // No more pointer events manipulation, no more flow-visible classes
 
     // Listen for messages from HoverNavbar and background script
     useEffect(() => {
@@ -172,7 +121,6 @@ const FlowContainer: React.FC = () => {
                     setShowLoginScreen(false);
                 } else {
                     console.error("❌ Authentication failed:", response.error);
-                    // You could show an error message here
                 }
             } else {
                 console.error("❌ Chrome runtime not available");
@@ -187,7 +135,6 @@ const FlowContainer: React.FC = () => {
     const handleContinueWithoutSignin = () => {
         console.log("👤 Continuing without Google Calendar sync");
         setShowLoginScreen(false);
-        // User remains null, FlowModal will show without calendar features
     };
 
     const handleSignOut = async () => {

@@ -1,59 +1,5 @@
 // src/services/contentScript.ts
 // This script runs on web pages to extract text content when requested
-import React from "react";
-import { createRoot } from "react-dom/client";
-import FlowContainer from "../components/FlowContainer";
-
-let flowRoot: ReturnType<typeof createRoot> | null = null;
-
-const injectFlowContainer = () => {
-    // Check if already injected
-    if (document.getElementById("lyncx-flow-root")) {
-        return;
-    }
-
-    const container = document.createElement("div");
-    container.id = "lyncx-flow-root";
-    container.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        pointer-events: none;
-        z-index: 9999999;
-    `;
-
-    document.body.appendChild(container);
-
-    // Use React 18+ createRoot API
-    flowRoot = createRoot(container);
-    flowRoot.render(React.createElement(FlowContainer));
-
-    console.log("✅ FlowContainer injected into page");
-};
-
-// Cleanup function to prevent memory leaks
-const cleanupFlowContainer = () => {
-    if (flowRoot) {
-        flowRoot.unmount();
-        flowRoot = null;
-    }
-    const container = document.getElementById("lyncx-flow-root");
-    if (container) {
-        container.remove();
-    }
-};
-
-// Inject when DOM is ready
-if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", injectFlowContainer);
-} else {
-    injectFlowContainer();
-}
-
-// Cleanup on page unload
-window.addEventListener("beforeunload", cleanupFlowContainer);
 
 export function onExecute() {
     console.log("LyncX content script loaded on:", window.location.hostname);
@@ -65,7 +11,6 @@ export function onExecute() {
     import("../content/hoverNavbarInjector")
         .then(() => console.log("✅ Hover navbar loaded"))
         .catch((error) => console.error("❌ Hover navbar failed:", error));
-    // Load clipboard injector (always ready for Shift+Shift)
 
     import("../content/ExploreInjector")
         .then(() => console.log("✅ Explore modal auto-loaded and visible"))
@@ -93,6 +38,22 @@ export function onExecute() {
 
     // Listen for messages from background script
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+        console.log("🔔 ContentScript received message:", message.type);
+
+        if (message.type === "SHOW_FLOW_MODAL") {
+            // Load FlowModalInjector on-demand
+            import("../content/FlowModalInjector")
+                .then(() => {
+                    console.log("✅ FlowModalInjector loaded and triggered");
+                    sendResponse({ success: true });
+                })
+                .catch((error) => {
+                    console.error("❌ FlowModalInjector failed:", error);
+                    sendResponse({ success: false, error: error.message });
+                });
+            return true;
+        }
+
         if (message.type === "SHOW_SPOTLIGHT_SEARCH") {
             import("../content/SpotlightSearchInjector")
                 .then(() => sendResponse({ success: true }))
@@ -113,15 +74,6 @@ export function onExecute() {
 
         if (message.type === "SHOW_NOTEPAD") {
             import("../content/NotepadInjector")
-                .then(() => sendResponse({ success: true }))
-                .catch((error) =>
-                    sendResponse({ success: false, error: error.message }),
-                );
-            return true;
-        }
-
-        if (message.type === "SHOW_ANALYTICS") {
-            import("../content/AnalyticsModalInjector")
                 .then(() => sendResponse({ success: true }))
                 .catch((error) =>
                     sendResponse({ success: false, error: error.message }),
@@ -175,16 +127,28 @@ export function onExecute() {
         return false;
     });
 
-    // 🆕 Add keyboard shortcut listener (optional but nice UX)
+    // Add keyboard shortcut listener
     document.addEventListener("keydown", (event) => {
+        // Trigger Flow with Cmd/Ctrl + Shift + F
+        if (
+            (event.metaKey || event.ctrlKey) &&
+            event.shiftKey &&
+            event.key === "F"
+        ) {
+            event.preventDefault();
+
+            // Send message to background to show Flow
+            chrome.runtime
+                .sendMessage({ type: "SHOW_FLOW_MODAL" })
+                .catch((error) => console.error("Failed to show Flow:", error));
+        }
+
         // Trigger search with Cmd/Ctrl + K
         if ((event.metaKey || event.ctrlKey) && event.key === "k") {
             event.preventDefault();
 
-            // Import and show search modal
             import("../content/ExploreInjector")
                 .then(() => {
-                    // The injector will handle showing the search modal
                     console.log(
                         "🔍 Search modal triggered via keyboard shortcut",
                     );
@@ -425,15 +389,6 @@ export function onExecute() {
 
     // Start usage tracking
     usageTracker.startTracking();
-
-    // Auto-extract when page loads (for potential future use)
-    if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", () => {
-            console.log("DOM content loaded, content script ready");
-        });
-    } else {
-        console.log("Document already loaded, content script ready");
-    }
 
     console.log("✅ LyncX content script initialization complete");
 }

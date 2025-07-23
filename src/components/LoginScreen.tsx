@@ -30,110 +30,106 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
     };
 
     return (
-        <div className="flow-login-container">
-            {/* Backdrop that doesn't interfere with navbar */}
-            <div className="flow-login-backdrop" />
+        /* REMOVED FULL-SCREEN CONTAINER - Just the modal positioned like FlowModal */
+        <div className="flow-login-modal">
+            <div className="flow-login-header">
+                <div className="flow-login-icon">
+                    <Calendar size={24} />
+                </div>
+                <h1 className="flow-login-title">Welcome to Flow</h1>
+                <p className="flow-login-subtitle">
+                    Sync your calendar or start organizing tasks
+                </p>
+            </div>
 
-            <div className="flow-login-modal">
-                <div className="flow-login-header">
-                    <div className="flow-login-icon">
-                        <Calendar size={24} />
+            <div className="flow-login-options">
+                <button
+                    className={`flow-login-option ${
+                        selectedOption === "google" ? "loading" : ""
+                    }`}
+                    onClick={handleGoogleLogin}
+                    disabled={isLoading}
+                >
+                    <div className="option-icon-wrapper">
+                        <div className="option-icon google">
+                            <Calendar size={18} />
+                        </div>
                     </div>
-                    <h1 className="flow-login-title">Welcome to Flow</h1>
-                    <p className="flow-login-subtitle">
-                        Sync your calendar or start organizing tasks
-                    </p>
-                </div>
+                    <div className="option-content">
+                        <h3 className="option-title">
+                            Connect Google Calendar
+                        </h3>
+                        <p className="option-description">
+                            Sync your events and create calendar-aware tasks
+                        </p>
+                        <div className="option-features">
+                            <div className="feature-item">
+                                <Check size={12} />
+                                <span>View upcoming events</span>
+                            </div>
+                            <div className="feature-item">
+                                <Check size={12} />
+                                <span>Smart scheduling</span>
+                            </div>
+                            <div className="feature-item">
+                                <Check size={12} />
+                                <span>Create calendar events</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="option-arrow">
+                        {selectedOption === "google" ? (
+                            <div className="loading-spinner" />
+                        ) : (
+                            <ArrowRight size={16} />
+                        )}
+                    </div>
+                </button>
 
-                <div className="flow-login-options">
-                    <button
-                        className={`flow-login-option ${
-                            selectedOption === "google" ? "loading" : ""
-                        }`}
-                        onClick={handleGoogleLogin}
-                        disabled={isLoading}
-                    >
-                        <div className="option-icon-wrapper">
-                            <div className="option-icon google">
-                                <Calendar size={18} />
+                <button
+                    className={`flow-login-option ${
+                        selectedOption === "continue" ? "loading" : ""
+                    }`}
+                    onClick={handleContinueWithout}
+                    disabled={isLoading}
+                >
+                    <div className="option-icon-wrapper">
+                        <div className="option-icon simple">
+                            <User size={18} />
+                        </div>
+                    </div>
+                    <div className="option-content">
+                        <h3 className="option-title">
+                            Continue Without Syncing
+                        </h3>
+                        <p className="option-description">
+                            Use Flow for local task management only
+                        </p>
+                        <div className="option-features">
+                            <div className="feature-item">
+                                <Check size={12} />
+                                <span>Create and manage tasks</span>
+                            </div>
+                            <div className="feature-item">
+                                <Check size={12} />
+                                <span>Daily organization</span>
                             </div>
                         </div>
-                        <div className="option-content">
-                            <h3 className="option-title">
-                                Connect Google Calendar
-                            </h3>
-                            <p className="option-description">
-                                Sync your events and create calendar-aware tasks
-                            </p>
-                            <div className="option-features">
-                                <div className="feature-item">
-                                    <Check size={12} />
-                                    <span>View upcoming events</span>
-                                </div>
-                                <div className="feature-item">
-                                    <Check size={12} />
-                                    <span>Smart scheduling</span>
-                                </div>
-                                <div className="feature-item">
-                                    <Check size={12} />
-                                    <span>Create calendar events</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="option-arrow">
-                            {selectedOption === "google" ? (
-                                <div className="loading-spinner" />
-                            ) : (
-                                <ArrowRight size={16} />
-                            )}
-                        </div>
-                    </button>
+                    </div>
+                    <div className="option-arrow">
+                        {selectedOption === "continue" ? (
+                            <div className="loading-spinner" />
+                        ) : (
+                            <ArrowRight size={16} />
+                        )}
+                    </div>
+                </button>
+            </div>
 
-                    <button
-                        className={`flow-login-option ${
-                            selectedOption === "continue" ? "loading" : ""
-                        }`}
-                        onClick={handleContinueWithout}
-                        disabled={isLoading}
-                    >
-                        <div className="option-icon-wrapper">
-                            <div className="option-icon simple">
-                                <User size={18} />
-                            </div>
-                        </div>
-                        <div className="option-content">
-                            <h3 className="option-title">
-                                Continue Without Syncing
-                            </h3>
-                            <p className="option-description">
-                                Use Flow for local task management only
-                            </p>
-                            <div className="option-features">
-                                <div className="feature-item">
-                                    <Check size={12} />
-                                    <span>Create and manage tasks</span>
-                                </div>
-                                <div className="feature-item">
-                                    <Check size={12} />
-                                    <span>Daily organization</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="option-arrow">
-                            {selectedOption === "continue" ? (
-                                <div className="loading-spinner" />
-                            ) : (
-                                <ArrowRight size={16} />
-                            )}
-                        </div>
-                    </button>
-                </div>
-
-                <div className="flow-login-footer">
-                    <p className="privacy-note">
-                        Your data is stored securely and never shared
-                    </p>
-                </div>
+            <div className="flow-login-footer">
+                <p className="privacy-note">
+                    Your data is stored securely and never shared
+                </p>
             </div>
 
             <style jsx>{`
@@ -141,33 +137,10 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
                     color: inherit !important;
                 }
 
-                .flow-login-container {
-                    position: fixed;
-                    top: 0;
-                    left: 80px; /* Leave space for navbar */
-                    right: 0;
-                    bottom: 0;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    z-index: 9999999; /* Lower than navbar */
-                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
-                        system-ui, sans-serif;
-                    pointer-events: auto;
-                }
-
-                .flow-login-backdrop {
-                    position: absolute;
-                    top: 0;
-                    left: -80px; /* Extend backdrop to cover full screen */
-                    right: 0;
-                    bottom: 0;
-                    background: rgba(160, 82, 45, 0.15);
-                    backdrop-filter: blur(20px);
-                    pointer-events: none; /* Don't block navbar */
-                }
-
                 .flow-login-modal {
+                    position: fixed;
+                    top: 60px;
+                    right: 20px;
                     width: 420px;
                     max-width: 90vw;
                     background: rgba(255, 251, 235, 0.98);
@@ -177,8 +150,10 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
                     overflow: hidden;
                     box-shadow: 0 24px 48px rgba(160, 82, 45, 0.15);
                     animation: slideUp 0.4s ease-out;
-                    position: relative;
-                    z-index: 1;
+                    z-index: 10000000;
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+                        system-ui, sans-serif;
+                    /* NO FULL-SCREEN CONTAINER OR BACKDROP */
                 }
 
                 @keyframes slideUp {

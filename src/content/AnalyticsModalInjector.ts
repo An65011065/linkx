@@ -1,4 +1,4 @@
-// AnalyticsInjector.ts - handles injecting the analytics modal into any page
+// AnalyticsModalInjector.ts - Debug version
 import React from "react";
 import ReactDOM from "react-dom/client";
 import AnalyticsModal from "../components/AnalyticsModal";
@@ -7,28 +7,13 @@ class AnalyticsInjector {
     private container: HTMLDivElement | null = null;
     private root: ReactDOM.Root | null = null;
     private isInjected = false;
+    private isVisible = false;
 
     constructor() {
-        // Listen for analytics requests from the navbar
-        chrome.runtime.onMessage.addListener(
-            (message, sender, sendResponse) => {
-                if (message.type === "SHOW_ANALYTICS") {
-                    this.showAnalytics();
-                    sendResponse({ success: true });
-                }
-            },
+        console.log(
+            "📊 AnalyticsInjector created at:",
+            new Date().toISOString(),
         );
-    }
-
-    public showAnalytics() {
-        if (!this.isInjected) {
-            this.injectAnalytics();
-        }
-        this.updateAnalyticsVisibility(true);
-    }
-
-    public hideAnalytics() {
-        this.updateAnalyticsVisibility(false);
     }
 
     private injectAnalytics() {
@@ -65,7 +50,7 @@ class AnalyticsInjector {
 
             // Create React root and render
             this.root = ReactDOM.createRoot(reactContainer);
-            this.renderAnalytics(false);
+            this.renderAnalytics();
 
             this.isInjected = true;
             console.log("✅ Analytics modal injected successfully");
@@ -74,21 +59,34 @@ class AnalyticsInjector {
         }
     }
 
-    private updateAnalyticsVisibility(isVisible: boolean) {
-        if (this.root) {
-            this.renderAnalytics(isVisible);
-        }
-    }
-
-    private renderAnalytics(isVisible: boolean) {
+    private renderAnalytics() {
         if (this.root) {
             this.root.render(
                 React.createElement(AnalyticsModal, {
-                    isVisible,
-                    onClose: () => this.hideAnalytics(),
+                    isVisible: this.isVisible,
+                    onClose: () => {
+                        console.log("📊 Analytics modal close requested");
+                        this.isVisible = false;
+                        this.renderAnalytics();
+                    },
                 }),
             );
+            console.log(
+                "📊 Analytics modal rendered with isVisible:",
+                this.isVisible,
+            );
         }
+    }
+
+    public show() {
+        console.log("📊 Analytics show() called");
+
+        if (!this.isInjected) {
+            this.injectAnalytics();
+        }
+
+        this.isVisible = true;
+        this.renderAnalytics();
     }
 
     public destroy() {
@@ -98,18 +96,61 @@ class AnalyticsInjector {
         this.container = null;
         this.root = null;
         this.isInjected = false;
+        this.isVisible = false;
+        console.log("📊 Analytics injector destroyed");
     }
 }
 
-// Initialize the analytics injector
+// Auto-initialize when module loads
+console.log("📊 AnalyticsModalInjector module loading...");
 const analyticsInjector = new AnalyticsInjector();
+console.log("📊 AnalyticsInjector instance created:", analyticsInjector);
 
-// Listen for cleanup messages
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+// Set up message listener
+console.log("📊 Setting up analytics message listener...");
+
+const messageListener = (message: any, sender: any, sendResponse: any) => {
+    console.log("📊 Analytics injector received message:", message.type);
+
+    if (message.type === "SHOW_ANALYTICS") {
+        console.log("📊 SHOW_ANALYTICS message received in injector!");
+        try {
+            analyticsInjector.show();
+            sendResponse({ success: true });
+            console.log("📊 Analytics show() completed successfully");
+        } catch (error) {
+            console.error("❌ Error showing analytics:", error);
+            sendResponse({ success: false, error: error.message });
+        }
+        return true;
+    }
+
     if (message.type === "CLEANUP_ANALYTICS") {
         analyticsInjector.destroy();
         sendResponse({ success: true });
+        return true;
     }
-});
 
-export default AnalyticsInjector;
+    return false; // Let other listeners handle other message types
+};
+
+// Add the listener
+chrome.runtime.onMessage.addListener(messageListener);
+console.log("📊 Analytics message listener registered");
+
+// Test that the listener is working
+setTimeout(() => {
+    console.log("📊 Analytics injector status check:");
+    console.log("  - Instance exists:", !!analyticsInjector);
+    console.log(
+        "  - Message listener active:",
+        chrome.runtime.onMessage.hasListeners(),
+    );
+    console.log(
+        "  - Container in DOM:",
+        !!document.getElementById("lyncx-analytics-root"),
+    );
+}, 1000);
+
+// Export for consistency
+export default analyticsInjector;

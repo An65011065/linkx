@@ -336,10 +336,6 @@ const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
                                 </span>
                                 <span className="metric-value">
                                     {animatedValues.uniquePages} unique
-                                    {animatedValues.totalWordCount > 0 &&
-                                        ` · ${formatWordCount(
-                                            animatedValues.totalWordCount,
-                                        )} words here`}
                                 </span>
                             </div>
                         </div>

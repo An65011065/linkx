@@ -82,10 +82,49 @@ const HoverNavbar: React.FC<HoverNavbarProps> = ({
     }, []);
 
     const handleAnalytics = () => {
+        console.log("🔍 Analytics button clicked - starting debug trace");
+        console.log(
+            "🔍 Chrome runtime available:",
+            typeof chrome !== "undefined" && !!chrome.runtime,
+        );
+
         if (typeof chrome !== "undefined" && chrome.runtime) {
-            chrome.runtime.sendMessage({ type: "SHOW_ANALYTICS" });
+            console.log("🔍 Sending SHOW_ANALYTICS message...");
+
+            chrome.runtime.sendMessage(
+                { type: "SHOW_ANALYTICS" },
+                (response) => {
+                    console.log("📊 Analytics response received:", response);
+                    console.log(
+                        "📊 Chrome runtime error:",
+                        chrome.runtime.lastError,
+                    );
+
+                    if (response) {
+                        if (response.success) {
+                            console.log(
+                                "✅ Analytics modal should be showing now",
+                            );
+                        } else {
+                            console.error(
+                                "❌ Analytics failed:",
+                                response.error,
+                            );
+                        }
+                    } else {
+                        console.error(
+                            "❌ No response received from analytics injector",
+                        );
+                    }
+                },
+            );
+
+            console.log("🔍 Message sent, waiting for response...");
+        } else {
+            console.error("❌ Chrome runtime not available");
         }
     };
+
     const handleNotepad = () => {
         if (typeof chrome !== "undefined" && chrome.runtime) {
             chrome.runtime.sendMessage({

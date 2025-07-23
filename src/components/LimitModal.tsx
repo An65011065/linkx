@@ -227,7 +227,7 @@ const LimitModal: React.FC<LimitModalProps> = ({
 
     const getSliderBackground = () => {
         const percentage = (minutes / MAX_MINUTES) * 100;
-        return `linear-gradient(to right, rgba(255, 183, 77, 0.8) 0%, rgba(255, 183, 77, 0.8) ${percentage}%, rgba(255, 183, 77, 0.2) ${percentage}%, rgba(255, 183, 77, 0.2) 100%)`;
+        return `linear-gradient(to right, rgba(218, 165, 32, 0.8) 0%, rgba(218, 165, 32, 0.8) ${percentage}%, rgba(218, 165, 32, 0.2) ${percentage}%, rgba(218, 165, 32, 0.2) 100%)`;
     };
 
     const getProgressPercentage = (limit: DailyLimit): number => {
@@ -242,7 +242,7 @@ const LimitModal: React.FC<LimitModalProps> = ({
     const getStatusColor = (percentage: number): string => {
         if (percentage >= 100) return "rgba(220, 38, 38, 0.9)";
         if (percentage >= 80) return "rgba(251, 146, 60, 0.9)";
-        return "rgba(52, 211, 153, 0.9)";
+        return "rgba(34, 197, 94, 0.9)";
     };
 
     if (!isVisible) return null;
@@ -453,12 +453,12 @@ const LimitModal: React.FC<LimitModalProps> = ({
                     transform: translate(-50%, -50%);
                     width: 320px;
                     height: 400px;
-                    background: rgba(255, 251, 235, 0.95);
+                    background: rgba(255, 251, 235, 0.98);
                     backdrop-filter: blur(20px);
-                    border: 1px solid rgba(255, 183, 77, 0.3);
+                    border: 1px solid rgba(205, 133, 63, 0.35);
                     border-radius: 16px;
                     padding: 24px;
-                    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1),
+                    box-shadow: 0 20px 40px rgba(160, 82, 45, 0.15),
                         0 0 0 1px rgba(255, 251, 235, 0.8);
                     animation: slideUp 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
                     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
@@ -472,13 +472,13 @@ const LimitModal: React.FC<LimitModalProps> = ({
                     position: absolute;
                     top: 16px;
                     right: 16px;
-                    background: rgba(184, 134, 11, 0.1);
+                    background: rgba(218, 165, 32, 0.12);
                     border: none;
                     border-radius: 8px;
                     width: 32px;
                     height: 32px;
                     cursor: pointer;
-                    color: rgba(184, 134, 11, 0.8);
+                    color: rgba(160, 82, 45, 0.75);
                     display: flex;
                     align-items: center;
                     justify-content: center;
@@ -486,8 +486,8 @@ const LimitModal: React.FC<LimitModalProps> = ({
                 }
 
                 .close-btn:hover {
-                    background: rgba(184, 134, 11, 0.2);
-                    color: rgba(184, 134, 11, 1);
+                    background: rgba(218, 165, 32, 0.25);
+                    color: rgba(160, 82, 45, 1);
                     transform: scale(1.05);
                 }
 
@@ -500,18 +500,18 @@ const LimitModal: React.FC<LimitModalProps> = ({
                 }
 
                 .loading-state p {
-                    color: rgba(184, 134, 11, 0.8);
-                    font-size: 14px;
+                    color: rgba(160, 82, 45, 0.7);
+                    font-size: 13px;
                     margin: 0;
                 }
 
                 .view-toggle {
                     display: flex;
-                    background: rgba(255, 183, 77, 0.1);
+                    background: rgba(218, 165, 32, 0.15);
                     border-radius: 8px;
                     padding: 4px;
                     margin-bottom: 24px;
-                    border: 1px solid rgba(255, 183, 77, 0.2);
+                    border: 1px solid rgba(205, 133, 63, 0.2);
                 }
 
                 .toggle-btn {
@@ -522,19 +522,19 @@ const LimitModal: React.FC<LimitModalProps> = ({
                     border-radius: 6px;
                     font-size: 13px;
                     font-weight: 600;
-                    color: rgba(184, 134, 11, 0.7);
+                    color: rgba(160, 82, 45, 0.7);
                     cursor: pointer;
                     transition: all 0.2s ease;
                 }
 
                 .toggle-btn.active {
-                    background: rgba(255, 183, 77, 0.2);
-                    color: rgba(120, 53, 15, 0.9);
+                    background: rgba(218, 165, 32, 0.25);
+                    color: rgba(101, 67, 33, 0.95);
                 }
 
                 .toggle-btn:hover:not(.active) {
-                    background: rgba(255, 183, 77, 0.1);
-                    color: rgba(184, 134, 11, 0.9);
+                    background: rgba(218, 165, 32, 0.15);
+                    color: rgba(160, 82, 45, 0.9);
                 }
 
                 .modal-header {
@@ -546,26 +546,26 @@ const LimitModal: React.FC<LimitModalProps> = ({
                     width: 48px;
                     height: 48px;
                     border-radius: 12px;
-                    background: rgba(255, 183, 77, 0.2);
+                    background: rgba(218, 165, 32, 0.2);
                     display: flex;
                     align-items: center;
                     justify-content: center;
                     margin: 0 auto 16px;
-                    color: rgba(184, 134, 11, 0.9);
+                    color: rgba(160, 82, 45, 0.85);
                 }
 
                 .modal-title {
                     margin: 0 0 8px 0;
                     font-size: 20px;
                     font-weight: 600;
-                    color: rgba(120, 53, 15, 0.9);
+                    color: rgba(101, 67, 33, 0.95);
                     line-height: 1.2;
                 }
 
                 .modal-subtitle {
                     margin: 0;
                     font-size: 14px;
-                    color: rgba(184, 134, 11, 0.7);
+                    color: rgba(160, 82, 45, 0.7);
                     line-height: 1.4;
                 }
 
@@ -578,17 +578,17 @@ const LimitModal: React.FC<LimitModalProps> = ({
                     display: inline-flex;
                     align-items: baseline;
                     gap: 6px;
-                    background: rgba(255, 183, 77, 0.15);
+                    background: rgba(218, 165, 32, 0.15);
                     padding: 16px 24px;
                     border-radius: 12px;
                     margin-bottom: 12px;
-                    border: 1px solid rgba(255, 183, 77, 0.3);
+                    border: 1px solid rgba(205, 133, 63, 0.3);
                 }
 
                 .value-number {
                     font-size: 28px;
                     font-weight: 700;
-                    color: rgba(120, 53, 15, 0.9);
+                    color: rgba(101, 67, 33, 0.95);
                     line-height: 1;
                     font-variant-numeric: tabular-nums;
                 }
@@ -596,13 +596,13 @@ const LimitModal: React.FC<LimitModalProps> = ({
                 .value-unit {
                     font-size: 14px;
                     font-weight: 600;
-                    color: rgba(184, 134, 11, 0.8);
+                    color: rgba(160, 82, 45, 0.8);
                     opacity: 0.8;
                 }
 
                 .value-description {
                     font-size: 12px;
-                    color: rgba(184, 134, 11, 0.6);
+                    color: rgba(160, 82, 45, 0.6);
                     font-style: italic;
                 }
 
@@ -631,39 +631,39 @@ const LimitModal: React.FC<LimitModalProps> = ({
                     width: 24px;
                     height: 24px;
                     border-radius: 50%;
-                    background: rgba(255, 183, 77, 0.9);
+                    background: rgba(218, 165, 32, 0.9);
                     cursor: pointer;
                     border: 3px solid rgba(255, 251, 235, 0.9);
-                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+                    box-shadow: 0 2px 8px rgba(160, 82, 45, 0.2);
                     transition: all 0.2s ease;
                 }
 
                 .time-slider::-webkit-slider-thumb:hover {
                     transform: scale(1.1);
-                    background: rgba(255, 183, 77, 1);
+                    background: rgba(218, 165, 32, 1);
                 }
 
                 .time-slider::-moz-range-thumb {
                     width: 24px;
                     height: 24px;
                     border-radius: 50%;
-                    background: rgba(255, 183, 77, 0.9);
+                    background: rgba(218, 165, 32, 0.9);
                     cursor: pointer;
                     border: 3px solid rgba(255, 251, 235, 0.9);
-                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+                    box-shadow: 0 2px 8px rgba(160, 82, 45, 0.2);
                     transition: all 0.2s ease;
                 }
 
                 .time-slider::-moz-range-thumb:hover {
                     transform: scale(1.1);
-                    background: rgba(255, 183, 77, 1);
+                    background: rgba(218, 165, 32, 1);
                 }
 
                 .slider-labels {
                     display: flex;
                     justify-content: space-between;
                     font-size: 12px;
-                    color: rgba(184, 134, 11, 0.6);
+                    color: rgba(160, 82, 45, 0.6);
                     font-weight: 500;
                 }
 
@@ -674,12 +674,12 @@ const LimitModal: React.FC<LimitModalProps> = ({
                 .save-button {
                     background: linear-gradient(
                         135deg,
-                        rgba(255, 183, 77, 0.9),
-                        rgba(245, 158, 11, 0.9)
+                        rgba(218, 165, 32, 0.9),
+                        rgba(205, 133, 63, 0.9)
                     );
                     border: none;
                     border-radius: 12px;
-                    color: rgba(120, 53, 15, 0.9);
+                    color: rgba(101, 67, 33, 0.95);
                     font-size: 14px;
                     font-weight: 600;
                     padding: 14px 32px;
@@ -691,12 +691,12 @@ const LimitModal: React.FC<LimitModalProps> = ({
                     justify-content: center;
                     min-width: 120px;
                     margin: 0 auto;
-                    box-shadow: 0 4px 12px rgba(255, 183, 77, 0.3);
+                    box-shadow: 0 4px 12px rgba(160, 82, 45, 0.3);
                 }
 
                 .save-button:hover:not(:disabled) {
                     transform: translateY(-2px);
-                    box-shadow: 0 6px 20px rgba(255, 183, 77, 0.4);
+                    box-shadow: 0 6px 20px rgba(160, 82, 45, 0.4);
                 }
 
                 .save-button:active:not(:disabled) {
@@ -721,7 +721,7 @@ const LimitModal: React.FC<LimitModalProps> = ({
                     align-items: center;
                     justify-content: center;
                     flex: 1;
-                    color: rgba(184, 134, 11, 0.6);
+                    color: rgba(160, 82, 45, 0.6);
                     font-size: 14px;
                     font-style: italic;
                 }
@@ -737,15 +737,15 @@ const LimitModal: React.FC<LimitModalProps> = ({
                     align-items: center;
                     gap: 12px;
                     padding: 12px;
-                    background: rgba(255, 183, 77, 0.08);
+                    background: rgba(218, 165, 32, 0.08);
                     border-radius: 8px;
-                    border: 1px solid rgba(255, 183, 77, 0.2);
+                    border: 1px solid rgba(205, 133, 63, 0.2);
                     transition: all 0.2s ease;
                 }
 
                 .limit-item:hover {
-                    background: rgba(255, 183, 77, 0.12);
-                    border-color: rgba(255, 183, 77, 0.3);
+                    background: rgba(218, 165, 32, 0.12);
+                    border-color: rgba(205, 133, 63, 0.3);
                 }
 
                 .limit-info {
@@ -756,7 +756,7 @@ const LimitModal: React.FC<LimitModalProps> = ({
                 .limit-domain {
                     font-size: 13px;
                     font-weight: 600;
-                    color: rgba(120, 53, 15, 0.9);
+                    color: rgba(101, 67, 33, 0.95);
                     margin-bottom: 2px;
                     white-space: nowrap;
                     overflow: hidden;
@@ -765,7 +765,7 @@ const LimitModal: React.FC<LimitModalProps> = ({
 
                 .limit-time {
                     font-size: 11px;
-                    color: rgba(184, 134, 11, 0.7);
+                    color: rgba(160, 82, 45, 0.7);
                     font-weight: 500;
                 }
 
@@ -779,7 +779,7 @@ const LimitModal: React.FC<LimitModalProps> = ({
                 .progress-container {
                     width: 60px;
                     height: 4px;
-                    background: rgba(255, 183, 77, 0.2);
+                    background: rgba(218, 165, 32, 0.2);
                     border-radius: 2px;
                     overflow: hidden;
                 }
@@ -793,7 +793,7 @@ const LimitModal: React.FC<LimitModalProps> = ({
                 .progress-text {
                     font-size: 11px;
                     font-weight: 600;
-                    color: rgba(120, 53, 15, 0.8);
+                    color: rgba(101, 67, 33, 0.8);
                     min-width: 30px;
                     text-align: right;
                     font-variant-numeric: tabular-nums;
@@ -824,8 +824,8 @@ const LimitModal: React.FC<LimitModalProps> = ({
                 .button-spinner {
                     width: 16px;
                     height: 16px;
-                    border: 2px solid rgba(255, 183, 77, 0.3);
-                    border-top: 2px solid rgba(255, 183, 77, 0.8);
+                    border: 2px solid rgba(218, 165, 32, 0.3);
+                    border-top: 2px solid rgba(218, 165, 32, 0.8);
                     border-radius: 50%;
                     animation: spin 1s linear infinite;
                 }

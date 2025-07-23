@@ -474,15 +474,15 @@ const FlowModal: React.FC<FlowCascadeProps> = ({
                             <h1 className="flow-title">What's next</h1>
                         </div>
                         <div className="flow-header-right">
-                            {user && (
-                                <button
-                                    className="flow-action-btn"
-                                    onClick={onSignOut}
-                                    title="Sign out"
-                                >
-                                    <LogOut size={12} />
-                                </button>
-                            )}
+                            <button
+                                className="flow-action-btn"
+                                onClick={onSignOut}
+                                title={
+                                    user ? "Sign out" : "Sign in with Google"
+                                }
+                            >
+                                <LogOut size={12} />
+                            </button>
                             <button
                                 className="flow-action-btn"
                                 onClick={() => setIsMinimized(true)}
@@ -851,20 +851,6 @@ const FlowModal: React.FC<FlowCascadeProps> = ({
                 .task-check:hover {
                     border-color: rgba(205, 133, 63, 0.6);
                     background: rgba(218, 165, 32, 0.1);
-                }
-
-                .flow-item.completed .task-check {
-                    background: rgba(34, 197, 94, 0.2);
-                    border-color: rgba(34, 197, 94, 0.5);
-                    color: rgba(34, 197, 94, 0.8);
-                }
-
-                .flow-item:not(.completed) .task-check {
-                    background: none;
-                }
-
-                .flow-item:not(.completed) .task-check .check-icon {
-                    opacity: 0;
                 }
 
                 .flow-item.completed .task-check .check-icon {
