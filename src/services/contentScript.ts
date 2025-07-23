@@ -1,5 +1,59 @@
 // src/services/contentScript.ts
 // This script runs on web pages to extract text content when requested
+import React from "react";
+import { createRoot } from "react-dom/client";
+import FlowContainer from "../components/FlowContainer";
+
+let flowRoot: ReturnType<typeof createRoot> | null = null;
+
+const injectFlowContainer = () => {
+    // Check if already injected
+    if (document.getElementById("lyncx-flow-root")) {
+        return;
+    }
+
+    const container = document.createElement("div");
+    container.id = "lyncx-flow-root";
+    container.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 9999999;
+    `;
+
+    document.body.appendChild(container);
+
+    // Use React 18+ createRoot API
+    flowRoot = createRoot(container);
+    flowRoot.render(React.createElement(FlowContainer));
+
+    console.log("✅ FlowContainer injected into page");
+};
+
+// Cleanup function to prevent memory leaks
+const cleanupFlowContainer = () => {
+    if (flowRoot) {
+        flowRoot.unmount();
+        flowRoot = null;
+    }
+    const container = document.getElementById("lyncx-flow-root");
+    if (container) {
+        container.remove();
+    }
+};
+
+// Inject when DOM is ready
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", injectFlowContainer);
+} else {
+    injectFlowContainer();
+}
+
+// Cleanup on page unload
+window.addEventListener("beforeunload", cleanupFlowContainer);
 
 export function onExecute() {
     console.log("LyncX content script loaded on:", window.location.hostname);
@@ -11,6 +65,12 @@ export function onExecute() {
     import("../content/hoverNavbarInjector")
         .then(() => console.log("✅ Hover navbar loaded"))
         .catch((error) => console.error("❌ Hover navbar failed:", error));
+    // Load clipboard injector (always ready for Shift+Shift)
+    import("../content/ClipboardInjector")
+        .then(() => console.log("✅ Clipboard injector loaded"))
+        .catch((error) =>
+            console.error("❌ Clipboard injector failed:", error),
+        );
 
     // Load limit status (lightweight)
     import("../content/LimitStatusInjector")
@@ -22,18 +82,12 @@ export function onExecute() {
         .then(() => console.log("✅ Timebar loaded"))
         .catch((error) => console.error("❌ Timebar failed:", error));
 
+    import("../content/AnalyticsModalInjector")
+        .then(() => console.log("✅ Analytics modal loaded"))
+        .catch((error) => console.error("❌ Analytics modal failed:", error));
+
     // Listen for messages from background script
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-        // Load heavier components on demand
-        if (message.type === "SHOW_ANALYTICS") {
-            import("../content/AnalyticsModalInjector")
-                .then(() => sendResponse({ success: true }))
-                .catch((error) =>
-                    sendResponse({ success: false, error: error.message }),
-                );
-            return true;
-        }
-
         if (message.type === "SHOW_SPOTLIGHT_SEARCH") {
             import("../content/SpotlightSearchInjector")
                 .then(() => sendResponse({ success: true }))
@@ -52,8 +106,8 @@ export function onExecute() {
             return true;
         }
 
-        if (message.type === "SHOW_FLOW_MODAL") {
-            import("../content/FlowModalInjector")
+        if (message.type === "SHOW_NOTEPAD") {
+            import("../content/NotepadInjector")
                 .then(() => sendResponse({ success: true }))
                 .catch((error) =>
                     sendResponse({ success: false, error: error.message }),
@@ -61,8 +115,8 @@ export function onExecute() {
             return true;
         }
 
-        if (message.type === "SHOW_NOTEPAD") {
-            import("../content/NotepadInjector")
+        if (message.type === "SHOW_ANALYTICS") {
+            import("../content/AnalyticsModalInjector")
                 .then(() => sendResponse({ success: true }))
                 .catch((error) =>
                     sendResponse({ success: false, error: error.message }),
@@ -73,6 +127,15 @@ export function onExecute() {
         // 🆕 Add search modal handler
         if (message.type === "SHOW_SEARCH_MODAL") {
             import("../content/SearchInjector")
+                .then(() => sendResponse({ success: true }))
+                .catch((error) =>
+                    sendResponse({ success: false, error: error.message }),
+                );
+            return true;
+        }
+
+        if (message.type === "SHOW_CLIPBOARD_MANAGER") {
+            import("../content/ClipboardInjector")
                 .then(() => sendResponse({ success: true }))
                 .catch((error) =>
                     sendResponse({ success: false, error: error.message }),

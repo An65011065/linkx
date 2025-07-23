@@ -40,7 +40,7 @@ class HoverNavbarInjector {
                 top: 0 !important;
                 left: 0 !important;
                 z-index: 999999 !important;
-                pointer-events: none !important;
+                pointer-events: auto !important;
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif !important;
             `;
 
@@ -91,7 +91,7 @@ class HoverNavbarInjector {
         left: 0;
         height: 100vh;
         z-index: 999999;
-        pointer-events: none;
+        pointer-events: auto;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
     }
 
@@ -126,7 +126,7 @@ class HoverNavbarInjector {
         };
         transform: translateX(-100%);
         transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-        pointer-events: auto;
+        pointer-events: all;
         display: flex;
         flex-direction: column;
         overflow: hidden;
@@ -299,9 +299,7 @@ class HoverNavbarInjector {
         height: 28px;
         border-radius: 6px;
         background: ${
-            isDarkBackground
-                ? "rgba(255, 255, 255, 0.1)"
-                : "rgba(0, 0, 0, 0.1)"
+            isDarkBackground ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.1)"
         };
         display: flex;
         align-items: center;
@@ -336,9 +334,7 @@ class HoverNavbarInjector {
         };
         backdrop-filter: blur(20px);
         border: 1px solid ${
-            isDarkBackground
-                ? "rgba(255, 255, 255, 0.1)"
-                : "rgba(0, 0, 0, 0.1)"
+            isDarkBackground ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.1)"
         };
         border-radius: 8px;
         padding: 8px;
@@ -367,9 +363,7 @@ class HoverNavbarInjector {
 
     .lynx-theme-option:hover {
         background: ${
-            isDarkBackground
-                ? "rgba(255, 255, 255, 0.1)"
-                : "rgba(0, 0, 0, 0.1)"
+            isDarkBackground ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.1)"
         };
         color: ${isDarkBackground ? "#ffffff" : "#000000"};
     }
@@ -388,9 +382,7 @@ class HoverNavbarInjector {
         height: 12px;
         border-radius: 3px;
         border: 1px solid ${
-            isDarkBackground
-                ? "rgba(255, 255, 255, 0.2)"
-                : "rgba(0, 0, 0, 0.2)"
+            isDarkBackground ? "rgba(255, 255, 255, 0.2)" : "rgba(0, 0, 0, 0.2)"
         };
     }
 

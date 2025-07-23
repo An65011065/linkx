@@ -20,14 +20,9 @@ interface TimerItem {
 interface TimerModalProps {
     onClose: () => void;
     onSave: (domain: string, minutes: number) => void;
-    isDarkMode?: boolean;
 }
 
-const TimerModal: React.FC<TimerModalProps> = ({
-    onClose,
-    onSave,
-    isDarkMode = false,
-}) => {
+const TimerModal: React.FC<TimerModalProps> = ({ onClose, onSave }) => {
     const [domain, setDomain] = useState("");
     const [minutes, setMinutes] = useState("");
 
@@ -51,43 +46,17 @@ const TimerModal: React.FC<TimerModalProps> = ({
     };
 
     return (
-        <div
-            className={`absolute inset-0 flex flex-col p-6 ${
-                isDarkMode
-                    ? "bg-black/80 border border-white/20 backdrop-blur-sm"
-                    : "bg-white border border-gray-200 shadow-2xl"
-            } rounded-2xl`}
-        >
+        <div className="absolute inset-0 flex flex-col p-6 bg-white border border-gray-200 shadow-2xl rounded-2xl">
             {/* Header */}
-            <div
-                className={`flex items-center gap-3 mb-6 pb-4 border-b ${
-                    isDarkMode ? "border-white/10" : "border-gray-100"
-                }`}
-            >
+            <div className="flex items-center gap-3 mb-6 pb-4 border-b border-gray-100">
                 {/* Search Bar Container */}
-                <div
-                    className={`
-                        flex-1 p-3 rounded-lg border relative flex items-center gap-2
-                        ${
-                            isDarkMode
-                                ? "bg-white/5 border-white/20 backdrop-blur-sm"
-                                : "bg-gray-50 border-gray-200"
-                        }
-                    `}
-                >
+                <div className="flex-1 p-3 rounded-lg border relative flex items-center gap-2 bg-gray-50 border-gray-200">
                     <input
                         type="text"
                         placeholder="Link"
                         value={domain}
                         onChange={(e) => setDomain(e.target.value)}
-                        className={`
-                            w-3/5 p-0 border-none text-sm outline-none bg-transparent
-                            ${
-                                isDarkMode
-                                    ? "text-white placeholder-white/50"
-                                    : "text-gray-900 placeholder-gray-500"
-                            }
-                        `}
+                        className="w-3/5 p-0 border-none text-sm outline-none bg-transparent text-gray-900 placeholder-gray-500"
                     />
                     <div className="absolute right-10 flex gap-1 items-center">
                         <input
@@ -95,34 +64,13 @@ const TimerModal: React.FC<TimerModalProps> = ({
                             placeholder="mins"
                             value={minutes}
                             onChange={(e) => setMinutes(e.target.value)}
-                            className={`
-                                w-16 p-0 border-none border-l pl-2 text-sm outline-none 
-                                bg-transparent appearance-none
-                                [&::-webkit-outer-spin-button]:appearance-none
-                                [&::-webkit-inner-spin-button]:appearance-none
-                                [-moz-appearance:textfield]
-                                ${
-                                    isDarkMode
-                                        ? "border-white/20 text-white placeholder-white/50"
-                                        : "border-gray-200 text-gray-900 placeholder-gray-500"
-                                }
-                            `}
+                            className="w-16 p-0 border-none border-l pl-2 text-sm outline-none bg-transparent appearance-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield] border-gray-200 text-gray-900 placeholder-gray-500"
                         />
                     </div>
                     <button
                         onClick={handleSave}
                         disabled={!domain.trim() || !minutes.trim()}
-                        className={`
-                            absolute right-2 top-1/2 transform -translate-y-1/2
-                            w-8 h-8 rounded-lg border-none cursor-pointer
-                            transition-all duration-300 flex items-center justify-center
-                            disabled:opacity-50 disabled:cursor-not-allowed
-                            ${
-                                isDarkMode
-                                    ? "text-white hover:bg-blue-500"
-                                    : "text-gray-600 hover:text-blue-600 hover:bg-blue-50"
-                            }
-                        `}
+                        className="absolute right-2 top-1/2 transform -translate-y-1/2 w-8 h-8 rounded-lg border-none cursor-pointer transition-all duration-300 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed text-gray-600 hover:text-blue-600 hover:bg-blue-50"
                     >
                         <ArrowRight size={16} />
                     </button>
@@ -131,29 +79,25 @@ const TimerModal: React.FC<TimerModalProps> = ({
                 {/* Close Button */}
                 <button
                     onClick={onClose}
-                    className="text-white hover:opacity-70 transition-opacity"
+                    className="text-gray-600 hover:text-gray-800 transition-colors"
                 >
                     <X size={20} />
                 </button>
             </div>
 
-            {/* Help Text - only for light mode */}
-            {!isDarkMode && (
-                <div className="text-sm text-gray-600 leading-relaxed">
-                    <p className="mb-2">
-                        Set a timer for a specific website or domain.
-                    </p>
-                </div>
-            )}
+            {/* Help Text */}
+            <div className="text-sm text-gray-600 leading-relaxed">
+                <p className="mb-2">
+                    Set a timer for a specific website or domain.
+                </p>
+            </div>
         </div>
     );
 };
 
-interface TimersProps {
-    isDarkMode?: boolean;
-}
+interface TimersProps {}
 
-const Timers: React.FC<TimersProps> = ({ isDarkMode = false }) => {
+const Timers: React.FC<TimersProps> = () => {
     const [timers, setTimers] = useState<TimerItem[]>([]);
     const [showModal, setShowModal] = useState(false);
     const [isDeleteMode, setIsDeleteMode] = useState(false);
@@ -327,29 +271,13 @@ const Timers: React.FC<TimersProps> = ({ isDarkMode = false }) => {
     return (
         <div
             ref={containerRef}
-            className={`
-                h-full flex flex-col relative transition-all duration-300 p-3 gap-2
-                ${
-                    isDarkMode
-                        ? "bg-white/5 border border-white/10 backdrop-blur-sm"
-                        : "bg-white border border-gray-200 shadow-sm"
-                }
-                rounded-2xl
-            `}
+            className="h-full flex flex-col relative transition-all duration-300 p-3 gap-2 bg-white border border-gray-200 shadow-sm rounded-2xl"
         >
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                    <Timer
-                        size={16}
-                        className={isDarkMode ? "text-white" : "text-gray-700"}
-                    />
-                    <div
-                        className={`
-                            text-sm font-medium
-                            ${isDarkMode ? "text-white" : "text-gray-900"}
-                        `}
-                    >
+                    <Timer size={16} className="text-gray-700" />
+                    <div className="text-sm font-medium text-gray-900">
                         Timers
                     </div>
                 </div>
@@ -357,29 +285,16 @@ const Timers: React.FC<TimersProps> = ({ isDarkMode = false }) => {
                 {/* Delete mode toggle */}
                 <button
                     onClick={() => setIsDeleteMode(!isDeleteMode)}
-                    className={`
-                        p-1 rounded-lg transition-colors
-                        ${
-                            isDarkMode
-                                ? "hover:bg-white/10"
-                                : "hover:bg-gray-100"
-                        }
-                    `}
+                    className="p-1 rounded-lg transition-colors hover:bg-gray-100"
                 >
                     <Trash2
                         size={14}
                         className={
-                            isDeleteMode
-                                ? "text-red-500"
-                                : isDarkMode
-                                ? "text-white/50"
-                                : "text-gray-400"
+                            isDeleteMode ? "text-red-500" : "text-gray-400"
                         }
                     />
                 </button>
             </div>
-
-            {/* Warning Message for Free Trial */}
 
             {/* Timers Grid */}
             <div className="overflow-x-auto overflow-y-hidden -mx-3 px-3">
@@ -396,38 +311,14 @@ const Timers: React.FC<TimersProps> = ({ isDarkMode = false }) => {
                     {/* Add New Timer Button */}
                     <div
                         onClick={handleAddNewClick}
-                        className={`
-                                    h-12 min-w-20 p-2 rounded-lg border cursor-pointer
-                                    flex flex-col items-center justify-center gap-1
-                                    transition-all
-                                    ${
-                                        isDarkMode
-                                            ? "bg-white/10 border-white/20 hover:bg-white/20"
-                                            : "bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-gray-300"
-                                    }
-                            ${
-                                isTrialMode && timers.length >= 1
-                                    ? "opacity-50 cursor-not-allowed"
-                                    : ""
-                            }
-                                `}
+                        className={`h-12 min-w-20 p-2 rounded-lg border cursor-pointer flex flex-col items-center justify-center gap-1 transition-all bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-gray-300 ${
+                            isTrialMode && timers.length >= 1
+                                ? "opacity-50 cursor-not-allowed"
+                                : ""
+                        }`}
                     >
-                        <Plus
-                            size={16}
-                            className={
-                                isDarkMode ? "text-white/70" : "text-gray-600"
-                            }
-                        />
-                        <div
-                            className={`
-                                        text-xs font-medium text-center
-                                        ${
-                                            isDarkMode
-                                                ? "text-white/70"
-                                                : "text-gray-600"
-                                        }
-                                    `}
-                        >
+                        <Plus size={16} className="text-gray-600" />
+                        <div className="text-xs font-medium text-center text-gray-600">
                             Add Timer
                         </div>
                     </div>
@@ -444,105 +335,56 @@ const Timers: React.FC<TimersProps> = ({ isDarkMode = false }) => {
                                                 e.stopPropagation();
                                                 handleDeleteTimer(timer.id);
                                             }}
-                                            className={`
-                                            absolute top-1 right-1 z-10 p-1 rounded-full border
-                                            transition-colors
-                                            ${
-                                                isDarkMode
-                                                    ? "bg-black/80 border-white/20 hover:bg-black/90"
-                                                    : "bg-white border-gray-200 hover:bg-red-50 hover:border-red-200"
-                                            }
-                                        `}
+                                            className="absolute top-1 right-1 z-10 p-1 rounded-full border bg-white border-gray-200 hover:bg-red-50 hover:border-red-200 transition-colors"
                                         >
                                             <X
                                                 size={8}
-                                                className="text-white"
+                                                className="text-gray-600"
                                             />
                                         </button>
                                     )}
                                     <div
-                                        className={`
-                                        h-12 min-w-20 p-2 rounded-lg border
-                                        flex flex-col items-center justify-center gap-1
-                                        transition-all
-                                        ${
+                                        className={`h-12 min-w-20 p-2 rounded-lg border flex flex-col items-center justify-center gap-1 transition-all ${
                                             !isDeleteMode
                                                 ? "cursor-pointer"
                                                 : "cursor-default"
-                                        }
-                                        ${
-                                            isDarkMode
-                                                ? "border-white/20"
-                                                : isExpired
+                                        } ${
+                                            isExpired
                                                 ? "bg-green-50 border-green-200"
                                                 : "bg-orange-50 border-orange-200"
-                                        }
-                                    `}
-                                        style={
-                                            isDarkMode
-                                                ? {
-                                                      background: isExpired
-                                                          ? "rgba(34, 197, 94, 0.2)"
-                                                          : "rgba(249, 115, 22, 0.2)",
-                                                  }
-                                                : {}
-                                        }
+                                        }`}
                                         onMouseEnter={(e) => {
-                                            if (!isDeleteMode) {
-                                                if (isDarkMode) {
-                                                    e.currentTarget.style.background =
-                                                        isExpired
-                                                            ? "rgba(34, 197, 94, 0.3)"
-                                                            : "rgba(249, 115, 22, 0.3)";
-                                                } else if (!isExpired) {
-                                                    e.currentTarget.style.backgroundColor =
-                                                        "#fed7aa40";
-                                                    e.currentTarget.style.boxShadow =
-                                                        "0 4px 12px rgba(0, 0, 0, 0.1)";
-                                                }
+                                            if (!isDeleteMode && !isExpired) {
+                                                e.currentTarget.style.backgroundColor =
+                                                    "#fed7aa40";
+                                                e.currentTarget.style.boxShadow =
+                                                    "0 4px 12px rgba(0, 0, 0, 0.1)";
                                             }
                                         }}
                                         onMouseLeave={(e) => {
-                                            if (!isDeleteMode) {
-                                                if (isDarkMode) {
-                                                    e.currentTarget.style.background =
-                                                        isExpired
-                                                            ? "rgba(34, 197, 94, 0.2)"
-                                                            : "rgba(249, 115, 22, 0.2)";
-                                                } else if (!isExpired) {
-                                                    e.currentTarget.style.backgroundColor =
-                                                        "#fff7ed";
-                                                    e.currentTarget.style.boxShadow =
-                                                        "none";
-                                                }
+                                            if (!isDeleteMode && !isExpired) {
+                                                e.currentTarget.style.backgroundColor =
+                                                    "#fff7ed";
+                                                e.currentTarget.style.boxShadow =
+                                                    "none";
                                             }
                                         }}
                                     >
                                         <div
-                                            className={`
-                                            text-xs font-medium text-center break-words leading-tight
-                                            ${
-                                                isDarkMode
-                                                    ? "text-white"
-                                                    : isExpired
+                                            className={`text-xs font-medium text-center break-words leading-tight ${
+                                                isExpired
                                                     ? "text-green-700"
                                                     : "text-orange-700"
-                                            }
-                                        `}
+                                            }`}
                                         >
                                             {timer.name}
                                         </div>
                                         <div
-                                            className={`
-                                            text-xs text-center font-medium
-                                            ${
-                                                isDarkMode
-                                                    ? "text-white/50"
-                                                    : isExpired
+                                            className={`text-xs text-center font-medium ${
+                                                isExpired
                                                     ? "text-green-600"
                                                     : "text-orange-600"
-                                            }
-                                        `}
+                                            }`}
                                         >
                                             {formatTimeRemaining(timer.endTime)}
                                         </div>
@@ -557,34 +399,10 @@ const Timers: React.FC<TimersProps> = ({ isDarkMode = false }) => {
                         (_, index) => (
                             <div
                                 key={`placeholder-${index}`}
-                                className={`
-                                h-12 min-w-20 p-2 rounded-lg border
-                                flex flex-col items-center justify-center gap-1
-                                ${
-                                    isDarkMode
-                                        ? "bg-white/5 border-white/10"
-                                        : "bg-gray-25 border-gray-100"
-                                }
-                            `}
+                                className="h-12 min-w-20 p-2 rounded-lg border flex flex-col items-center justify-center gap-1 bg-gray-25 border-gray-100"
                             >
-                                <Circle
-                                    size={16}
-                                    className={
-                                        isDarkMode
-                                            ? "text-white/30"
-                                            : "text-gray-300"
-                                    }
-                                />
-                                <div
-                                    className={`
-                                            text-xs text-center
-                                            ${
-                                                isDarkMode
-                                                    ? "text-white/30"
-                                                    : "text-gray-400"
-                                            }
-                                        `}
-                                >
+                                <Circle size={16} className="text-gray-300" />
+                                <div className="text-xs text-center text-gray-400">
                                     Add Timer
                                 </div>
                             </div>
@@ -598,7 +416,6 @@ const Timers: React.FC<TimersProps> = ({ isDarkMode = false }) => {
                 <TimerModal
                     onClose={handleModalClose}
                     onSave={handleSaveTimer}
-                    isDarkMode={isDarkMode}
                 />
             )}
         </div>

@@ -26,6 +26,7 @@ export interface UrlVisit {
     category: "work" | "social" | "other"; // Site category
     sourceInfo?: SourceInfo; // Navigation source information
     creationMode: "chain" | "hyperlink"; // How this page visit was created
+    wordCount?: number;
 }
 
 // State tracking for each browser tab
@@ -69,6 +70,37 @@ interface DailyUsage {
     domain: string;
     date: string; // YYYY-MM-DD format
     timeSpent: number; // in minutes
+}
+
+// ===============================
+// ANALYTICS NOTIFICATION (moved to top)
+// ===============================
+async function notifyAnalyticsUpdate(tabId?: number): Promise<void> {
+    try {
+        const tabs = tabId ? [{ id: tabId }] : await chrome.tabs.query({});
+        tabs.forEach(async (tab) => {
+            if (tab.id) {
+                try {
+                    await chrome.tabs.sendMessage(tab.id, {
+                        type: "ANALYTICS_DATA_UPDATED",
+                    });
+                } catch (error) {
+                    // Ignore errors for tabs without content script
+                }
+            }
+        });
+    } catch (error) {
+        console.log("Could not notify analytics update:", error);
+    }
+}
+
+// Make extractDomain a standalone function
+function extractDomain(url: string): string {
+    try {
+        return new URL(url).hostname.replace(/^www\./, "");
+    } catch {
+        return url.split("/")[2] || url;
+    }
 }
 
 class DailyLimitManager {
@@ -183,11 +215,13 @@ class BackgroundTracker {
     private syncInterval?: ReturnType<typeof setTimeout>;
     private cleanupInterval?: ReturnType<typeof setTimeout>;
     private isDestroyed: boolean;
+    private requestCounts: Map<string, number>; // 🆕 ADD THIS LINE
 
     private constructor() {
         this.dataService = DataService.getInstance();
         this.tabStates = new Map();
         this.linkCreatedTabs = new Map();
+        this.requestCounts = new Map(); // 🆕 ADD THIS LINE
         this.isUserActive = true;
         this.userIdleThreshold = 60; // seconds
         this.isDestroyed = false;
@@ -234,7 +268,6 @@ class BackgroundTracker {
         chrome.webNavigation.onCreatedNavigationTarget.addListener(
             this.handleCreatedNavigationTarget.bind(this),
         );
-
         // Context menu for selected text
         this.setupContextMenu();
 
@@ -285,11 +318,7 @@ class BackgroundTracker {
 
     // Extract clean domain from URL
     private extractDomain(url: string): string {
-        try {
-            return new URL(url).hostname.replace(/^www\./, "");
-        } catch {
-            return url.split("/")[2] || url;
-        }
+        return extractDomain(url);
     }
 
     // Categorize URL as work, social, or other based on domain
@@ -404,6 +433,7 @@ class BackgroundTracker {
             category: this.categorizeUrl(domain),
             sourceInfo,
             creationMode,
+            wordCount: 0,
         };
     }
 
@@ -469,6 +499,9 @@ class BackgroundTracker {
         if (activeState?.currentVisit) {
             await this.dataService.addUrlVisit(activeState.currentVisit);
         }
+
+        // 🆕 NOTIFY ANALYTICS UPDATE ON TAB SWITCH
+        await notifyAnalyticsUpdate(tabId);
     }
 
     private async handleTabUpdated(
@@ -494,7 +527,6 @@ class BackgroundTracker {
 
         if (changeInfo.status === "complete" && tab.url) {
             console.log("✅ Page completed loading:", changeInfo.url);
-
             let previousVisitInfo: { id: string; url: string } | undefined;
 
             // End previous visit if exists
@@ -521,7 +553,6 @@ class BackgroundTracker {
                     "🔗 Hyperlink navigation detected from:",
                     linkInfo.sourceUrl,
                 );
-                // This tab was created from a link click (hyperlink navigation)
                 sourceInfo = {
                     nodeId: linkInfo.sourceVisitId || "",
                     url: linkInfo.sourceUrl,
@@ -534,7 +565,6 @@ class BackgroundTracker {
                     "⛓️ Chain navigation detected from:",
                     previousVisitInfo.url,
                 );
-                // This is navigation within the same tab (chain navigation)
                 sourceInfo = {
                     nodeId: previousVisitInfo.id,
                     url: previousVisitInfo.url,
@@ -557,15 +587,125 @@ class BackgroundTracker {
 
             console.log("💾 Saving visit to storage");
             await this.dataService.addUrlVisit(state.currentVisit);
+
+            // Extract word count for reading time calculation
+            try {
+                console.log(
+                    "📊 Extracting word count for reading analytics...",
+                );
+
+                // Try direct script injection first
+                const [result] = await chrome.scripting.executeScript({
+                    target: { tabId },
+                    func: () => {
+                        // More accurate word count extraction
+                        const textContent =
+                            document.body.innerText ||
+                            document.body.textContent ||
+                            "";
+
+                        // Remove extra whitespace and split by word boundaries
+                        const words = textContent
+                            .trim()
+                            .replace(/\s+/g, " ") // Replace multiple spaces with single space
+                            .split(/\s+/) // Split by spaces
+                            .filter((word) => word.length > 0); // Remove empty strings
+
+                        return {
+                            wordCount: words.length,
+                            characterCount: textContent.length,
+                            textPreview: textContent.substring(0, 100) + "...",
+                        };
+                    },
+                });
+
+                if (result?.result?.wordCount) {
+                    console.log(
+                        `📝 Word count extracted: ${result.result.wordCount} words`,
+                    );
+                    console.log(
+                        `📝 Character count: ${result.result.characterCount} chars`,
+                    );
+                    console.log(
+                        `📝 Text preview: ${result.result.textPreview}`,
+                    );
+
+                    // Only set word count if it hasn't been set yet or if it's significantly different
+                    if (
+                        !state.currentVisit.wordCount ||
+                        Math.abs(
+                            state.currentVisit.wordCount -
+                                result.result.wordCount,
+                        ) > 10
+                    ) {
+                        state.currentVisit.wordCount = result.result.wordCount;
+                        await this.dataService.addUrlVisit(state.currentVisit);
+                        console.log("✅ Word count saved to visit");
+                    } else {
+                        console.log(
+                            "📝 Word count already set, skipping update",
+                        );
+                    }
+                } else {
+                    console.log(
+                        "📝 No word count available or extraction failed",
+                    );
+
+                    // Fallback: try content script message
+                    try {
+                        const response = await chrome.tabs.sendMessage(tabId, {
+                            type: "GET_WORD_COUNT", // Use consistent message type
+                        });
+
+                        if (
+                            response?.wordCount &&
+                            (!state.currentVisit.wordCount ||
+                                Math.abs(
+                                    state.currentVisit.wordCount -
+                                        response.wordCount,
+                                ) > 10)
+                        ) {
+                            state.currentVisit.wordCount = response.wordCount;
+                            await this.dataService.addUrlVisit(
+                                state.currentVisit,
+                            );
+                            console.log(
+                                "✅ Word count from content script:",
+                                response.wordCount,
+                            );
+                        }
+                    } catch (contentScriptError) {
+                        console.log(
+                            "📝 Content script also unavailable, using estimated count",
+                        );
+                        // Use a rough estimate based on character count
+                        const estimatedWords = Math.round(
+                            (result?.result?.characterCount || 0) / 5,
+                        ); // Rough estimate
+                        if (!state.currentVisit.wordCount) {
+                            state.currentVisit.wordCount = estimatedWords;
+                        }
+                    }
+                }
+            } catch (error) {
+                console.log("⚠️ Could not extract word count:", error);
+                state.currentVisit.wordCount = 0;
+            }
+
             console.log("✅ Visit saved successfully");
+
+            // 🆕 NOTIFY ANALYTICS UPDATE
+            await notifyAnalyticsUpdate(tabId);
         } else if (changeInfo.title && state.currentVisit) {
             console.log(
                 "📄 Title updated for existing visit:",
                 changeInfo.title,
             );
-            // Update title for existing visit
             state.currentVisit.title = changeInfo.title;
             await this.dataService.addUrlVisit(state.currentVisit);
+
+            // 🆕 NOTIFY ANALYTICS UPDATE
+            await notifyAnalyticsUpdate(tabId);
         }
     }
 
@@ -651,12 +791,15 @@ class BackgroundTracker {
 
     // Periodically sync all active visits to prevent data loss
     private async syncAllVisits(): Promise<void> {
-        for (const [, state] of this.tabStates) {
+        for (const [tabId, state] of this.tabStates) {
             if (state.currentVisit) {
                 this.updateActiveTime(state.currentVisit);
                 await this.dataService.addUrlVisit(state.currentVisit);
             }
         }
+
+        // 🆕 NOTIFY ANALYTICS UPDATE AFTER SYNC
+        await notifyAnalyticsUpdate();
     }
 
     private async cleanupExpiredBlocks(): Promise<void> {
@@ -721,7 +864,7 @@ class BackgroundTracker {
                 tab?.url
             ) {
                 try {
-                    const domain = this.extractDomain(tab.url);
+                    const domain = extractDomain(tab.url);
                     const timestamp = new Date().toLocaleString();
                     const selectedContent = `--- ${timestamp} ---\nFrom: ${tab.url}\n\n${info.selectionText}`;
 
@@ -883,6 +1026,12 @@ class BackgroundTracker {
         });
     }
 
+    // Get request count for a specific tab and domain
+    public getRequestCount(tabId: number, domain: string): number {
+        const key = `${tabId}_${domain}`;
+        return this.requestCounts.get(key) || 0;
+    }
+
     // Clean up resources when tracker is destroyed
     public destroy(): void {
         this.isDestroyed = true;
@@ -922,6 +1071,7 @@ class BackgroundTracker {
         // Clear state
         this.tabStates.clear();
         this.linkCreatedTabs.clear();
+        this.requestCounts.clear();
         this.focusedWindowId = undefined;
         this.focusedTabId = undefined;
     }
@@ -2075,9 +2225,6 @@ function handleShowLimitModal(sendResponse: (response: any) => void) {
 // ===============================
 
 // ===============================
-// FLOW
-// ===============================
-// ===============================
 // LYNCX FLOW HANDLERS
 // ===============================
 
@@ -2091,207 +2238,6 @@ function handleShowFlowModal(sendResponse: (response: any) => void) {
         }
     });
     sendResponse({ success: true });
-}
-
-// Handle Google sign-in for Flow
-async function handleFlowGoogleSignin(sendResponse: (response: any) => void) {
-    try {
-        console.log("🔄 Flow: Starting Google sign-in...");
-
-        const authService = AuthService.getInstance();
-        const user = await authService.authenticate();
-
-        if (user) {
-            console.log("✅ Flow: Google sign-in successful");
-            sendResponse({
-                success: true,
-                user: {
-                    uid: user.uid,
-                    email: user.email,
-                    displayName: user.displayName,
-                    photoURL: user.photoURL,
-                    gmailToken: user.gmailToken,
-                },
-            });
-        } else {
-            throw new Error("Failed to authenticate user");
-        }
-    } catch (error) {
-        console.error("❌ Flow: Google sign-in failed:", error);
-        sendResponse({
-            success: false,
-            error: error instanceof Error ? error.message : "Sign-in failed",
-        });
-    }
-}
-
-// Handle sign-out for Flow
-async function handleFlowSignOut(sendResponse: (response: any) => void) {
-    try {
-        console.log("🔄 Flow: Starting sign-out...");
-
-        const authService = AuthService.getInstance();
-        await authService.signOut();
-
-        console.log("✅ Flow: Sign-out successful");
-        sendResponse({ success: true });
-    } catch (error) {
-        console.error("❌ Flow: Sign-out failed:", error);
-        sendResponse({
-            success: false,
-            error: error instanceof Error ? error.message : "Sign-out failed",
-        });
-    }
-}
-
-// Handle getting calendar events
-async function handleGetCalendarEvents(sendResponse: (response: any) => void) {
-    try {
-        console.log("🗓️ Flow: Getting calendar events...");
-
-        const authService = AuthService.getInstance();
-        const user = authService.getCurrentUser();
-
-        if (!user || !user.gmailToken) {
-            throw new Error("User not authenticated or missing Gmail token");
-        }
-
-        // Get today's date range
-        const today = new Date();
-        const startOfDay = new Date(today.setHours(0, 0, 0, 0));
-        const endOfDay = new Date(today.setHours(23, 59, 59, 999));
-
-        // Make Google Calendar API call
-        const response = await fetch(
-            `https://www.googleapis.com/calendar/v3/calendars/primary/events?` +
-                `timeMin=${startOfDay.toISOString()}&` +
-                `timeMax=${endOfDay.toISOString()}&` +
-                `singleEvents=true&` +
-                `orderBy=startTime&` +
-                `maxResults=10`,
-            {
-                headers: {
-                    Authorization: `Bearer ${user.gmailToken}`,
-                    "Content-Type": "application/json",
-                },
-            },
-        );
-
-        if (!response.ok) {
-            if (response.status === 401) {
-                // Token expired, try to refresh
-                await authService.refreshUserData();
-                throw new Error(
-                    "Authentication token expired. Please sign in again.",
-                );
-            }
-            throw new Error(`Calendar API error: ${response.status}`);
-        }
-
-        const data = await response.json();
-
-        // Transform events to our format
-        const events = (data.items || []).map((event: any) => ({
-            id: event.id,
-            title: event.summary || "Untitled Event",
-            start: event.start?.dateTime || event.start?.date,
-            end: event.end?.dateTime || event.end?.date,
-            description: event.description,
-            location: event.location,
-        }));
-
-        console.log(`✅ Flow: Retrieved ${events.length} calendar events`);
-        sendResponse({ success: true, events });
-    } catch (error) {
-        console.error("❌ Flow: Failed to get calendar events:", error);
-        sendResponse({
-            success: false,
-            error:
-                error instanceof Error
-                    ? error.message
-                    : "Failed to get calendar events",
-            events: [],
-        });
-    }
-}
-
-// Handle creating calendar events (optional feature)
-async function handleCreateCalendarEvent(
-    request: {
-        title: string;
-        description?: string;
-        start: string;
-        end: string;
-        location?: string;
-    },
-    sendResponse: (response: any) => void,
-) {
-    try {
-        console.log("🗓️ Flow: Creating calendar event...");
-
-        const authService = AuthService.getInstance();
-        const user = authService.getCurrentUser();
-
-        if (!user || !user.gmailToken) {
-            throw new Error("User not authenticated or missing Gmail token");
-        }
-
-        const eventData = {
-            summary: request.title,
-            description: request.description,
-            start: {
-                dateTime: request.start,
-                timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-            },
-            end: {
-                dateTime: request.end,
-                timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-            },
-            location: request.location,
-        };
-
-        const response = await fetch(
-            "https://www.googleapis.com/calendar/v3/calendars/primary/events",
-            {
-                method: "POST",
-                headers: {
-                    Authorization: `Bearer ${user.gmailToken}`,
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify(eventData),
-            },
-        );
-
-        if (!response.ok) {
-            throw new Error(
-                `Failed to create calendar event: ${response.status}`,
-            );
-        }
-
-        const event = await response.json();
-
-        console.log("✅ Flow: Calendar event created successfully");
-        sendResponse({
-            success: true,
-            event: {
-                id: event.id,
-                title: event.summary,
-                start: event.start?.dateTime || event.start?.date,
-                end: event.end?.dateTime || event.end?.date,
-                description: event.description,
-                location: event.location,
-            },
-        });
-    } catch (error) {
-        console.error("❌ Flow: Failed to create calendar event:", error);
-        sendResponse({
-            success: false,
-            error:
-                error instanceof Error
-                    ? error.message
-                    : "Failed to create calendar event",
-        });
-    }
 }
 
 function handleShowSearchModal(sendResponse: (response: any) => void) {
@@ -2382,12 +2328,261 @@ async function simulateAIResponse(
 }
 
 // ===============================
+// FLOW MODAL HANDLERS
+// ===============================
+
+// Handle Google authentication for Flow
+async function handleGoogleAuth(sendResponse: (response: any) => void) {
+    try {
+        console.log(
+            "🔐 Starting Google authentication with calendar scopes...",
+        );
+
+        // Request auth token with calendar scopes
+        chrome.identity.getAuthToken(
+            {
+                interactive: true,
+                scopes: [
+                    "openid",
+                    "email",
+                    "profile",
+                    "https://www.googleapis.com/auth/calendar.readonly",
+                    "https://www.googleapis.com/auth/calendar.events",
+                    "https://www.googleapis.com/auth/userinfo.email",
+                    "https://www.googleapis.com/auth/userinfo.profile",
+                ],
+            },
+            async (token) => {
+                if (chrome.runtime.lastError) {
+                    console.error("❌ Auth error:", chrome.runtime.lastError);
+                    sendResponse({
+                        success: false,
+                        error: chrome.runtime.lastError.message,
+                    });
+                    return;
+                }
+
+                if (!token) {
+                    console.error("❌ No token received");
+                    sendResponse({
+                        success: false,
+                        error: "No access token received",
+                    });
+                    return;
+                }
+
+                console.log(
+                    "✅ Access token received:",
+                    token.substring(0, 20) + "...",
+                );
+
+                try {
+                    // Get user info
+                    const userResponse = await fetch(
+                        "https://www.googleapis.com/oauth2/v2/userinfo",
+                        {
+                            headers: {
+                                Authorization: `Bearer ${token}`,
+                            },
+                        },
+                    );
+
+                    if (!userResponse.ok) {
+                        throw new Error(
+                            `Failed to get user info: ${userResponse.status}`,
+                        );
+                    }
+
+                    const userData = await userResponse.json();
+                    console.log("👤 User data received:", userData.email);
+
+                    const user = {
+                        id: userData.id,
+                        email: userData.email,
+                        name: userData.name,
+                        picture: userData.picture,
+                        accessToken: token,
+                    };
+
+                    // Store the user data
+                    await chrome.storage.local.set({ user });
+
+                    // Broadcast auth state change to all tabs
+                    const tabs = await chrome.tabs.query({});
+                    tabs.forEach((tab) => {
+                        if (tab.id) {
+                            chrome.tabs
+                                .sendMessage(tab.id, {
+                                    type: "AUTH_STATE_CHANGED",
+                                    user: user,
+                                })
+                                .catch(() => {
+                                    // Ignore errors for tabs that don't have content script
+                                });
+                        }
+                    });
+
+                    sendResponse({
+                        success: true,
+                        user: user,
+                    });
+                } catch (error) {
+                    console.error("❌ Error getting user info:", error);
+                    sendResponse({
+                        success: false,
+                        error: error.message,
+                    });
+                }
+            },
+        );
+    } catch (error) {
+        console.error("❌ Authentication failed:", error);
+        sendResponse({
+            success: false,
+            error: error.message,
+        });
+    }
+}
+
+//checkpoint
+
+// Handle checking authentication state
+async function handleCheckAuthState(sendResponse: (response: any) => void) {
+    try {
+        // First check Flow-specific storage
+        const result = await chrome.storage.local.get(["user"]);
+
+        if (result.user && result.user.accessToken) {
+            console.log("✅ Found Flow user in storage:", result.user.email);
+
+            // Verify the token still works with calendar API
+            try {
+                const testResponse = await fetch(
+                    "https://www.googleapis.com/oauth2/v2/userinfo",
+                    {
+                        headers: {
+                            Authorization: `Bearer ${result.user.accessToken}`,
+                        },
+                    },
+                );
+
+                if (testResponse.ok) {
+                    console.log("✅ Flow token is still valid");
+                    sendResponse({ user: result.user });
+                    return;
+                } else {
+                    console.log("❌ Flow token is invalid, clearing...");
+                    await chrome.storage.local.remove(["user"]);
+                }
+            } catch (error) {
+                console.log("❌ Token verification failed, clearing...");
+                await chrome.storage.local.remove(["user"]);
+            }
+        }
+
+        // Fallback: try to get from AuthService
+        try {
+            const authService = AuthService.getInstance();
+            const authUser = authService.getCurrentUser();
+
+            if (authUser && authUser.gmailToken) {
+                console.log("📋 Using AuthService user for Flow");
+
+                // Convert AuthService format to Flow format
+                const flowUser = {
+                    id: authUser.uid,
+                    email: authUser.email,
+                    name: authUser.displayName || authUser.email,
+                    picture: authUser.photoURL,
+                    accessToken: authUser.gmailToken,
+                };
+
+                // Store in Flow format for next time
+                await chrome.storage.local.set({ user: flowUser });
+
+                sendResponse({ user: flowUser });
+                return;
+            }
+        } catch (error) {
+            console.log("No AuthService user available:", error);
+        }
+
+        // No valid user found
+        sendResponse({ user: null });
+    } catch (error) {
+        console.error("❌ Error checking Flow auth state:", error);
+        sendResponse({ user: null });
+    }
+}
+
+// Handle sign out
+async function handleSignOut(sendResponse: (response: any) => void) {
+    try {
+        console.log("🚪 Flow: Signing out...");
+
+        // Clear Flow-specific storage
+        await chrome.storage.local.remove(["user"]);
+
+        // Also sign out from AuthService if available
+        try {
+            const authService = AuthService.getInstance();
+            await authService.signOut();
+        } catch (error) {
+            console.log("Note: Could not sign out from AuthService:", error);
+        }
+
+        // Revoke Chrome identity tokens
+        try {
+            const token = await chrome.identity.getAuthToken({
+                interactive: false,
+            });
+            if (token) {
+                await chrome.identity.removeCachedAuthToken({ token });
+            }
+        } catch (error) {
+            console.log("Note: Could not revoke cached token:", error);
+        }
+
+        // Broadcast sign out to all tabs
+        const tabs = await chrome.tabs.query({});
+        tabs.forEach((tab) => {
+            if (tab.id) {
+                chrome.tabs
+                    .sendMessage(tab.id, {
+                        type: "AUTH_STATE_CHANGED",
+                        user: null,
+                    })
+                    .catch(() => {
+                        // Ignore errors
+                    });
+            }
+        });
+
+        console.log("✅ Flow: Sign out successful");
+        sendResponse({ success: true });
+    } catch (error) {
+        console.error("❌ Flow: Sign out failed:", error);
+        sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : "Sign out failed",
+        });
+    }
+}
+
+// ===============================
 // UNIFIED MESSAGE HANDLER
 // ===============================
 
 // Centralized message listener - handles ALL messages
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     console.log("Background received message:", request);
+
+    if (request.type === "OPEN_SETTINGS_PAGE") {
+        chrome.tabs.create({
+            url: chrome.runtime.getURL("src/settings/settings.html"),
+        });
+        return;
+    }
 
     if (request.type === "SHOW_SEARCH_MODAL") {
         handleShowSearchModal(sendResponse);
@@ -2571,23 +2766,30 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return true;
     }
 
-    if (request.type === "FLOW_GOOGLE_SIGNIN") {
-        handleFlowGoogleSignin(sendResponse);
+    if (request.type === "GOOGLE_AUTH") {
+        handleGoogleAuth(sendResponse);
         return true;
     }
 
-    if (request.type === "FLOW_SIGN_OUT") {
-        handleFlowSignOut(sendResponse);
+    if (request.type === "CHECK_AUTH_STATE") {
+        handleCheckAuthState(sendResponse);
         return true;
     }
 
-    if (request.type === "GET_CALENDAR_EVENTS") {
-        handleGetCalendarEvents(sendResponse);
+    if (request.type === "SIGN_OUT") {
+        handleSignOut(sendResponse);
         return true;
     }
-
-    if (request.type === "CREATE_CALENDAR_EVENT") {
-        handleCreateCalendarEvent(request, sendResponse);
+    if (request.type === "SHOW_CLIPBOARD_MANAGER") {
+        if (sender.tab?.id) {
+            chrome.tabs.sendMessage(sender.tab.id, {
+                type: "SHOW_CLIPBOARD_MANAGER",
+                // No domain - clipboard is global!
+            });
+            sendResponse({ success: true });
+        } else {
+            sendResponse({ success: false, error: "No tab available" });
+        }
         return true;
     }
 

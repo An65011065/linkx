@@ -28,7 +28,7 @@ const normalizeUrl = (url: string): string => {
 
         const urlObj = new URL(url);
         // Remove www. prefix
-        let hostname = urlObj.hostname.replace(/^www\./, "");
+        const hostname = urlObj.hostname.replace(/^www\./, "");
         // Remove trailing slashes
         let pathname = urlObj.pathname.replace(/\/$/, "");
         // Remove common index files
@@ -54,47 +54,39 @@ export function useNetworkData() {
                 const dataService = DataService.getInstance();
                 const visits = await dataService.getAllUrlVisits();
 
-                // Create nodes for each unique normalized URL
+                // Sort visits by timestamp to maintain chronological order
+                const sortedVisits = visits.sort(
+                    (a, b) => a.startTime - b.startTime,
+                );
+
+                // Create nodes for each visit instance (not just unique URLs)
                 const nodes = new Map<string, NetworkNode>();
+                const visitToNodeId = new Map<string, string>(); // visit.id -> node.id
 
-                // Process visits and create base nodes
-                for (const visit of visits) {
+                // Process visits and create separate nodes for each visit instance
+                for (const visit of sortedVisits) {
                     const normalizedUrl = normalizeUrl(visit.url);
-                    if (!nodes.has(normalizedUrl)) {
-                        nodes.set(normalizedUrl, {
-                            id: normalizedUrl,
-                            url: normalizedUrl,
-                            domain: visit.domain,
-                            title: visit.title || visit.url,
-                            totalTime: 0,
-                            activeTime: 0,
-                            lastVisited: visit.startTime,
-                            category: visit.category,
 
-                            originalUrls: new Set([visit.url]),
-                            youtubeMetadata: null, // Add this field
-                        });
-                    } else {
-                        nodes.get(normalizedUrl)!.originalUrls.add(visit.url);
-                        if (
-                            visit.title &&
-                            (!nodes.get(normalizedUrl)!.title ||
-                                nodes.get(normalizedUrl)!.title ===
-                                    nodes.get(normalizedUrl)!.url)
-                        ) {
-                            nodes.get(normalizedUrl)!.title = visit.title;
-                        }
-                    }
+                    // Create unique node ID for this visit instance
+                    const nodeId = `${normalizedUrl}_${visit.id}`;
+                    visitToNodeId.set(visit.id, nodeId);
 
-                    const node = nodes.get(normalizedUrl)!;
-                    node.totalTime += visit.duration;
-                    if (visit.isActive) {
-                        node.activeTime += visit.duration;
-                    }
-                    node.lastVisited = Math.max(
-                        node.lastVisited,
-                        visit.startTime,
-                    );
+                    // Create a new node for each visit instance
+                    nodes.set(nodeId, {
+                        id: nodeId,
+                        url: normalizedUrl,
+                        domain: visit.domain,
+                        title: visit.title || visit.url,
+                        totalTime: visit.duration,
+                        activeTime: visit.isActive ? visit.duration : 0,
+                        lastVisited: visit.startTime,
+                        category: visit.category,
+                        originalUrls: new Set([visit.url]),
+                        youtubeMetadata: null,
+                        // Add visit metadata to help with layout
+                        visitId: visit.id,
+                        visitTimestamp: visit.startTime,
+                    });
                 }
 
                 // Fetch YouTube metadata for YouTube nodes
@@ -106,19 +98,24 @@ export function useNetworkData() {
                         const metadata = await fetchYouTubeMetadata(node.url);
                         if (metadata) {
                             node.youtubeMetadata = metadata;
-                            // Update the display title for YouTube nodes
                             node.displayName = metadata.author_name;
                             node.tooltipTitle = metadata.title;
                         }
                     }),
                 );
 
-                // Create links between nodes based on navigation
+                // Create links between visit instances based on navigation
                 const links = new Map<string, NetworkLink>();
-                visits.forEach((visit: UrlVisit) => {
-                    // For chain navigation, use the previous visit in the same tab
+
+                sortedVisits.forEach((visit: UrlVisit) => {
+                    const targetNodeId = visitToNodeId.get(visit.id);
+                    if (!targetNodeId) return;
+
+                    let sourceNodeId: string | null = null;
+
+                    // For chain navigation, find the previous visit in the same tab
                     if (visit.creationMode === "chain") {
-                        const previousVisits = visits.filter(
+                        const previousVisits = sortedVisits.filter(
                             (v) =>
                                 v.tabId === visit.tabId &&
                                 v.endTime &&
@@ -135,42 +132,8 @@ export function useNetworkData() {
                                         ? current
                                         : latest,
                             );
-
-                            const sourceNode = nodes.get(
-                                normalizeUrl(previousVisit.url),
-                            );
-                            const targetNode = nodes.get(
-                                normalizeUrl(visit.url),
-                            );
-
-                            if (
-                                sourceNode &&
-                                targetNode &&
-                                sourceNode !== targetNode
-                            ) {
-                                const linkId = `${sourceNode.id}->${targetNode.id}`;
-                                const existingLink = links.get(linkId);
-
-                                if (existingLink) {
-                                    existingLink.weight++;
-                                    existingLink.transitions.push({
-                                        timestamp: visit.startTime,
-                                        sourceType: visit.creationMode,
-                                    });
-                                } else {
-                                    links.set(linkId, {
-                                        source: sourceNode.id,
-                                        target: targetNode.id,
-                                        weight: 1,
-                                        transitions: [
-                                            {
-                                                timestamp: visit.startTime,
-                                                sourceType: visit.creationMode,
-                                            },
-                                        ],
-                                    });
-                                }
-                            }
+                            sourceNodeId =
+                                visitToNodeId.get(previousVisit.id) || null;
                         }
                     }
                     // For hyperlink navigation, use the sourceInfo
@@ -178,38 +141,43 @@ export function useNetworkData() {
                         visit.creationMode === "hyperlink" &&
                         visit.sourceInfo
                     ) {
-                        const sourceNode = nodes.get(
-                            normalizeUrl(visit.sourceInfo.url),
+                        // Find the source visit that matches the sourceInfo
+                        const sourceVisit = sortedVisits.find(
+                            (v) =>
+                                v.url === visit.sourceInfo!.url &&
+                                v.tabId === visit.sourceInfo!.tabId &&
+                                v.startTime < visit.startTime,
                         );
-                        const targetNode = nodes.get(normalizeUrl(visit.url));
+                        if (sourceVisit) {
+                            sourceNodeId =
+                                visitToNodeId.get(sourceVisit.id) || null;
+                        }
+                    }
 
-                        if (
-                            sourceNode &&
-                            targetNode &&
-                            sourceNode !== targetNode
-                        ) {
-                            const linkId = `${sourceNode.id}->${targetNode.id}`;
-                            const existingLink = links.get(linkId);
+                    // Create link if we found a valid source
+                    if (sourceNodeId && sourceNodeId !== targetNodeId) {
+                        const linkId = `${sourceNodeId}->${targetNodeId}`;
 
-                            if (existingLink) {
-                                existingLink.weight++;
-                                existingLink.transitions.push({
-                                    timestamp: visit.startTime,
-                                    sourceType: visit.creationMode,
-                                });
-                            } else {
-                                links.set(linkId, {
-                                    source: sourceNode.id,
-                                    target: targetNode.id,
-                                    weight: 1,
-                                    transitions: [
-                                        {
-                                            timestamp: visit.startTime,
-                                            sourceType: visit.creationMode,
-                                        },
-                                    ],
-                                });
-                            }
+                        if (!links.has(linkId)) {
+                            links.set(linkId, {
+                                source: sourceNodeId,
+                                target: targetNodeId,
+                                weight: 1,
+                                transitions: [
+                                    {
+                                        timestamp: visit.startTime,
+                                        sourceType: visit.creationMode,
+                                    },
+                                ],
+                            });
+                        } else {
+                            // This shouldn't happen with unique visit instances, but just in case
+                            const existingLink = links.get(linkId)!;
+                            existingLink.weight++;
+                            existingLink.transitions.push({
+                                timestamp: visit.startTime,
+                                sourceType: visit.creationMode,
+                            });
                         }
                     }
                 });

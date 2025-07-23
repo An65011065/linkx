@@ -2,16 +2,13 @@
 const { onCall } = require("firebase-functions/v2/https");
 const { defineSecret } = require("firebase-functions/params");
 const { OpenAI } = require("openai");
-
 const openaiApiKey = defineSecret("OPENAI_API_KEY");
 
 // Create clean CSV (no comments, just data)
 function createCleanCSV(data) {
     const visits = data.today.allVisits || [];
-
     // Sort visits chronologically (most recent first)
     const sortedVisits = [...visits].sort((a, b) => b.startTime - a.startTime);
-
     const headers = [
         "domain",
         "title",
@@ -19,7 +16,6 @@ function createCleanCSV(data) {
         "readableTime",
         "activeTimeMinutes",
     ];
-
     const rows = sortedVisits.map((visit) => {
         const date = new Date(visit.startTime);
         const timeDisplay =
@@ -29,7 +25,6 @@ function createCleanCSV(data) {
                 minute: "2-digit",
                 hour12: false,
             });
-
         return [
             visit.domain || "",
             (visit.title || "").replace(/"/g, '""'), // Escape quotes
@@ -38,22 +33,19 @@ function createCleanCSV(data) {
             visit.activeTimeMinutes || 0,
         ];
     });
-
     // Add summary as first data row (5 columns to match headers)
     const summaryRow = [
         "SUMMARY_DATA",
-        `Total visits: ${sortedVisits.length}, Active minutes: ${data.today.totalActiveMinutes}, Sessions: ${data.today.tabSessions}`,
+        `Total visits: ${sortedVisites.length}, Active minutes: ${data.today.totalActiveMinutes}, Sessions: ${data.today.tabSessions}`,
         data.today.date,
         "Summary",
         data.today.totalActiveMinutes,
     ];
-
     const csvLines = [
         headers.join(","),
         summaryRow.map((cell) => `"${cell}"`).join(","),
         ...rows.map((row) => row.map((cell) => `"${cell}"`).join(",")),
     ];
-
     return csvLines.join("\n");
 }
 
@@ -70,6 +62,7 @@ exports.chatWithOpenAI = onCall(
         const userMessage = (request.data && request.data.userMessage) || "";
         const browsingData =
             (request.data && request.data.browsingData) || null;
+        const pageContent = (request.data && request.data.pageContent) || null; // 🆕 NEW
         const existingThreadId =
             (request.data && request.data.threadId) || null;
         const assistantType =
@@ -79,10 +72,11 @@ exports.chatWithOpenAI = onCall(
             throw new Error("No message provided");
         }
 
-        // Set assistant ID based on type
+        // 🆕 UPDATED: Set assistant ID based on type
         const assistantIds = {
             browsing: "asst_oGJq9HXdbQ5VoLRuE8JdgvRQ",
             summarise: "asst_y1LZY5JHQX3YZiAXyVs1Iiif",
+            page_analysis: "asst_Wed1vBDeodu3B1ATQYLeqksz",
             asst_YxsrXIl2Ro9POndtudAi1GUk: "asst_YxsrXIl2Ro9POndtudAi1GUk",
         };
 
@@ -96,6 +90,7 @@ exports.chatWithOpenAI = onCall(
             console.log("User message:", userMessage);
             console.log("Assistant type:", assistantType);
             console.log("Browsing data received:", browsingData ? "YES" : "NO");
+            console.log("Page content received:", pageContent ? "YES" : "NO"); // 🆕 NEW
             console.log("Existing thread:", existingThreadId ? "YES" : "NO");
 
             let threadId;
@@ -114,25 +109,49 @@ exports.chatWithOpenAI = onCall(
 
             let messageContent = userMessage;
 
-            // Always upload CSV for new browsing conversations
+            // 🆕 NEW: Handle page content for page_analysis assistant
             if (
+                !existingThreadId &&
+                pageContent &&
+                assistantType === "page_analysis"
+            ) {
+                console.log("Processing page content for analysis...");
+                console.log("Page title:", pageContent.title);
+                console.log("Page URL:", pageContent.url);
+                console.log("Content length:", pageContent.content.length);
+                console.log("Word count:", pageContent.wordCount);
+
+                // Simple format like the summarise assistant - just provide the data
+                messageContent = `Page Title: ${pageContent.title}
+URL: ${pageContent.url}
+Word Count: ${pageContent.wordCount}
+
+Content:
+${pageContent.content}
+
+User Question: ${userMessage}`;
+
+                console.log(
+                    "Page content message length:",
+                    messageContent.length,
+                );
+            }
+            // EXISTING: Always upload CSV for new browsing conversations
+            else if (
                 !existingThreadId &&
                 browsingData &&
                 assistantType === "browsing"
             ) {
                 console.log("Uploading CSV file for browsing data...");
-
                 const csvContent = createCleanCSV(browsingData);
                 const timestamp = new Date().toISOString().split("T")[0];
                 const fileName = `browsing-data-${timestamp}.csv`;
-
                 console.log("Generated CSV length:", csvContent.length);
 
                 // Upload CSV file
                 const fs = require("fs");
                 const os = require("os");
                 const path = require("path");
-
                 const tempDir = os.tmpdir();
                 const tempFilePath = path.join(tempDir, fileName);
                 fs.writeFileSync(tempFilePath, csvContent);
@@ -144,8 +163,8 @@ exports.chatWithOpenAI = onCall(
 
                 fs.unlinkSync(tempFilePath);
                 fileId = file.id;
-
                 console.log("File uploaded:", fileId);
+
                 messageContent = `Your browsing data has been uploaded as a CSV file for analysis.\n\nUser question: ${userMessage}`;
             }
 
@@ -196,7 +215,6 @@ exports.chatWithOpenAI = onCall(
             while (!completed && attempts < maxAttempts) {
                 attempts++;
                 console.log(`Polling run ${run.id} (attempt ${attempts})`);
-
                 runResult = await openai.beta.threads.runs.retrieve(
                     threadId,
                     run.id,
@@ -217,7 +235,6 @@ exports.chatWithOpenAI = onCall(
                         runResult.last_error?.code === "server_error"
                     ) {
                         console.log("Retrying without code interpreter...");
-
                         const retryRun = await openai.beta.threads.runs.create(
                             threadId,
                             {
@@ -228,7 +245,6 @@ exports.chatWithOpenAI = onCall(
                         // Continue polling the retry
                         let retryCompleted = false;
                         let retryAttempts = 0;
-
                         while (!retryCompleted && retryAttempts < 20) {
                             retryAttempts++;
                             const retryResult =
@@ -236,7 +252,6 @@ exports.chatWithOpenAI = onCall(
                                     threadId,
                                     retryRun.id,
                                 );
-
                             if (retryResult.status === "completed") {
                                 runResult = retryResult;
                                 completed = true;
@@ -251,7 +266,6 @@ exports.chatWithOpenAI = onCall(
                                 );
                             }
                         }
-
                         if (!retryCompleted) {
                             throw new Error("Retry run timed out");
                         }

@@ -1,347 +1,536 @@
-import React, { useState, useEffect, useRef } from "react";
-import { X, BarChart3 } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { ChevronRight, Eye, Clock, GitPullRequest } from "lucide-react";
+import DataService from "../data/dataService";
 
-interface DomainAnalytics {
-    domain: string;
-    timeSpent: number;
-    percentage: number;
-    category: "work" | "social" | "other";
-    visits: number;
+interface AnalyticsData {
+    readingTime: number;
+    completionPercentage: number;
+    timeSpentOnPage: number;
+    activeTime: number;
+    uniquePages: number; // Changed from pullRequests
+    totalWordCount: number; // Changed from pushRequests
 }
 
 interface AnalyticsModalProps {
-    onClose: () => void;
     isVisible: boolean;
+    onClose: () => void;
 }
 
 const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
-    onClose,
     isVisible,
+    onClose,
 }) => {
-    const [domainData, setDomainData] = useState<DomainAnalytics | null>(null);
-    const [totalScreenTime, setTotalScreenTime] = useState(0);
-    const [totalLyncxUse, setTotalLyncxUse] = useState(0);
-    const [loading, setLoading] = useState(true);
-    const modalRef = useRef<HTMLDivElement>(null);
+    const [isExpanded, setIsExpanded] = useState(false);
+    const [analyticsData, setAnalyticsData] = useState<AnalyticsData>({
+        readingTime: 0,
+        completionPercentage: 0,
+        timeSpentOnPage: 0,
+        activeTime: 0,
+        uniquePages: 0,
+        totalWordCount: 0,
+    });
 
+    const [animatedValues, setAnimatedValues] = useState({
+        completionPercentage: 0,
+        readingTime: 0,
+        timeSpentOnPage: 0,
+        activeTime: 0,
+        uniquePages: 0,
+        totalWordCount: 0,
+    });
+
+    // Fetch real data from DataService
+    const fetchData = async () => {
+        try {
+            // Get current URL and domain
+            const currentUrl = window.location.href;
+            const currentDomain = window.location.hostname.replace(
+                /^www\./,
+                "",
+            );
+
+            const dataService = DataService.getInstance();
+            const session = await dataService.getCurrentSession();
+
+            console.log("📊 Analytics Debug:", {
+                currentUrl,
+                currentDomain,
+                totalTabSessions: session.tabSessions.length,
+                totalStats: session.stats,
+            });
+
+            // Filter visits for current domain and current page
+            const allVisits = session.tabSessions.flatMap((ts) => ts.urlVisits);
+            const domainVisits = allVisits.filter(
+                (visit) => visit.domain === currentDomain,
+            );
+
+            // Get current page visits (for reading analytics)
+            const currentPageVisits = allVisits.filter(
+                (visit) => visit.url === currentUrl,
+            );
+
+            console.log("📊 Analytics Breakdown:", {
+                totalVisits: allVisits.length,
+                domainVisits: domainVisits.length,
+                currentPageVisits: currentPageVisits.length,
+                currentPageSample: currentPageVisits[0],
+                allWordCountsForThisPage: currentPageVisits.map(
+                    (v) => v.wordCount,
+                ), // Debug this
+            });
+
+            // Calculate UNIQUE pages visited on this domain
+            const uniqueUrls = new Set(domainVisits.map((visit) => visit.url));
+            const uniquePages = uniqueUrls.size;
+
+            // Calculate CURRENT PAGE analytics (for reading time and completion)
+            const currentPageActiveTime = currentPageVisits.reduce(
+                (total, visit) => total + visit.activeTime,
+                0,
+            );
+
+            // ✅ FIXED: Use most recent or highest word count, not sum
+            const currentPageWordCount =
+                currentPageVisits.length > 0
+                    ? Math.max(
+                          ...currentPageVisits.map(
+                              (visit) => visit.wordCount || 0,
+                          ),
+                      )
+                    : 0;
+
+            console.log("📝 Word count debug:", {
+                numberOfVisitsToThisPage: currentPageVisits.length,
+                wordCountsPerVisit: currentPageVisits.map((v) => ({
+                    id: v.id,
+                    wordCount: v.wordCount,
+                    startTime: new Date(v.startTime).toISOString(),
+                })),
+                finalWordCount: currentPageWordCount,
+            });
+
+            // Calculate DOMAIN-wide time (for domain time metric)
+            const domainActiveTime = domainVisits.reduce(
+                (total, visit) => total + visit.activeTime,
+                0,
+            );
+
+            // Calculate DOMAIN-wide word count (for context)
+            const domainWordCount = domainVisits.reduce(
+                (total, visit) => total + (visit.wordCount || 0),
+                0,
+            );
+
+            // Calculate estimated reading time for CURRENT PAGE
+            const estimatedReadingTime =
+                currentPageWordCount > 0
+                    ? currentPageWordCount / 200 // 200 words per minute
+                    : 0;
+
+            // Calculate completion percentage for CURRENT PAGE
+            const currentPageTimeMinutes = currentPageActiveTime / (1000 * 60);
+            const completionPercentage =
+                estimatedReadingTime > 0
+                    ? Math.min(
+                          100,
+                          (currentPageTimeMinutes / estimatedReadingTime) * 100,
+                      )
+                    : currentPageTimeMinutes > 0
+                    ? Math.min(100, currentPageTimeMinutes * 20) // Fallback: 3 min = 100%
+                    : 0;
+
+            const realData: AnalyticsData = {
+                readingTime: estimatedReadingTime,
+                completionPercentage: Math.round(completionPercentage),
+                timeSpentOnPage: currentPageTimeMinutes, // Current page time
+                activeTime: domainActiveTime / (1000 * 60), // Domain time
+                uniquePages: uniquePages,
+                totalWordCount: currentPageWordCount, // Current page word count
+            };
+
+            console.log("📊 Final Analytics Data:", {
+                ...realData,
+                debug: {
+                    currentPageWordCount,
+                    domainWordCount,
+                    estimatedReadingTimeMinutes: estimatedReadingTime,
+                    currentPageTimeMinutes,
+                    domainTimeMinutes: domainActiveTime / (1000 * 60),
+                },
+            });
+
+            setAnalyticsData(realData);
+        } catch (error) {
+            console.error("Error fetching analytics data:", error);
+            // Set fallback data to show component is working
+            setAnalyticsData({
+                readingTime: 0,
+                completionPercentage: 0,
+                timeSpentOnPage: 0,
+                activeTime: 0,
+                uniquePages: 0,
+                totalWordCount: 0,
+            });
+        }
+    };
+
+    // Initial fetch when modal becomes visible
     useEffect(() => {
         if (isVisible) {
-            const domain = window.location.hostname.replace(/^www\./, "");
-            loadAnalyticsData(domain);
+            fetchData();
         }
     }, [isVisible]);
 
-    const loadAnalyticsData = async (domain: string) => {
-        setLoading(true);
-        try {
-            const response = await chrome.runtime.sendMessage({
-                type: "GET_DOMAIN_ANALYTICS",
-                domain: domain,
-            });
-
-            if (response && response.success) {
-                const { domainStats, totalScreenTime, totalLyncxUse } =
-                    response;
-
-                setDomainData({
-                    domain: domain,
-                    timeSpent: Math.round(domainStats.timeSpent / (1000 * 60)),
-                    percentage: domainStats.percentage,
-                    category: domainStats.category,
-                    visits: domainStats.visits,
-                });
-
-                setTotalScreenTime(Math.round(totalScreenTime / (1000 * 60)));
-                setTotalLyncxUse(totalLyncxUse);
-            } else {
-                // Fallback data
-                setDomainData({
-                    domain: domain,
-                    timeSpent: Math.floor(Math.random() * 120) + 15,
-                    percentage: Math.floor(Math.random() * 40) + 10,
-                    category: getCategoryFromDomain(domain),
-                    visits: Math.floor(Math.random() * 20) + 5,
-                });
-                setTotalScreenTime(Math.floor(Math.random() * 480) + 120);
-                setTotalLyncxUse(Math.floor(Math.random() * 60) + 5);
-            }
-        } catch (error) {
-            console.error("Error loading analytics:", error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const getCategoryFromDomain = (
-        domain: string,
-    ): "work" | "social" | "other" => {
-        if (
-            domain.includes("github") ||
-            domain.includes("docs.google") ||
-            domain.includes("stackoverflow")
-        )
-            return "work";
-        if (
-            domain.includes("youtube") ||
-            domain.includes("twitter") ||
-            domain.includes("facebook")
-        )
-            return "social";
-        return "other";
-    };
-
-    const formatTime = (minutes: number): string => {
-        if (minutes >= 60) {
-            const hours = Math.floor(minutes / 60);
-            const remainingMinutes = minutes % 60;
-            return remainingMinutes > 0
-                ? `${hours}h ${remainingMinutes}m`
-                : `${hours}h`;
-        }
-        return `${minutes}m`;
-    };
-
-    const getCategoryColor = (
-        category: "work" | "social" | "other",
-    ): string => {
-        switch (category) {
-            case "work":
-                return "#10b981";
-            case "social":
-                return "#ef4444";
-            case "other":
-                return "#6366f1";
-        }
-    };
-
-    // Handle escape key
+    // Set up real-time updates with interval
     useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (!isVisible) return;
-            if (e.key === "Escape") {
-                onClose();
+        let interval: ReturnType<typeof setInterval> | null = null;
+
+        if (isVisible) {
+            // Update every 5 seconds when modal is visible
+            interval = setInterval(() => {
+                fetchData();
+            }, 5000);
+        }
+
+        return () => {
+            if (interval) {
+                clearInterval(interval);
+            }
+        };
+    }, [isVisible]);
+
+    // Listen for data updates from background script
+    useEffect(() => {
+        const handleMessage = (event: MessageEvent) => {
+            if (event.data?.type === "ANALYTICS_DATA_UPDATED") {
+                fetchData();
             }
         };
 
-        document.addEventListener("keydown", handleKeyDown);
-        return () => document.removeEventListener("keydown", handleKeyDown);
-    }, [isVisible, onClose]);
+        // Listen for messages from background script
+        const handleChromeMessage = (message: any) => {
+            if (message.type === "ANALYTICS_DATA_UPDATED") {
+                fetchData();
+            }
+        };
+
+        window.addEventListener("message", handleMessage);
+
+        // Also listen for Chrome runtime messages
+        if (typeof chrome !== "undefined" && chrome.runtime) {
+            chrome.runtime.onMessage.addListener(handleChromeMessage);
+        }
+
+        return () => {
+            window.removeEventListener("message", handleMessage);
+            if (typeof chrome !== "undefined" && chrome.runtime) {
+                chrome.runtime.onMessage.removeListener(handleChromeMessage);
+            }
+        };
+    }, []);
+
+    // Animate values when data changes
+    useEffect(() => {
+        if (isVisible && analyticsData) {
+            const timer = setTimeout(() => {
+                setAnimatedValues({
+                    completionPercentage: analyticsData.completionPercentage,
+                    readingTime: analyticsData.readingTime,
+                    timeSpentOnPage: analyticsData.timeSpentOnPage,
+                    activeTime: analyticsData.activeTime,
+                    uniquePages: analyticsData.uniquePages,
+                    totalWordCount: analyticsData.totalWordCount,
+                });
+            }, 100);
+            return () => clearTimeout(timer);
+        }
+    }, [isVisible, analyticsData]);
+
+    const formatTime = (minutes: number): string => {
+        if (minutes < 1) return `${Math.round(minutes * 60)}s`;
+        if (minutes < 60) return `${minutes.toFixed(1)}m`;
+        const hours = Math.floor(minutes / 60);
+        const mins = Math.round(minutes % 60);
+        return `${hours}h ${mins}m`;
+    };
+
+    const formatWordCount = (count: number): string => {
+        if (count < 1000) return `${count}`;
+        if (count < 1000000) return `${(count / 1000).toFixed(1)}k`;
+        return `${(count / 1000000).toFixed(1)}m`;
+    };
 
     if (!isVisible) return null;
 
     return (
-        <div
-            className="analytics-overlay"
-            onClick={(e) => {
-                if (e.target === e.currentTarget) onClose();
-            }}
-        >
-            <div ref={modalRef} className="analytics-modal" tabIndex={-1}>
-                {/* Simple header */}
-                <div className="modal-header">
-                    <div className="header-left">
-                        <BarChart3 size={14} />
-                        <span>Analytics</span>
+        <div className="analytics-widget">
+            {/* Collapsed State */}
+            {!isExpanded && (
+                <div
+                    className="widget-collapsed"
+                    onClick={() => setIsExpanded(true)}
+                >
+                    <div className="progress-indicator">
+                        <div
+                            className="progress-fill"
+                            style={{
+                                width: `${animatedValues.completionPercentage}%`,
+                                transition: "width 1s ease",
+                            }}
+                        />
                     </div>
-                    <button onClick={onClose} className="close-btn">
-                        <X size={14} />
-                    </button>
+                    <span className="collapsed-value">
+                        {Math.round(animatedValues.completionPercentage)}%
+                    </span>
+                    <ChevronRight size={12} className="expand-icon" />
                 </div>
+            )}
 
-                {/* Content */}
-                <div className="modal-content">
-                    {loading ? (
-                        <div className="loading">
-                            <div className="spinner"></div>
+            {/* Expanded State */}
+            {isExpanded && (
+                <div className="widget-expanded">
+                    <div
+                        className="widget-header"
+                        onClick={() => setIsExpanded(false)}
+                    >
+                        <span className="widget-title">Analytics</span>
+                        <div className="live-indicator">●</div>
+                        <ChevronRight size={12} className="collapse-icon" />
+                    </div>
+
+                    <div className="metrics-list">
+                        <div className="metric-item">
+                            <Eye size={10} />
+                            <div className="metric-content">
+                                <span className="metric-label">
+                                    Page Reading
+                                </span>
+                                <span className="metric-value">
+                                    {Math.round(
+                                        animatedValues.completionPercentage,
+                                    )}
+                                    % · {formatTime(animatedValues.readingTime)}{" "}
+                                    est
+                                </span>
+                            </div>
                         </div>
-                    ) : (
-                        <>
-                            {/* Domain info */}
-                            <div className="domain-section">
-                                <div className="domain-name">
-                                    {domainData?.domain}
-                                </div>
-                                <div className="time-spent">
-                                    {formatTime(domainData?.timeSpent || 0)}
-                                </div>
-                                <div className="usage-info">
-                                    {domainData?.percentage}% of daily usage •{" "}
-                                    {domainData?.visits} visits
-                                </div>
-                            </div>
 
-                            {/* Footer stats */}
-                            <div className="footer-stats">
-                                <span className="screen-time-label">
-                                    Total screen time:{" "}
-                                </span>
-                                <span className="screen-time-value">
-                                    {formatTime(totalScreenTime)}
+                        <div className="metric-item">
+                            <Clock size={10} />
+                            <div className="metric-content">
+                                <span className="metric-label">Page Time</span>
+                                <span className="metric-value">
+                                    {formatTime(animatedValues.timeSpentOnPage)}{" "}
+                                    · {formatTime(animatedValues.activeTime)}{" "}
+                                    domain
                                 </span>
                             </div>
-                        </>
-                    )}
+                        </div>
+
+                        <div className="metric-item">
+                            <GitPullRequest size={10} />
+                            <div className="metric-content">
+                                <span className="metric-label">
+                                    Domain Pages
+                                </span>
+                                <span className="metric-value">
+                                    {animatedValues.uniquePages} unique
+                                    {animatedValues.totalWordCount > 0 &&
+                                        ` · ${formatWordCount(
+                                            animatedValues.totalWordCount,
+                                        )} words here`}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </div>
+            )}
 
-            <style>{`
-                .analytics-overlay {
+            <style jsx>{`
+                .analytics-widget {
                     position: fixed;
-                    top: 0;
-                    left: 0;
-                    right: 0;
-                    bottom: 0;
-                    background: rgba(0, 0, 0, 0.25);
-                    display: flex;
-                    align-items: flex-start;
-                    justify-content: flex-start;
-                    padding: 20px;
-                    z-index: 999999;
+                    bottom: 20px;
+                    right: 20px;
                     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
-                        Roboto, sans-serif;
-                    animation: fadeIn 0.15s ease-out;
+                        system-ui, sans-serif;
+                    z-index: 1000;
+                    font-size: 12px;
                 }
 
-                .analytics-modal {
-                    width: 260px;
-                    background: rgba(30, 30, 30, 0.96);
-                    backdrop-filter: blur(20px);
-                    border-radius: 10px;
-                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-                    border: 1px solid rgba(255, 255, 255, 0.1);
-                    animation: slideIn 0.2s ease-out;
-                    outline: none;
-                    overflow: hidden;
-                }
-
-                .modal-header {
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                    padding: 14px 16px;
-                    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-                    color: white;
-                    font-size: 14px;
-                    font-weight: 600;
-                }
-
-                .header-left {
+                .widget-collapsed {
                     display: flex;
                     align-items: center;
                     gap: 8px;
-                    color: rgba(255, 255, 255, 0.9);
-                }
-
-                .close-btn {
-                    width: 24px;
-                    height: 24px;
-                    border: none;
-                    background: rgba(255, 255, 255, 0.08);
-                    border-radius: 5px;
-                    color: rgba(255, 255, 255, 0.6);
+                    background: rgba(245, 245, 220, 0.9);
+                    border: 1px solid rgba(139, 69, 19, 0.25);
+                    border-radius: 20px;
+                    padding: 6px 12px 6px 8px;
                     cursor: pointer;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    transition: all 0.15s ease;
+                    transition: all 0.2s ease;
+                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+                    min-width: 80px;
                 }
 
-                .close-btn:hover {
-                    background: rgba(255, 255, 255, 0.15);
-                    color: white;
+                .widget-collapsed:hover {
+                    background: rgba(245, 245, 220, 0.95);
+                    border-color: rgba(139, 69, 19, 0.35);
+                    transform: translateY(-1px);
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
                 }
 
-                .modal-content {
-                    padding: 16px;
-                }
-
-                .loading {
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    height: 60px;
-                }
-
-                .spinner {
-                    width: 16px;
-                    height: 16px;
-                    border: 2px solid rgba(255, 255, 255, 0.2);
-                    border-top: 2px solid #4285f4;
+                .progress-indicator {
+                    width: 20px;
+                    height: 20px;
                     border-radius: 50%;
-                    animation: spin 1s linear infinite;
+                    background: rgba(139, 69, 19, 0.1);
+                    position: relative;
+                    overflow: hidden;
+                    flex-shrink: 0;
                 }
 
-                .domain-section {
-                    text-align: center;
-                    margin-bottom: 16px;
-                    padding-bottom: 16px;
-                    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+                .progress-fill {
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    height: 100%;
+                    background: rgba(139, 69, 19, 0.7);
+                    transform-origin: left center;
+                    border-radius: 50%;
                 }
 
-                .domain-name {
-                    color: white;
-                    font-size: 14px;
+                .collapsed-value {
                     font-weight: 600;
-                    margin-bottom: 8px;
-                    opacity: 0.9;
-                }
-
-                .time-spent {
-                    color: white;
-                    font-size: 24px;
-                    font-weight: 700;
-                    margin-bottom: 6px;
-                }
-
-                .usage-info {
-                    color: rgba(255, 255, 255, 0.6);
+                    color: rgba(101, 67, 33, 0.9);
+                    font-variant-numeric: tabular-nums;
                     font-size: 11px;
                 }
 
-                .footer-stats {
+                .expand-icon {
+                    color: rgba(139, 69, 19, 0.6);
+                    transition: transform 0.2s ease;
+                }
+
+                .widget-collapsed:hover .expand-icon {
+                    transform: translateX(1px);
+                }
+
+                .widget-expanded {
+                    background: rgba(245, 245, 220, 0.95);
+                    border: 1px solid rgba(139, 69, 19, 0.25);
+                    border-radius: 10px;
+                    overflow: hidden;
+                    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+                    min-width: 160px;
+                    animation: expandIn 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+                }
+
+                .widget-header {
                     display: flex;
                     align-items: center;
-                    justify-content: center;
-                    padding: 8px 0;
-                    font-size: 11px;
+                    justify-content: space-between;
+                    padding: 8px 12px;
+                    background: rgba(139, 69, 19, 0.08);
+                    border-bottom: 1px solid rgba(139, 69, 19, 0.15);
+                    cursor: pointer;
+                    transition: background 0.2s ease;
+                    gap: 8px;
                 }
 
-                .screen-time-label {
-                    color: rgba(255, 255, 255, 0.6);
+                .widget-header:hover {
+                    background: rgba(139, 69, 19, 0.12);
                 }
 
-                .screen-time-value {
-                    color: white;
+                .widget-title {
                     font-weight: 600;
-                    margin-left: 4px;
+                    color: rgba(101, 67, 33, 0.9);
+                    font-size: 11px;
+                    flex: 1;
                 }
 
-                @keyframes fadeIn {
+                .live-indicator {
+                    color: #10b981;
+                    font-size: 8px;
+                    animation: pulse 2s infinite;
+                }
+
+                @keyframes pulse {
+                    0%,
+                    100% {
+                        opacity: 1;
+                    }
+                    50% {
+                        opacity: 0.5;
+                    }
+                }
+
+                .collapse-icon {
+                    color: rgba(139, 69, 19, 0.6);
+                    transform: rotate(90deg);
+                    transition: transform 0.2s ease;
+                }
+
+                .widget-header:hover .collapse-icon {
+                    transform: rotate(90deg) translateX(1px);
+                }
+
+                .metrics-list {
+                    padding: 8px;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 6px;
+                }
+
+                .metric-item {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    padding: 5px 6px;
+                    border-radius: 5px;
+                    transition: background 0.2s ease;
+                }
+
+                .metric-item:hover {
+                    background: rgba(139, 69, 19, 0.08);
+                }
+
+                .metric-item svg {
+                    color: rgba(139, 69, 19, 0.7);
+                    flex-shrink: 0;
+                }
+
+                .metric-content {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 1px;
+                    flex: 1;
+                }
+
+                .metric-label {
+                    font-size: 9px;
+                    font-weight: 600;
+                    color: rgba(139, 69, 19, 0.7);
+                    text-transform: uppercase;
+                    letter-spacing: 0.3px;
+                    line-height: 1;
+                }
+
+                .metric-value {
+                    font-weight: 500;
+                    color: rgba(101, 67, 33, 0.95);
+                    font-variant-numeric: tabular-nums;
+                    font-size: 11px;
+                    line-height: 1.2;
+                }
+
+                @keyframes expandIn {
                     from {
                         opacity: 0;
+                        transform: scale(0.9) translateY(8px);
                     }
                     to {
                         opacity: 1;
-                    }
-                }
-
-                @keyframes slideIn {
-                    from {
-                        transform: translateY(-8px) scale(0.98);
-                        opacity: 0;
-                    }
-                    to {
-                        transform: translateY(0) scale(1);
-                        opacity: 1;
-                    }
-                }
-
-                @keyframes spin {
-                    from {
-                        transform: rotate(0deg);
-                    }
-                    to {
-                        transform: rotate(360deg);
+                        transform: scale(1) translateY(0);
                     }
                 }
             `}</style>

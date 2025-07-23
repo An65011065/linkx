@@ -18,6 +18,8 @@ export interface NetworkNode {
     displayName?: string;
     tooltipTitle?: string;
     timestamp?: number; // When the node was created
+    visitId?: string; // ID of the specific visit instance
+    visitTimestamp?: number; // Timestamp of the specific visit
 }
 
 export interface NetworkLink {

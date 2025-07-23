@@ -22,13 +22,12 @@ class FlowModalInjector {
 
     private showFlow() {
         if (!this.isInjected) {
-            this.injectFlow(true); // show immediately
-        } else {
-            this.updateFlowVisibility(true);
+            this.injectFlow();
         }
+        this.updateFlowVisibility(true);
     }
 
-    private injectFlow(showImmediately = false) {
+    private injectFlow() {
         if (this.isInjected) {
             console.log("⚠️ Flow modal already injected, skipping");
             return;
@@ -62,7 +61,7 @@ class FlowModalInjector {
 
             // Create React root and render
             this.root = ReactDOM.createRoot(reactContainer);
-            this.renderFlow(showImmediately);
+            this.renderFlow(false);
 
             this.isInjected = true;
             console.log("✅ Flow modal injected successfully");

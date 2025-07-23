@@ -344,7 +344,9 @@ const MainContent: React.FC<MainContentProps> = () => {
         setTimeout(async () => {
             try {
                 const note = await handleLoadNote(currentDomain);
-                setHasNote(Boolean(note?.content?.trim().length > 0));
+                setHasNote(
+                    Boolean(note?.content && note.content.trim().length > 0),
+                );
             } catch (err) {
                 console.error("Error refreshing note status:", err);
             }
@@ -790,6 +792,30 @@ const MainContent: React.FC<MainContentProps> = () => {
                 }}
             >
                 Open dashboard
+            </button>
+
+            {/* Open Landing Page Button */}
+            <button
+                onClick={() => {
+                    chrome.tabs.create({
+                        url: chrome.runtime.getURL("src/landing/landing.html"),
+                    });
+                }}
+                style={{
+                    width: "100%",
+                    padding: "12px",
+                    border: "1px solid rgba(255, 183, 77, 0.2)",
+                    borderRadius: "12px",
+                    color: "#ff6b35",
+                    fontSize: "14px",
+                    fontWeight: "600",
+                    cursor: "pointer",
+                    transition: "all 0.2s ease",
+                    background: "transparent",
+                    marginTop: "8px",
+                }}
+            >
+                Open landing page
             </button>
 
             {/* LyncX Branding */}

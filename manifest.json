@@ -18,7 +18,9 @@
         "contextMenus",
         "alarms",
         "notifications",
-        "identity.email"
+        "identity.email",
+        "clipboardRead",
+        "clipboardWrite"
     ],
     "host_permissions": [
         "<all_urls>",
@@ -53,10 +55,12 @@
     "web_accessible_resources": [
         {
             "resources": [
+                "src/settings/settings.html",
                 "waterfall.html",
                 "src/graph/graph.html",
                 "src/dashboard/dashboard.html",
                 "src/main/main.html",
+                "src/landing/landing.html",
                 "src/assets/fonts/*.ttf",
                 "src/assets/leaves.png"
             ],
