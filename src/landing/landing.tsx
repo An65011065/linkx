@@ -1,132 +1,156 @@
-import React, { useState, useEffect } from "react";
-import {
-    Search,
-    Calendar,
-    Moon,
-    Sun,
-    ArrowRight,
-    CheckCircle,
-    Settings,
-    Target,
-    ChevronDown,
-    Check,
-    MoreHorizontal,
-    Github,
-    Figma,
-    Zap,
-    Bot,
-    FileText,
-    Youtube,
-    Dribbble,
-    Film,
-    Music,
-    Smartphone,
-    BookOpen,
-    Twitter,
-} from "lucide-react";
-import DataLandingPage from "./dataLanding";
-import NetworkLandingPage from "./networkLanding";
-import "./landing.css";
+import React, { useState, useEffect, useRef } from "react";
+import { Calendar, ChevronDown, ArrowRight, Moon, Sun } from "lucide-react";
 
-interface QuickAction {
+interface CalendarEvent {
     id: string;
     title: string;
-    url: string;
-    icon: string;
-    category: "work" | "creative" | "learn" | "social";
+    time: string;
+    color: string;
 }
 
-interface TaskItem {
-    id: string;
-    title: string;
-    completed: boolean;
-}
+// Text animation component for insights
+const AnimatedText: React.FC<{
+    text: string;
+    animation: "karaoke" | "filling";
+    isDarkMode: boolean;
+}> = ({ text, animation, isDarkMode }) => {
+    const ref = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const element = ref.current;
+        if (!element) return;
+
+        // Set up the characters
+        element.textContent = "";
+        [...text].forEach((char) => {
+            const span = document.createElement("span");
+            span.className = "char";
+            span.textContent = char === " " ? "\u00A0" : char; // Non-breaking space for proper spacing
+            span.setAttribute("data-char", char === " " ? "\u00A0" : char);
+            element.appendChild(span);
+        });
+
+        // Trigger animation
+        const chars = element.querySelectorAll(".char");
+        chars.forEach((char, index) => {
+            (char as HTMLElement).style.setProperty("--reveal", "0");
+            setTimeout(() => {
+                (char as HTMLElement).style.setProperty("--reveal", "1");
+            }, index * 30);
+        });
+
+        return () => {
+            // Clean up on unmount
+            chars.forEach((char) => {
+                (char as HTMLElement).style.setProperty("--reveal", "0");
+            });
+        };
+    }, [text]);
+
+    return (
+        <div
+            ref={ref}
+            className={`${animation} ${
+                isDarkMode ? "dark" : "light"
+            } text-xl font-light`}
+            style={{ position: "relative" }}
+        >
+            {text}
+        </div>
+    );
+};
 
 const LandingPage: React.FC = () => {
     const [isDarkMode, setIsDarkMode] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
-    const [isSearchFocused, setIsSearchFocused] = useState(false);
     const [currentTime, setCurrentTime] = useState(new Date());
-    const [focusMode, setFocusMode] = useState(false);
     const [currentPage, setCurrentPage] = useState<"main" | "data" | "network">(
         "main",
     );
-    const [expandedSection, setExpandedSection] = useState<string | null>(null);
-    const [tasks, setTasks] = useState<TaskItem[]>([
-        { id: "1", title: "Review morning priorities", completed: false },
-        { id: "2", title: "Design system updates", completed: true },
-        { id: "3", title: "Team sync at 2pm", completed: false },
-    ]);
+    const [searchType, setSearchType] = useState<"Search" | "Insights">(
+        "Search",
+    );
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const [showAllEvents, setShowAllEvents] = useState(false);
+    const [isSearchFocused, setIsSearchFocused] = useState(false);
 
-    const quickActions: QuickAction[] = [
+    // Refs for positioning
+    const searchRef = useRef<HTMLDivElement>(null);
+    const dropdownRef = useRef<HTMLDivElement>(null);
+    const calendarRef = useRef<HTMLDivElement>(null);
+
+    // Mock calendar events - replace with real data
+    const upcomingEvents: CalendarEvent[] = [
         {
             id: "1",
-            title: "GitHub",
-            url: "https://github.com",
-            icon: "Github",
-            category: "work",
+            title: "Team Standup",
+            time: "10:00 AM",
+            color: "bg-blue-500",
         },
         {
             id: "2",
-            title: "Linear",
-            url: "https://linear.app",
-            icon: "Target",
-            category: "work",
+            title: "Design Review",
+            time: "2:30 PM",
+            color: "bg-green-500",
         },
         {
             id: "3",
-            title: "Figma",
-            url: "https://figma.com",
-            icon: "Figma",
-            category: "creative",
-        },
-        {
-            id: "4",
-            title: "Claude",
-            url: "https://claude.ai",
-            icon: "Bot",
-            category: "work",
-        },
-        {
-            id: "5",
-            title: "Vercel",
-            url: "https://vercel.com",
-            icon: "Zap",
-            category: "work",
-        },
-        {
-            id: "6",
-            title: "Notion",
-            url: "https://notion.so",
-            icon: "FileText",
-            category: "work",
+            title: "Client Call",
+            time: "4:00 PM",
+            color: "bg-purple-500",
         },
     ];
+    const nextEvent = upcomingEvents[0];
 
-    const getGreeting = () => {
-        const hour = currentTime.getHours();
-        const name = "Alex"; // This would come from user settings
-
-        if (hour < 12) return `Good morning, ${name}`;
-        if (hour < 17) return `Good afternoon, ${name}`;
-        return `Good evening, ${name}`;
-    };
-
-    const getMotivation = () => {
-        const motivations = [
-            "Ready to create something amazing?",
-            "What will you build today?",
-            "Time to make things happen.",
-            "Focus on what matters most.",
-            "Every great day starts with intention.",
-        ];
-        return motivations[Math.floor(Math.random() * motivations.length)];
-    };
+    // Rotating insight placeholders
+    const insightPlaceholders = [
+        "Analyze market trends...",
+        "Find patterns in data...",
+        "Generate insights...",
+        "Explore connections...",
+        "Discover opportunities...",
+    ];
+    const [currentPlaceholderIndex, setCurrentPlaceholderIndex] = useState(0);
 
     // Update time every minute
     useEffect(() => {
         const timer = setInterval(() => setCurrentTime(new Date()), 60000);
         return () => clearInterval(timer);
+    }, []);
+
+    // Rotate placeholder text - faster switching
+    useEffect(() => {
+        if (searchType === "Insights" && !isSearchFocused) {
+            const interval = setInterval(() => {
+                setCurrentPlaceholderIndex(
+                    (prev) => (prev + 1) % insightPlaceholders.length,
+                );
+            }, 2500); // Faster switching - 2.5 seconds total
+            return () => clearInterval(interval);
+        }
+    }, [searchType, insightPlaceholders.length, isSearchFocused]);
+
+    // Close dropdowns when clicking outside
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (
+                dropdownRef.current &&
+                !dropdownRef.current.contains(event.target as Node)
+            ) {
+                setIsDropdownOpen(false);
+            }
+            if (
+                calendarRef.current &&
+                !calendarRef.current.contains(event.target as Node)
+            ) {
+                setShowAllEvents(false);
+            }
+        }
+
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
     }, []);
 
     const handleSearch = () => {
@@ -144,18 +168,6 @@ const LandingPage: React.FC = () => {
         }
     };
 
-    const toggleTask = (id: string) => {
-        setTasks(
-            tasks.map((task) =>
-                task.id === id ? { ...task, completed: !task.completed } : task,
-            ),
-        );
-    };
-
-    const toggleSection = (section: string) => {
-        setExpandedSection(expandedSection === section ? null : section);
-    };
-
     const formatTime = (date: Date) => {
         return date.toLocaleTimeString([], {
             hour: "2-digit",
@@ -163,713 +175,437 @@ const LandingPage: React.FC = () => {
         });
     };
 
-    // If we're on the data page, render the DataLandingPage component
-    if (currentPage === "data") {
-        return (
-            <DataLandingPage
-                isDarkMode={isDarkMode}
-                currentPage={currentPage}
-                onNavigate={setCurrentPage}
-            />
-        );
-    }
+    const getGreeting = () => {
+        const hour = currentTime.getHours();
+        if (hour < 12) return "Good morning";
+        if (hour < 17) return "Good afternoon";
+        return "Good evening";
+    };
 
-    if (currentPage === "network") {
-        return (
-            <NetworkLandingPage
-                isDarkMode={isDarkMode}
-                onBack={(page) => setCurrentPage(page)} // NEW
-            />
-        );
-    }
+    // Handle input focus - clear placeholder
+    const handleSearchFocus = () => {
+        setIsSearchFocused(true);
+    };
+
+    // Handle input blur - restore placeholder if empty
+    const handleSearchBlur = () => {
+        setIsSearchFocused(false);
+    };
 
     return (
+        // Fixed: Added global reset styles and proper full-screen coverage
         <div
-            className={`min-h-screen transition-all duration-500 ${
-                focusMode
-                    ? isDarkMode
-                        ? "bg-slate-950"
-                        : "bg-stone-50"
-                    : isDarkMode
-                    ? "bg-slate-950"
-                    : "bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100"
+            className={`min-h-screen h-screen w-full transition-all duration-300 ${
+                isDarkMode ? "bg-slate-950" : "bg-gray-50"
             }`}
+            style={{
+                margin: 0,
+                padding: 0,
+                position: "relative",
+                overflow: "hidden",
+            }}
         >
-            {/* Header */}
-            <div className="flex justify-between items-center p-6">
-                {/* Page Selector */}
+            {/* Simple Floating Header - Just Navigation + Dark Mode */}
+            <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50">
                 <div
-                    className={`flex items-center gap-1 p-1 rounded-xl backdrop-blur-sm border ${
+                    className={`flex items-center gap-2 px-3 py-2 rounded-xl backdrop-blur-md border ${
                         isDarkMode
-                            ? "bg-slate-800/40 border-slate-700/30"
-                            : "bg-white/50 border-amber-200/30"
+                            ? "bg-slate-900/80 border-slate-700/50"
+                            : "bg-white/80 border-gray-200/50"
                     }`}
                 >
-                    <button
-                        onClick={() => setCurrentPage("main")}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
-                            isDarkMode
-                                ? "bg-slate-700/60 text-slate-200"
-                                : "bg-amber-100/60 text-amber-800"
+                    {/* Navigation Pills */}
+                    <div
+                        className={`flex gap-1 p-1 rounded-lg ${
+                            isDarkMode ? "bg-slate-800/50" : "bg-gray-100/50"
                         }`}
                     >
-                        Home
-                    </button>
-                    <button
-                        onClick={() => setCurrentPage("data")}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
-                            isDarkMode
-                                ? "text-slate-400 hover:text-slate-300"
-                                : "text-amber-600 hover:text-amber-700"
-                        }`}
-                    >
-                        Data
-                    </button>
-                    <button
-                        onClick={() => setCurrentPage("network")}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
-                            isDarkMode
-                                ? "text-slate-400 hover:text-slate-300"
-                                : "text-amber-600 hover:text-amber-700"
-                        }`}
-                    >
-                        Network
-                    </button>
-                </div>
-
-                <div className="flex items-center gap-2">
-                    <button
-                        onClick={() => setFocusMode(!focusMode)}
-                        className={`p-2.5 rounded-xl transition-all duration-200 hover:scale-105 ${
-                            focusMode
-                                ? isDarkMode
-                                    ? "bg-blue-500/20 text-blue-400"
-                                    : "bg-blue-500/20 text-blue-600"
-                                : isDarkMode
-                                ? "bg-slate-800/50 text-slate-400 hover:bg-slate-800/70"
-                                : "bg-white/50 text-amber-600 hover:bg-white/70"
-                        } backdrop-blur-sm border ${
-                            isDarkMode
-                                ? "border-slate-700/30"
-                                : "border-amber-200/30"
-                        }`}
-                    >
-                        <Target size={16} />
-                    </button>
-                    <button
-                        className={`p-2.5 rounded-xl transition-all duration-200 hover:scale-105 backdrop-blur-sm border ${
-                            isDarkMode
-                                ? "bg-slate-800/50 text-slate-400 hover:bg-slate-800/70 border-slate-700/30"
-                                : "bg-white/50 text-amber-600 hover:bg-white/70 border-amber-200/30"
-                        }`}
-                    >
-                        <Settings size={16} />
-                    </button>
+                        {[
+                            { key: "main", label: "Home" },
+                            { key: "data", label: "Data" },
+                            { key: "network", label: "Network" },
+                        ].map(({ key, label }) => (
+                            <button
+                                key={key}
+                                onClick={() => setCurrentPage(key as any)}
+                                className={`px-3 py-1 rounded text-xs font-medium transition-all ${
+                                    currentPage === key
+                                        ? isDarkMode
+                                            ? "bg-slate-700 text-slate-200"
+                                            : "bg-white text-gray-800 shadow-sm"
+                                        : isDarkMode
+                                        ? "text-slate-400 hover:text-slate-300"
+                                        : "text-gray-600 hover:text-gray-800"
+                                }`}
+                            >
+                                {label}
+                            </button>
+                        ))}
+                    </div>
+                    {/* Dark Mode Toggle */}
                     <button
                         onClick={() => setIsDarkMode(!isDarkMode)}
-                        className={`p-2.5 rounded-xl transition-all duration-200 hover:scale-105 backdrop-blur-sm border ${
+                        className={`p-2 rounded-lg transition-all ${
                             isDarkMode
-                                ? "bg-slate-800/50 text-slate-400 hover:bg-slate-800/70 border-slate-700/30"
-                                : "bg-white/50 text-amber-600 hover:bg-white/70 border-amber-200/30"
+                                ? "text-slate-400 hover:bg-slate-800/50"
+                                : "text-gray-600 hover:bg-gray-100"
                         }`}
                     >
                         {isDarkMode ? <Sun size={16} /> : <Moon size={16} />}
                     </button>
                 </div>
             </div>
-
-            {/* Main Content */}
-            <div className="flex flex-col items-center justify-center min-h-[60vh] px-6">
-                {!focusMode ? (
-                    <>
-                        {/* Personal Greeting & Time */}
-                        <div className="text-center mb-12 animate-in fade-in duration-800">
-                            <h1
-                                className={`text-3xl font-light mb-3 animate-in slide-in-from-top-4 duration-600 delay-200 ${
-                                    isDarkMode
-                                        ? "text-slate-200"
-                                        : "text-amber-900"
-                                }`}
-                            >
-                                {getGreeting()}
-                            </h1>
-                            <p
-                                className={`text-base mb-8 animate-in fade-in duration-500 delay-400 ${
-                                    isDarkMode
-                                        ? "text-slate-400"
-                                        : "text-amber-600"
-                                }`}
-                            >
-                                {getMotivation()}
-                            </p>
-                            <div
-                                className={`text-6xl font-extralight mb-2 tracking-tight animate-in zoom-in duration-700 delay-500 ${
-                                    isDarkMode
-                                        ? "text-slate-300"
-                                        : "text-amber-800"
-                                }`}
-                                style={{ fontVariantNumeric: "tabular-nums" }}
-                            >
-                                {formatTime(currentTime)}
-                            </div>
-                        </div>
-
-                        {/* Search */}
-                        <div className="w-full max-w-2xl mb-12 animate-in slide-in-from-bottom-4 duration-600 delay-700">
-                            <div
-                                className={`flex items-center gap-4 px-6 py-4 rounded-2xl backdrop-blur-xl shadow-lg transition-all duration-300 border ${
-                                    isDarkMode
-                                        ? "bg-slate-800/50 border-slate-700/30"
-                                        : "bg-white/70 border-amber-200/40"
-                                } ${
-                                    isSearchFocused
-                                        ? "scale-[1.02] shadow-2xl"
-                                        : ""
-                                }`}
-                            >
-                                <Search
-                                    size={18}
-                                    className={`transition-colors duration-200 ${
-                                        isSearchFocused
-                                            ? isDarkMode
-                                                ? "text-slate-200"
-                                                : "text-amber-800"
-                                            : isDarkMode
-                                            ? "text-slate-400"
-                                            : "text-amber-500"
-                                    }`}
-                                />
-                                <input
-                                    type="text"
-                                    placeholder="Search or enter address"
-                                    value={searchQuery}
-                                    onChange={(e) =>
-                                        setSearchQuery(e.target.value)
-                                    }
-                                    onFocus={() => setIsSearchFocused(true)}
-                                    onBlur={() => setIsSearchFocused(false)}
-                                    onKeyPress={(e) =>
-                                        e.key === "Enter" && handleSearch()
-                                    }
-                                    className={`flex-1 bg-transparent outline-none text-lg ${
-                                        isDarkMode
-                                            ? "text-slate-200"
-                                            : "text-amber-900"
-                                    }`}
-                                />
-                                {searchQuery && (
-                                    <button
-                                        onClick={handleSearch}
-                                        className={`transition-all duration-200 hover:scale-110 ${
-                                            isDarkMode
-                                                ? "text-slate-300"
-                                                : "text-amber-600"
-                                        }`}
-                                    >
-                                        <ArrowRight size={18} />
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Quick Actions */}
-                        <div className="w-full max-w-2xl animate-in fade-in duration-600 delay-900">
-                            <div className="grid grid-cols-3 md:grid-cols-6 gap-3 mb-8">
-                                {quickActions.map((action, index) => (
-                                    <a
-                                        key={action.id}
-                                        href={action.url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className={`group flex flex-col items-center gap-2 p-3 rounded-xl backdrop-blur-xl transition-all duration-200 hover:scale-105 border animate-in slide-in-from-bottom-4 ${
-                                            isDarkMode
-                                                ? "bg-slate-800/40 border-slate-700/30 hover:bg-slate-800/60"
-                                                : "bg-white/50 border-amber-200/30 hover:bg-white/70"
-                                        }`}
-                                        style={{
-                                            animationDuration: "400ms",
-                                            animationDelay: `${
-                                                1000 + index * 100
-                                            }ms`,
-                                        }}
-                                    >
-                                        <div className="w-8 h-8 flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
-                                            {(() => {
-                                                const iconMap: {
-                                                    [
-                                                        key: string
-                                                    ]: React.ComponentType<{
-                                                        size?: number;
-                                                    }>;
-                                                } = {
-                                                    Github,
-                                                    Target,
-                                                    Figma,
-                                                    Bot,
-                                                    Zap,
-                                                    FileText,
-                                                    Youtube,
-                                                    Dribbble,
-                                                    Film,
-                                                    Music,
-                                                    Smartphone,
-                                                    BookOpen,
-                                                    Twitter,
-                                                };
-                                                const IconComponent =
-                                                    iconMap[action.icon];
-                                                return IconComponent ? (
-                                                    <IconComponent size={20} />
-                                                ) : null;
-                                            })()}
-                                        </div>
-                                        <span
-                                            className={`text-xs font-medium text-center ${
-                                                isDarkMode
-                                                    ? "text-slate-300"
-                                                    : "text-amber-700"
-                                            }`}
-                                        >
-                                            {action.title}
-                                        </span>
-                                    </a>
-                                ))}
-                            </div>
-                        </div>
-                    </>
-                ) : (
-                    /* Focus Mode */
-                    <div className="text-center max-w-md animate-in fade-in duration-700">
-                        <div className="mb-8">
-                            <div
-                                className={`text-5xl font-light mb-4 animate-in zoom-in duration-600 delay-300 ${
-                                    isDarkMode
-                                        ? "text-slate-200"
-                                        : "text-stone-800"
-                                }`}
-                                style={{ fontVariantNumeric: "tabular-nums" }}
-                            >
-                                {formatTime(currentTime)}
-                            </div>
-                            <p
-                                className={`text-lg animate-in fade-in duration-500 delay-500 ${
-                                    isDarkMode
-                                        ? "text-slate-400"
-                                        : "text-stone-500"
-                                }`}
-                            >
-                                Deep work session in progress
-                            </p>
-                        </div>
-
-                        <div
-                            className={`flex items-center gap-3 px-4 py-3 rounded-xl backdrop-blur-xl border transition-all duration-300 hover:scale-[1.02] animate-in slide-in-from-bottom-4 duration-500 delay-400 ${
-                                isDarkMode
-                                    ? "bg-slate-800/40 border-slate-700/30 hover:bg-slate-800/60"
-                                    : "bg-white/60 border-stone-200/40 hover:bg-white/80"
-                            }`}
-                        >
-                            <Search
-                                size={16}
-                                className={
-                                    isDarkMode
-                                        ? "text-slate-400"
-                                        : "text-stone-500"
-                                }
-                            />
+            {/* Main Content - Pushed higher for better visual balance */}
+            <div className="flex flex-col items-center justify-center min-h-screen px-6 -mt-16">
+                {/* Greeting */}
+                <div className="text-center mb-8">
+                    <h1
+                        className={`text-xl font-light mb-6 ${
+                            isDarkMode ? "text-slate-400" : "text-gray-600"
+                        }`}
+                    >
+                        {getGreeting()}
+                    </h1>
+                    {/* Large Time */}
+                    <div
+                        className={`text-7xl font-extralight tracking-tight mb-2 ${
+                            isDarkMode ? "text-slate-200" : "text-gray-900"
+                        }`}
+                        style={{ fontVariantNumeric: "tabular-nums" }}
+                    >
+                        {formatTime(currentTime)}
+                    </div>
+                    <div
+                        className={`text-base ${
+                            isDarkMode ? "text-slate-500" : "text-gray-500"
+                        }`}
+                    >
+                        {currentTime.toLocaleDateString([], {
+                            weekday: "long",
+                            month: "long",
+                            day: "numeric",
+                        })}
+                    </div>
+                </div>
+                {/* Search Bar - More compact and with relative positioning */}
+                <div
+                    className="w-full max-w-2xl mb-12 relative"
+                    ref={searchRef}
+                >
+                    <div
+                        className={`rounded-2xl backdrop-blur-md border transition-all duration-300 ${
+                            isDarkMode
+                                ? "bg-slate-900/50 border-slate-700/50"
+                                : "bg-white/70 border-gray-200/50"
+                        } ${isSearchFocused ? "shadow-xl" : "shadow-sm"}`}
+                    >
+                        <div className="relative">
                             <input
                                 type="text"
-                                placeholder="Quick search..."
+                                placeholder={
+                                    searchType === "Search"
+                                        ? "Search or enter address"
+                                        : ""
+                                }
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
+                                onFocus={handleSearchFocus}
+                                onBlur={handleSearchBlur}
                                 onKeyPress={(e) =>
                                     e.key === "Enter" && handleSearch()
                                 }
-                                className={`flex-1 bg-transparent outline-none ${
+                                className={`w-full bg-transparent outline-none px-8 py-5 text-lg pr-32 ${
                                     isDarkMode
                                         ? "text-slate-200"
-                                        : "text-stone-800"
+                                        : "text-gray-800"
                                 }`}
                             />
+                            {/* Animated Text for Insights placeholder */}
+                            {searchType === "Insights" &&
+                                !searchQuery &&
+                                !isSearchFocused && (
+                                    <div
+                                        className="absolute left-8 top-5 pointer-events-none overflow-hidden"
+                                        style={{ minWidth: "200px" }}
+                                        key={currentPlaceholderIndex} // Force re-render for instant switching
+                                    >
+                                        <AnimatedText
+                                            text={
+                                                insightPlaceholders[
+                                                    currentPlaceholderIndex
+                                                ]
+                                            }
+                                            animation={
+                                                currentPlaceholderIndex % 2 ===
+                                                0
+                                                    ? "karaoke"
+                                                    : "filling"
+                                            }
+                                            isDarkMode={isDarkMode}
+                                        />
+                                    </div>
+                                )}
+                            {/* Bottom right controls */}
+                            <div className="absolute bottom-4 right-4 flex items-center gap-2">
+                                {/* Search Type Picker - Minimal Design */}
+                                <div className="relative" ref={dropdownRef}>
+                                    <button
+                                        onClick={() =>
+                                            setIsDropdownOpen(!isDropdownOpen)
+                                        }
+                                        className={`flex items-center gap-1 px-2 py-1 text-sm transition-all ${
+                                            isDarkMode
+                                                ? "text-slate-400 hover:text-slate-300"
+                                                : "text-gray-500 hover:text-gray-700"
+                                        }`}
+                                    >
+                                        {searchType}
+                                        <ChevronDown
+                                            size={12}
+                                            className={`transition-transform ${
+                                                isDropdownOpen
+                                                    ? "rotate-180"
+                                                    : ""
+                                            }`}
+                                        />
+                                    </button>
+                                    {/* Minimal dropdown - no borders or shadows */}
+                                    {isDropdownOpen && (
+                                        <div
+                                            className={`absolute top-full right-0 mt-1 w-20 rounded-md overflow-hidden z-10 ${
+                                                isDarkMode
+                                                    ? "bg-slate-900/90"
+                                                    : "bg-white/90"
+                                            }`}
+                                            style={{
+                                                backdropFilter: "blur(12px)",
+                                            }}
+                                        >
+                                            {["Search", "Insights"].map(
+                                                (type) => (
+                                                    <button
+                                                        key={type}
+                                                        onClick={() => {
+                                                            setSearchType(
+                                                                type as any,
+                                                            );
+                                                            setIsDropdownOpen(
+                                                                false,
+                                                            );
+                                                        }}
+                                                        className={`w-full px-3 py-2 text-left text-sm capitalize transition-all ${
+                                                            searchType === type
+                                                                ? isDarkMode
+                                                                    ? "text-slate-200"
+                                                                    : "text-gray-800"
+                                                                : isDarkMode
+                                                                ? "text-slate-400 hover:text-slate-300"
+                                                                : "text-gray-500 hover:text-gray-700"
+                                                        }`}
+                                                    >
+                                                        {type}
+                                                    </button>
+                                                ),
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                                {/* Send Button - Always visible */}
+                                <button
+                                    onClick={handleSearch}
+                                    className={`p-2 rounded-lg transition-all hover:scale-105 ${
+                                        searchQuery
+                                            ? "bg-yellow-500 text-black"
+                                            : "bg-yellow-400 text-gray-900"
+                                    }`}
+                                >
+                                    <ArrowRight
+                                        size={16}
+                                        color={
+                                            searchQuery
+                                                ? "black"
+                                                : "currentColor"
+                                        }
+                                    />
+                                </button>
+                            </div>
                         </div>
+                    </div>
+                </div>
 
-                        <button
-                            onClick={() => setFocusMode(false)}
-                            className={`mt-6 px-4 py-2 rounded-lg transition-all duration-200 hover:scale-105 animate-in fade-in duration-500 delay-600 ${
-                                isDarkMode
-                                    ? "text-slate-400 hover:text-slate-200 hover:bg-slate-800/30"
-                                    : "text-stone-500 hover:text-stone-700 hover:bg-white/30"
-                            }`}
-                        >
-                            Exit Focus Mode
-                        </button>
+                {/* What's Next - Calendar Events - FIXED: Absolute positioning to prevent layout shift */}
+                {nextEvent ? (
+                    <div className="relative" style={{ minHeight: "40px" }}>
+                        <div className="absolute top-0 left-1/2 transform -translate-x-1/2">
+                            <div
+                                className="flex items-center px-2 py-2 cursor-pointer transition-all hover:opacity-80"
+                                onClick={() => setShowAllEvents(!showAllEvents)}
+                                style={{ minWidth: "280px" }}
+                            >
+                                <Calendar
+                                    size={18}
+                                    className={
+                                        isDarkMode
+                                            ? "text-slate-400"
+                                            : "text-gray-600"
+                                    }
+                                />
+                                <span
+                                    className={`font-medium ml-3 ${
+                                        isDarkMode
+                                            ? "text-slate-200"
+                                            : "text-gray-800"
+                                    }`}
+                                >
+                                    {nextEvent.title}
+                                </span>
+                                <span
+                                    className={`text-sm ml-auto ${
+                                        isDarkMode
+                                            ? "text-slate-400"
+                                            : "text-gray-600"
+                                    }`}
+                                >
+                                    {nextEvent.time}
+                                </span>
+                                <ChevronDown
+                                    size={16}
+                                    className={`transition-transform ml-2 ${
+                                        showAllEvents ? "rotate-180" : ""
+                                    } ${
+                                        isDarkMode
+                                            ? "text-slate-400"
+                                            : "text-gray-400"
+                                    }`}
+                                />
+                            </div>
+
+                            {/* FIXED: Show all events inline without popup styling */}
+                            {showAllEvents && upcomingEvents.length > 1 && (
+                                <div className="mt-2 space-y-1">
+                                    {upcomingEvents.slice(1).map((event) => (
+                                        <div
+                                            key={event.id}
+                                            className="flex items-center px-2 py-2"
+                                            style={{ minWidth: "280px" }}
+                                        >
+                                            {/* Empty space to align with main calendar icon */}
+                                            <div
+                                                style={{ width: "18px" }}
+                                            ></div>
+                                            <span
+                                                className={`font-medium ml-3 ${
+                                                    isDarkMode
+                                                        ? "text-slate-200"
+                                                        : "text-gray-800"
+                                                }`}
+                                            >
+                                                {event.title}
+                                            </span>
+                                            <span
+                                                className={`text-sm ${
+                                                    isDarkMode
+                                                        ? "text-slate-400"
+                                                        : "text-gray-600"
+                                                }`}
+                                                style={{
+                                                    marginLeft: "auto",
+                                                    marginRight: "26px",
+                                                }}
+                                            >
+                                                {event.time}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                ) : (
+                    <div
+                        className={`text-center ${
+                            isDarkMode ? "text-slate-500" : "text-gray-500"
+                        }`}
+                    >
+                        <Calendar
+                            size={20}
+                            className="mx-auto mb-2 opacity-50"
+                        />
+                        <p className="text-sm">No upcoming events</p>
                     </div>
                 )}
             </div>
 
-            {/* Expandable Sections - Only show on main page */}
-            {!focusMode && (
-                <div className="max-w-2xl mx-auto px-6 pb-12 animate-in fade-in duration-500 delay-1200">
-                    <div className="flex justify-center gap-3">
-                        <button
-                            onClick={() => toggleSection("tasks")}
-                            className={`flex items-center gap-2 px-3 py-2 rounded-lg backdrop-blur-xl transition-all duration-200 hover:scale-105 border animate-in slide-in-from-bottom-4 duration-400 delay-1300 ${
-                                isDarkMode
-                                    ? "bg-slate-800/40 border-slate-700/30 hover:bg-slate-800/60"
-                                    : "bg-white/50 border-amber-200/30 hover:bg-white/70"
-                            }`}
-                        >
-                            <CheckCircle
-                                size={14}
-                                className={
-                                    isDarkMode
-                                        ? "text-slate-400"
-                                        : "text-amber-500"
-                                }
-                            />
-                            <span
-                                className={`text-sm font-medium ${
-                                    isDarkMode
-                                        ? "text-slate-300"
-                                        : "text-amber-700"
-                                }`}
-                            >
-                                {tasks.filter((t) => !t.completed).length} tasks
-                            </span>
-                            <ChevronDown
-                                size={12}
-                                className={`transition-transform duration-200 ${
-                                    expandedSection === "tasks"
-                                        ? "rotate-180"
-                                        : ""
-                                } ${
-                                    isDarkMode
-                                        ? "text-slate-400"
-                                        : "text-amber-500"
-                                }`}
-                            />
-                        </button>
+            {/* CSS for text animations */}
+            <style jsx>{`
+                /* Global reset */
+                * {
+                    margin: 0;
+                    padding: 0;
+                    box-sizing: border-box;
+                }
 
-                        <button
-                            onClick={() => toggleSection("calendar")}
-                            className={`flex items-center gap-2 px-3 py-2 rounded-lg backdrop-blur-xl transition-all duration-200 hover:scale-105 border animate-in slide-in-from-bottom-4 duration-400 delay-1400 ${
-                                isDarkMode
-                                    ? "bg-slate-800/40 border-slate-700/30 hover:bg-slate-800/60"
-                                    : "bg-white/50 border-amber-200/30 hover:bg-white/70"
-                            }`}
-                        >
-                            <Calendar
-                                size={14}
-                                className={
-                                    isDarkMode
-                                        ? "text-slate-400"
-                                        : "text-amber-500"
-                                }
-                            />
-                            <span
-                                className={`text-sm font-medium ${
-                                    isDarkMode
-                                        ? "text-slate-300"
-                                        : "text-amber-700"
-                                }`}
-                            >
-                                Today
-                            </span>
-                            <ChevronDown
-                                size={12}
-                                className={`transition-transform duration-200 ${
-                                    expandedSection === "calendar"
-                                        ? "rotate-180"
-                                        : ""
-                                } ${
-                                    isDarkMode
-                                        ? "text-slate-400"
-                                        : "text-amber-500"
-                                }`}
-                            />
-                        </button>
+                html,
+                body {
+                    height: 100%;
+                    margin: 0;
+                    padding: 0;
+                }
 
-                        <button
-                            onClick={() => toggleSection("more")}
-                            className={`flex items-center gap-2 px-3 py-2 rounded-lg backdrop-blur-xl transition-all duration-200 hover:scale-105 border animate-in slide-in-from-bottom-4 duration-400 delay-1500 ${
-                                isDarkMode
-                                    ? "bg-slate-800/40 border-slate-700/30 hover:bg-slate-800/60"
-                                    : "bg-white/50 border-amber-200/30 hover:bg-white/70"
-                            }`}
-                        >
-                            <MoreHorizontal
-                                size={14}
-                                className={
-                                    isDarkMode
-                                        ? "text-slate-400"
-                                        : "text-amber-500"
-                                }
-                            />
-                            <span
-                                className={`text-sm font-medium ${
-                                    isDarkMode
-                                        ? "text-slate-300"
-                                        : "text-amber-700"
-                                }`}
-                            >
-                                More
-                            </span>
-                            <ChevronDown
-                                size={12}
-                                className={`transition-transform duration-200 ${
-                                    expandedSection === "more"
-                                        ? "rotate-180"
-                                        : ""
-                                } ${
-                                    isDarkMode
-                                        ? "text-slate-400"
-                                        : "text-amber-500"
-                                }`}
-                            />
-                        </button>
-                    </div>
+                /* Karaoke animation */
+                .karaoke {
+                    margin-bottom: 10px;
+                }
 
-                    {/* Expandable Content */}
-                    {expandedSection && (
-                        <div className="mt-4 animate-in slide-in-from-bottom-4 duration-400">
-                            <div
-                                className={`backdrop-blur-xl rounded-xl p-4 border transition-all duration-300 ${
-                                    isDarkMode
-                                        ? "bg-slate-800/50 border-slate-700/30"
-                                        : "bg-white/70 border-amber-200/40"
-                                }`}
-                            >
-                                {expandedSection === "tasks" && (
-                                    <div>
-                                        <h3
-                                            className={`text-lg font-semibold mb-4 ${
-                                                isDarkMode
-                                                    ? "text-slate-200"
-                                                    : "text-amber-900"
-                                            }`}
-                                        >
-                                            Today's Tasks
-                                        </h3>
-                                        <div className="space-y-3">
-                                            {tasks.map((task) => (
-                                                <div
-                                                    key={task.id}
-                                                    className={`flex items-center gap-3 p-3 rounded-lg backdrop-blur-sm transition-all duration-200 border ${
-                                                        isDarkMode
-                                                            ? "bg-slate-700/30 border-slate-600/30 hover:bg-slate-700/50"
-                                                            : "bg-white/40 border-amber-200/30 hover:bg-white/60"
-                                                    } ${
-                                                        task.completed
-                                                            ? "opacity-60"
-                                                            : ""
-                                                    }`}
-                                                >
-                                                    <button
-                                                        onClick={() =>
-                                                            toggleTask(task.id)
-                                                        }
-                                                        className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors duration-200 ${
-                                                            task.completed
-                                                                ? isDarkMode
-                                                                    ? "bg-blue-600 border-blue-600"
-                                                                    : "bg-amber-600 border-amber-600"
-                                                                : isDarkMode
-                                                                ? "border-slate-500 hover:border-slate-400"
-                                                                : "border-amber-300 hover:border-amber-400"
-                                                        }`}
-                                                    >
-                                                        {task.completed && (
-                                                            <Check
-                                                                size={10}
-                                                                className="text-white"
-                                                            />
-                                                        )}
-                                                    </button>
-                                                    <span
-                                                        className={`flex-1 ${
-                                                            task.completed
-                                                                ? "line-through"
-                                                                : ""
-                                                        } ${
-                                                            isDarkMode
-                                                                ? "text-slate-200"
-                                                                : "text-amber-900"
-                                                        }`}
-                                                    >
-                                                        {task.title}
-                                                    </span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
+                .karaoke .char {
+                    color: ${isDarkMode
+                        ? "hsla(0, 0%, 60%, 0.25)"
+                        : "hsla(0, 0%, 50%, 0.25)"};
+                    position: relative;
+                    display: inline-block;
+                }
 
-                                {expandedSection === "calendar" && (
-                                    <div>
-                                        <h3
-                                            className={`text-lg font-semibold mb-4 ${
-                                                isDarkMode
-                                                    ? "text-slate-200"
-                                                    : "text-amber-900"
-                                            }`}
-                                        >
-                                            Today's Schedule
-                                        </h3>
-                                        <div className="space-y-3">
-                                            {[
-                                                {
-                                                    time: "9:00 AM",
-                                                    title: "Team Standup",
-                                                    color: "bg-blue-500",
-                                                },
-                                                {
-                                                    time: "2:00 PM",
-                                                    title: "Design Review",
-                                                    color: "bg-green-500",
-                                                },
-                                                {
-                                                    time: "4:30 PM",
-                                                    title: "Client Call",
-                                                    color: "bg-purple-500",
-                                                },
-                                            ].map((event, index) => (
-                                                <div
-                                                    key={index}
-                                                    className="flex items-center gap-3"
-                                                >
-                                                    <div
-                                                        className={`w-3 h-3 rounded-full ${event.color}`}
-                                                    ></div>
-                                                    <div className="flex-1">
-                                                        <div
-                                                            className={`font-medium ${
-                                                                isDarkMode
-                                                                    ? "text-slate-200"
-                                                                    : "text-amber-900"
-                                                            }`}
-                                                        >
-                                                            {event.title}
-                                                        </div>
-                                                        <div
-                                                            className={`text-sm ${
-                                                                isDarkMode
-                                                                    ? "text-slate-400"
-                                                                    : "text-amber-600"
-                                                            }`}
-                                                        >
-                                                            {event.time}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
+                .karaoke .char:after {
+                    content: attr(data-char);
+                    position: absolute;
+                    left: 0;
+                    top: 0;
+                    color: ${isDarkMode
+                        ? "hsl(0, 0%, 60%)"
+                        : "hsl(0, 0%, 50%)"};
+                    visibility: visible;
+                    clip-path: inset(
+                        0 calc((100 - (var(--reveal, 0) * 100)) * 1%) 0 0
+                    );
+                    transition: clip-path 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+                }
 
-                                {expandedSection === "more" && (
-                                    <div>
-                                        <h3
-                                            className={`text-lg font-semibold mb-4 ${
-                                                isDarkMode
-                                                    ? "text-slate-200"
-                                                    : "text-amber-900"
-                                            }`}
-                                        >
-                                            Quick Stats
-                                        </h3>
-                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                            <div className="text-center">
-                                                <div
-                                                    className={`text-2xl font-bold ${
-                                                        isDarkMode
-                                                            ? "text-slate-200"
-                                                            : "text-amber-900"
-                                                    }`}
-                                                >
-                                                    2h 34m
-                                                </div>
-                                                <div
-                                                    className={`text-sm ${
-                                                        isDarkMode
-                                                            ? "text-slate-400"
-                                                            : "text-amber-600"
-                                                    }`}
-                                                >
-                                                    Focus time
-                                                </div>
-                                            </div>
-                                            <div className="text-center">
-                                                <div
-                                                    className={`text-2xl font-bold ${
-                                                        isDarkMode
-                                                            ? "text-slate-200"
-                                                            : "text-amber-900"
-                                                    }`}
-                                                >
-                                                    23
-                                                </div>
-                                                <div
-                                                    className={`text-sm ${
-                                                        isDarkMode
-                                                            ? "text-slate-400"
-                                                            : "text-amber-600"
-                                                    }`}
-                                                >
-                                                    Sites visited
-                                                </div>
-                                            </div>
-                                            <div className="text-center">
-                                                <div
-                                                    className={`text-2xl font-bold ${
-                                                        isDarkMode
-                                                            ? "text-slate-200"
-                                                            : "text-amber-900"
-                                                    }`}
-                                                >
-                                                    8
-                                                </div>
-                                                <div
-                                                    className={`text-sm ${
-                                                        isDarkMode
-                                                            ? "text-slate-400"
-                                                            : "text-amber-600"
-                                                    }`}
-                                                >
-                                                    Tasks done
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
+                /* Filling animation */
+                .filling {
+                    margin-bottom: 10px;
+                }
 
-                                <button
-                                    onClick={() => setExpandedSection(null)}
-                                    className={`mt-4 w-full flex items-center justify-center gap-2 py-2 rounded-lg transition-all duration-200 hover:scale-[1.02] ${
-                                        isDarkMode
-                                            ? "text-slate-400 hover:text-slate-200 hover:bg-slate-700/30"
-                                            : "text-amber-600 hover:text-amber-800 hover:bg-white/30"
-                                    }`}
-                                >
-                                    <ChevronDown
-                                        size={14}
-                                        className="rotate-180"
-                                    />
-                                    <span className="text-sm">Collapse</span>
-                                </button>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
+                .filling .char {
+                    color: ${isDarkMode
+                        ? "hsla(0, 0%, 60%, 0.25)"
+                        : "hsla(0, 0%, 50%, 0.25)"};
+                    position: relative;
+                    display: inline-block;
+                }
 
-            <style>{`
-                input::placeholder {
-                    color: ${
-                        isDarkMode
-                            ? "rgba(148, 163, 184, 0.5)"
-                            : "rgba(217, 119, 6, 0.5)"
-                    };
-                    font-weight: 400;
+                .filling .char:after {
+                    content: attr(data-char);
+                    position: absolute;
+                    left: 0;
+                    top: 0;
+                    color: ${isDarkMode
+                        ? "hsl(0, 0%, 60%)"
+                        : "hsl(0, 0%, 50%)"};
+                    visibility: visible;
+                    clip-path: inset(
+                        calc((100 - (var(--reveal, 0) * 100)) * 1%) 0 0 0
+                    );
+                    transition: clip-path 0.3s cubic-bezier(0.16, 1, 0.3, 1);
                 }
             `}</style>
         </div>
