@@ -1,5 +1,6 @@
+// src/components/FlowModal.tsx
 import React, { useState, useEffect } from "react";
-import { Plus, X, Check, Calendar, LogOut, RefreshCw } from "lucide-react";
+import { Plus, X, Check, RefreshCw } from "lucide-react";
 
 interface Task {
     id: string;
@@ -21,309 +22,21 @@ interface CalendarEvent {
 }
 
 interface AuthUser {
-    id: string;
+    uid: string;
     email: string;
-    name: string;
-    picture?: string;
+    displayName: string | null;
+    photoURL: string | null;
     accessToken: string;
+    refreshToken: string | null;
+    plan: string;
+    subscriptionEnd: string | null;
+    createdAt: number;
 }
-
-interface AuthMessage {
-    type: string;
-    success?: boolean;
-    user?: AuthUser;
-    error?: string;
-}
-
-interface FlowMessage {
-    type: string;
-    user?: AuthUser;
-}
-
-interface FlowContainerProps {
-    isVisible: boolean;
-    onClose: () => void;
-}
-
-interface LoginScreenProps {
-    onGoogleLogin: () => Promise<void>;
-    onContinueWithoutSignin: () => void;
-    isLoading?: boolean;
-}
-
-const LoginScreen: React.FC<LoginScreenProps> = ({
-    onGoogleLogin,
-    onContinueWithoutSignin,
-    isLoading = false,
-}) => {
-    const [selectedOption, setSelectedOption] = useState<string | null>(null);
-
-    const handleGoogleLogin = async () => {
-        setSelectedOption("google");
-        try {
-            await onGoogleLogin();
-        } catch (error) {
-            setSelectedOption(null);
-            console.error("Login failed:", error);
-        }
-    };
-
-    const handleContinueWithout = () => {
-        setSelectedOption("continue");
-        onContinueWithoutSignin();
-    };
-
-    return (
-        <div className="flow-login-modal">
-            <div className="flow-login-header">
-                <div className="flow-login-icon">
-                    <Calendar size={24} />
-                </div>
-                <h1 className="flow-login-title">Welcome to Flow</h1>
-                <p className="flow-login-subtitle">
-                    Sync your calendar or start organizing tasks
-                </p>
-            </div>
-
-            <div className="flow-login-options">
-                <button
-                    className={`flow-login-option ${
-                        selectedOption === "google" ? "loading" : ""
-                    }`}
-                    onClick={handleGoogleLogin}
-                    disabled={isLoading}
-                >
-                    <div className="option-icon-wrapper">
-                        <div className="option-icon google">
-                            <Calendar size={18} />
-                        </div>
-                    </div>
-                    <div className="option-content">
-                        <h3 className="option-title">
-                            Connect Google Calendar
-                        </h3>
-                        <p className="option-description">
-                            Sync your events and create calendar-aware tasks
-                        </p>
-                    </div>
-                    <div className="option-arrow">
-                        {selectedOption === "google" ? (
-                            <div className="loading-spinner" />
-                        ) : (
-                            <div>→</div>
-                        )}
-                    </div>
-                </button>
-
-                <button
-                    className={`flow-login-option ${
-                        selectedOption === "continue" ? "loading" : ""
-                    }`}
-                    onClick={handleContinueWithout}
-                    disabled={isLoading}
-                >
-                    <div className="option-icon-wrapper">
-                        <div className="option-icon simple">
-                            <Calendar size={18} />
-                        </div>
-                    </div>
-                    <div className="option-content">
-                        <h3 className="option-title">
-                            Continue Without Syncing
-                        </h3>
-                        <p className="option-description">
-                            Use Flow for local task management only
-                        </p>
-                    </div>
-                    <div className="option-arrow">
-                        {selectedOption === "continue" ? (
-                            <div className="loading-spinner" />
-                        ) : (
-                            <div>→</div>
-                        )}
-                    </div>
-                </button>
-            </div>
-
-            <div className="flow-login-footer">
-                <p className="privacy-note">
-                    Your data is stored securely and never shared
-                </p>
-            </div>
-
-            <style jsx>{`
-                .flow-login-modal {
-                    position: fixed;
-                    top: 60px;
-                    right: 20px;
-                    width: 420px;
-                    max-width: 90vw;
-                    background: rgba(255, 251, 235, 0.98);
-                    backdrop-filter: blur(20px);
-                    border: 1px solid rgba(205, 133, 63, 0.9);
-                    border-radius: 16px;
-                    overflow: hidden;
-                    box-shadow: 0 24px 48px rgba(160, 82, 45, 0.15);
-                    animation: slideUp 0.4s ease-out;
-                    z-index: 10000000;
-                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
-                        system-ui, sans-serif;
-                    pointer-events: auto;
-                }
-
-                @keyframes slideUp {
-                    from {
-                        opacity: 0;
-                        transform: translateY(20px) scale(0.95);
-                    }
-                    to {
-                        opacity: 1;
-                        transform: translateY(0) scale(1);
-                    }
-                }
-
-                .flow-login-header {
-                    text-align: center;
-                    padding: 32px 24px 24px;
-                    background: rgba(218, 165, 32, 0.08);
-                    border-bottom: 1px solid rgba(205, 133, 63, 0.25);
-                }
-
-                .flow-login-icon {
-                    width: 48px;
-                    height: 48px;
-                    background: rgba(218, 165, 32, 0.25);
-                    border-radius: 12px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    color: rgba(160, 82, 45, 0.85);
-                    margin: 0 auto 16px;
-                }
-
-                .flow-login-title {
-                    margin: 0 0 8px;
-                    font-size: 24px;
-                    font-weight: 700;
-                    color: rgba(101, 67, 33, 0.95);
-                }
-
-                .flow-login-subtitle {
-                    margin: 0;
-                    font-size: 15px;
-                    color: rgba(160, 82, 45, 0.7);
-                    font-weight: 500;
-                }
-
-                .flow-login-options {
-                    padding: 24px;
-                    display: flex;
-                    flex-direction: column;
-                    gap: 16px;
-                }
-
-                .flow-login-option {
-                    display: flex;
-                    align-items: flex-start;
-                    gap: 16px;
-                    padding: 20px;
-                    background: rgba(255, 248, 220, 0.6);
-                    border: 1.5px solid rgba(205, 133, 63, 0.2);
-                    border-radius: 12px;
-                    cursor: pointer;
-                    transition: all 0.2s ease;
-                    text-align: left;
-                    width: 100%;
-                }
-
-                .flow-login-option:hover {
-                    border-color: rgba(205, 133, 63, 0.35);
-                    background: rgba(255, 248, 220, 0.8);
-                    transform: translateY(-1px);
-                    box-shadow: 0 8px 16px rgba(160, 82, 45, 0.1);
-                }
-
-                .option-icon-wrapper {
-                    flex-shrink: 0;
-                }
-
-                .option-icon {
-                    width: 44px;
-                    height: 44px;
-                    border-radius: 10px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    background: rgba(218, 165, 32, 0.2);
-                    color: rgba(160, 82, 45, 0.85);
-                }
-
-                .option-content {
-                    flex: 1;
-                    min-width: 0;
-                }
-
-                .option-title {
-                    margin: 0 0 4px;
-                    font-size: 16px;
-                    font-weight: 600;
-                    color: rgba(101, 67, 33, 0.95);
-                }
-
-                .option-description {
-                    margin: 0;
-                    font-size: 14px;
-                    color: rgba(160, 82, 45, 0.7);
-                    line-height: 1.4;
-                }
-
-                .option-arrow {
-                    flex-shrink: 0;
-                    color: rgba(160, 82, 45, 0.6);
-                    margin-top: 2px;
-                }
-
-                .loading-spinner {
-                    width: 16px;
-                    height: 16px;
-                    border: 2px solid rgba(218, 165, 32, 0.25);
-                    border-top: 2px solid rgba(160, 82, 45, 0.85);
-                    border-radius: 50%;
-                    animation: spin 1s linear infinite;
-                }
-
-                @keyframes spin {
-                    0% {
-                        transform: rotate(0deg);
-                    }
-                    100% {
-                        transform: rotate(360deg);
-                    }
-                }
-
-                .flow-login-footer {
-                    padding: 16px 24px 24px;
-                    text-align: center;
-                    background: rgba(218, 165, 32, 0.15);
-                    border-top: 1px solid rgba(205, 133, 63, 0.25);
-                }
-
-                .privacy-note {
-                    margin: 0;
-                    font-size: 12px;
-                    color: rgba(160, 82, 45, 0.7);
-                    font-weight: 500;
-                }
-            `}</style>
-        </div>
-    );
-};
 
 const FlowModal: React.FC<{
     user: AuthUser | null;
     onClose: () => void;
-    onSignOut: () => void;
-}> = ({ user, onClose, onSignOut }) => {
+}> = ({ user, onClose }) => {
     const [tasks, setTasks] = useState<Task[]>([]);
     const [newTaskTitle, setNewTaskTitle] = useState("");
     const [currentView, setCurrentView] = useState<
@@ -332,6 +45,7 @@ const FlowModal: React.FC<{
     const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
     const [isLoadingEvents, setIsLoadingEvents] = useState(false);
     const [selectedTime, setSelectedTime] = useState("");
+    const [isMinimized, setIsMinimized] = useState(false);
 
     useEffect(() => {
         loadTasks();
@@ -395,19 +109,30 @@ const FlowModal: React.FC<{
                 : {};
 
             const events: CalendarEvent[] =
-                data.items?.map((item: any) => ({
-                    id: item.id,
-                    title: item.summary || "No title",
-                    start: new Date(item.start.dateTime || item.start.date),
-                    end: new Date(item.end.dateTime || item.end.date),
-                    location: item.location,
-                    description: item.description,
-                    attendees:
-                        item.attendees?.map(
-                            (attendee: any) => attendee.email,
-                        ) || [],
-                    completed: eventStates[item.id] || false,
-                })) || [];
+                data.items?.map(
+                    (
+                        item: Record<string, unknown> & {
+                            id: string;
+                            summary?: string;
+                            start: { dateTime?: string; date?: string };
+                            end: { dateTime?: string; date?: string };
+                            location?: string;
+                            description?: string;
+                            attendees?: { email: string }[];
+                        },
+                    ) => ({
+                        id: item.id,
+                        title: item.summary || "No title",
+                        start: new Date(item.start.dateTime || item.start.date),
+                        end: new Date(item.end.dateTime || item.end.date),
+                        location: item.location,
+                        description: item.description,
+                        attendees:
+                            item.attendees?.map((attendee) => attendee.email) ||
+                            [],
+                        completed: eventStates[item.id] || false,
+                    }),
+                ) || [];
 
             setCalendarEvents(events);
         } catch (error) {
@@ -513,7 +238,7 @@ const FlowModal: React.FC<{
         if (!user?.accessToken) throw new Error("No access token");
 
         const now = new Date();
-        let eventDate = new Date();
+        const eventDate = new Date();
 
         if (currentView === "tomorrow") {
             eventDate.setDate(now.getDate() + 1);
@@ -751,615 +476,565 @@ const FlowModal: React.FC<{
 
     const currentTasks = getItemsToDisplay();
 
+    // Get today's tasks/events for minimized view
+    const getTodayItems = () => {
+        if (user) {
+            const now = new Date();
+            return calendarEvents.filter(
+                (event) => event.start.toDateString() === now.toDateString(),
+            );
+        } else {
+            return tasks.filter((task) => task.dueDate === "today");
+        }
+    };
+
+    const todayItems = getTodayItems();
+
     return (
         <div className="flow-container" onKeyDown={handleKeyDown}>
-            <div className="flow-header">
+            <div
+                className="flow-header"
+                onClick={() => setIsMinimized(!isMinimized)}
+            >
                 <div className="flow-header-left">
                     <h1 className="flow-title">What's next</h1>
+                    {isMinimized && todayItems.length > 0 && (
+                        <div className="flow-header-preview">
+                            {todayItems.slice(0, 2).map((item, index) => (
+                                <span key={item.id} className="preview-item">
+                                    {user
+                                        ? formatEventTime(
+                                              (item as CalendarEvent).start,
+                                          )
+                                        : "•"}{" "}
+                                    {item.title}
+                                    {index <
+                                        Math.min(todayItems.length, 2) - 1 &&
+                                        ", "}
+                                </span>
+                            ))}
+                            {todayItems.length > 2 && (
+                                <span className="more-items">
+                                    +{todayItems.length - 2} more
+                                </span>
+                            )}
+                        </div>
+                    )}
                 </div>
                 <div className="flow-header-right">
                     <button
-                        className="flow-action-btn"
-                        onClick={onSignOut}
-                        title="Sign out"
+                        className="flow-minimize-btn"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setIsMinimized(!isMinimized);
+                        }}
+                        title={isMinimized ? "Expand" : "Minimize"}
                     >
-                        <LogOut size={12} />
+                        {isMinimized ? "↕" : "−"}
                     </button>
-                    <button className="flow-close-btn" onClick={onClose}>
+                    <button
+                        className="flow-close-btn"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onClose();
+                        }}
+                    >
                         <X size={12} />
                     </button>
                 </div>
             </div>
 
-            <div className="flow-main-container">
-                <div className="flow-view-selector">
-                    <button
-                        className={`view-btn ${
-                            currentView === "yesterday" ? "active" : ""
-                        }`}
-                        onClick={() => setCurrentView("yesterday")}
-                    >
-                        Yesterday
-                    </button>
-                    <button
-                        className={`view-btn ${
-                            currentView === "today" ? "active" : ""
-                        }`}
-                        onClick={() => setCurrentView("today")}
-                    >
-                        Today
-                    </button>
-                    <button
-                        className={`view-btn ${
-                            currentView === "tomorrow" ? "active" : ""
-                        }`}
-                        onClick={() => setCurrentView("tomorrow")}
-                    >
-                        Tomorrow
-                    </button>
-                </div>
-
-                {isLoadingEvents && (
-                    <div className="flow-loading">
-                        <RefreshCw size={14} className="spinning" />
-                        <span>Loading events...</span>
-                    </div>
-                )}
-
-                {!isLoadingEvents && currentTasks.length === 0 && (
-                    <div className="flow-empty">
-                        <p>
-                            No{" "}
-                            {user && currentView !== "yesterday"
-                                ? "events"
-                                : "tasks"}{" "}
-                            for {currentView}
-                        </p>
-                    </div>
-                )}
-
-                {!isLoadingEvents &&
-                    currentTasks.map((item) => (
-                        <div
-                            key={item.id}
-                            className={`flow-item ${
-                                (item as Task).completed ||
-                                (item as CalendarEvent).completed
-                                    ? "completed"
-                                    : ""
+            {!isMinimized && (
+                <div className="flow-main-container">
+                    <div className="flow-view-selector">
+                        <button
+                            className={`view-btn ${
+                                currentView === "yesterday" ? "active" : ""
                             }`}
+                            onClick={() => setCurrentView("yesterday")}
                         >
-                            {user && currentView !== "yesterday" ? (
-                                // Calendar Event
-                                <>
-                                    <button
-                                        className="task-check"
-                                        onClick={() =>
-                                            toggleCalendarEvent(item.id)
-                                        }
-                                    >
-                                        <Check
-                                            size={10}
-                                            className="check-icon"
-                                        />
-                                    </button>
-                                    <div className="event-time">
-                                        {formatEventTime(
-                                            (item as CalendarEvent).start,
-                                        )}
-                                    </div>
-                                    <span
-                                        className={`task-title ${
-                                            (item as CalendarEvent).completed
-                                                ? "completed"
-                                                : ""
-                                        }`}
-                                    >
-                                        {item.title}
-                                    </span>
-                                    <button
-                                        className="task-delete-btn"
-                                        onClick={() =>
-                                            deleteTask(item.id, true)
-                                        }
-                                        title="Delete event"
-                                    >
-                                        <X size={10} />
-                                    </button>
-                                </>
-                            ) : (
-                                // Task
-                                <>
-                                    <button
-                                        className="task-check"
-                                        onClick={() => toggleTask(item.id)}
-                                    >
-                                        <Check
-                                            size={10}
-                                            className="check-icon"
-                                        />
-                                    </button>
-                                    <span
-                                        className={`task-title ${
-                                            (item as Task).completed
-                                                ? "completed"
-                                                : ""
-                                        }`}
-                                    >
-                                        {item.title}
-                                    </span>
-                                    <button
-                                        className="task-delete-btn"
-                                        onClick={() =>
-                                            deleteTask(item.id, false)
-                                        }
-                                        title="Delete task"
-                                    >
-                                        <X size={10} />
-                                    </button>
-                                </>
-                            )}
-                        </div>
-                    ))}
+                            Yesterday
+                        </button>
+                        <button
+                            className={`view-btn ${
+                                currentView === "today" ? "active" : ""
+                            }`}
+                            onClick={() => setCurrentView("today")}
+                        >
+                            Today
+                        </button>
+                        <button
+                            className={`view-btn ${
+                                currentView === "tomorrow" ? "active" : ""
+                            }`}
+                            onClick={() => setCurrentView("tomorrow")}
+                        >
+                            Tomorrow
+                        </button>
+                    </div>
 
-                <div className="flow-add">
-                    <Plus size={12} className="flow-add-icon" />
-                    <input
-                        type="text"
-                        placeholder={`Add ${
-                            user && currentView !== "yesterday"
-                                ? "event"
-                                : "task"
-                        } for ${currentView}...`}
-                        value={newTaskTitle}
-                        onChange={handleInputChange}
-                        onKeyPress={handleAddKeyPress}
-                        className="flow-add-input"
-                        autoFocus
-                    />
-                    {user && currentView !== "yesterday" && (
+                    {isLoadingEvents && (
+                        <div className="flow-loading">
+                            <RefreshCw size={14} className="spinning" />
+                            <span>Loading events...</span>
+                        </div>
+                    )}
+
+                    {!isLoadingEvents && currentTasks.length === 0 && (
+                        <div className="flow-empty">
+                            <p>
+                                No{" "}
+                                {user && currentView !== "yesterday"
+                                    ? "events"
+                                    : "tasks"}{" "}
+                                for {currentView}
+                            </p>
+                        </div>
+                    )}
+
+                    {!isLoadingEvents &&
+                        currentTasks.map((item) => (
+                            <div
+                                key={item.id}
+                                className={`flow-item ${
+                                    (item as Task).completed ||
+                                    (item as CalendarEvent).completed
+                                        ? "completed"
+                                        : ""
+                                }`}
+                            >
+                                {user && currentView !== "yesterday" ? (
+                                    // Calendar Event
+                                    <>
+                                        <button
+                                            className="task-check"
+                                            onClick={() =>
+                                                toggleCalendarEvent(item.id)
+                                            }
+                                        >
+                                            <Check
+                                                size={10}
+                                                className="check-icon"
+                                            />
+                                        </button>
+                                        <div className="event-time">
+                                            {formatEventTime(
+                                                (item as CalendarEvent).start,
+                                            )}
+                                        </div>
+                                        <span
+                                            className={`task-title ${
+                                                (item as CalendarEvent)
+                                                    .completed
+                                                    ? "completed"
+                                                    : ""
+                                            }`}
+                                        >
+                                            {item.title}
+                                        </span>
+                                        <button
+                                            className="task-delete-btn"
+                                            onClick={() =>
+                                                deleteTask(item.id, true)
+                                            }
+                                            title="Delete event"
+                                        >
+                                            <X size={10} />
+                                        </button>
+                                    </>
+                                ) : (
+                                    // Task
+                                    <>
+                                        <button
+                                            className="task-check"
+                                            onClick={() => toggleTask(item.id)}
+                                        >
+                                            <Check
+                                                size={10}
+                                                className="check-icon"
+                                            />
+                                        </button>
+                                        <span
+                                            className={`task-title ${
+                                                (item as Task).completed
+                                                    ? "completed"
+                                                    : ""
+                                            }`}
+                                        >
+                                            {item.title}
+                                        </span>
+                                        <button
+                                            className="task-delete-btn"
+                                            onClick={() =>
+                                                deleteTask(item.id, false)
+                                            }
+                                            title="Delete task"
+                                        >
+                                            <X size={10} />
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+                        ))}
+
+                    <div className="flow-add">
+                        <Plus size={12} className="flow-add-icon" />
                         <input
                             type="text"
-                            value={selectedTime}
-                            onChange={handleTimeInputChange}
+                            placeholder={`Add ${
+                                user && currentView !== "yesterday"
+                                    ? "event"
+                                    : "task"
+                            } for ${currentView}...`}
+                            value={newTaskTitle}
+                            onChange={handleInputChange}
                             onKeyPress={handleAddKeyPress}
-                            placeholder="9:00 AM"
-                            className="flow-time-input"
-                            maxLength={8}
+                            className="flow-add-input"
+                            autoFocus
                         />
-                    )}
+                        {user && currentView !== "yesterday" && (
+                            <input
+                                type="text"
+                                value={selectedTime}
+                                onChange={handleTimeInputChange}
+                                onKeyPress={handleAddKeyPress}
+                                placeholder="9:00 AM"
+                                className="flow-time-input"
+                                maxLength={8}
+                            />
+                        )}
+                    </div>
                 </div>
-            </div>
+            )}
 
             <style>{`
-                .flow-container {
-                    position: fixed;
-                    top: 60px;
-                    right: 20px;
-                    z-index: 10000000;
-                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-                    width: 320px;
-                    pointer-events: auto;
-                }
+            .flow-container {
+                position: fixed;
+                top: 60px;
+                right: 20px;
+                z-index: 10000000;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+                width: 320px;
+                pointer-events: auto;
+            }
 
-                .flow-header {
-                    background: rgba(255, 251, 235, 0.98);
-                    backdrop-filter: blur(20px);
-                    border: 1px solid rgba(205, 133, 63, 0.35);
-                    border-radius: 12px;
-                    padding: 12px 16px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                    box-shadow: 0 8px 24px rgba(160, 82, 45, 0.15);
-                    margin-bottom: 2px;
-                }
+            .flow-header {
+                background: rgba(255, 251, 235, 0.98);
+                backdrop-filter: blur(20px);
+                border: 1px solid rgba(205, 133, 63, 0.35);
+                border-radius: 12px;
+                padding: 12px 16px;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                box-shadow: 0 8px 24px rgba(160, 82, 45, 0.15);
+                margin-bottom: 2px;
+                cursor: pointer;
+                transition: all 0.2s ease;
+            }
 
-                .flow-title {
-                    margin: 0;
-                    font-size: 14px;
-                    font-weight: 600;
-                    color: rgba(101, 67, 33, 0.95);
-                }
+            .flow-header:hover {
+                background: rgba(255, 251, 235, 1);
+            }
 
-                .flow-header-right {
-                    display: flex;
-                    align-items: center;
-                    gap: 4px;
-                }
+            .flow-header-left {
+                flex: 1;
+                min-width: 0;
+            }
 
-                .flow-action-btn,
-                .flow-close-btn {
-                    width: 24px;
-                    height: 24px;
-                    background: rgba(218, 165, 32, 0.12);
-                    border: none;
-                    border-radius: 6px;
-                    color: rgba(160, 82, 45, 0.75);
-                    cursor: pointer;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    transition: all 0.2s ease;
-                }
+            .flow-title {
+                margin: 0;
+                font-size: 14px;
+                font-weight: 600;
+                color: rgba(101, 67, 33, 0.95);
+            }
 
-                .flow-action-btn:hover,
-                .flow-close-btn:hover {
-                    background: rgba(218, 165, 32, 0.25);
-                    color: rgba(160, 82, 45, 1);
-                    transform: scale(1.1);
-                }
+            .flow-header-preview {
+                margin-top: 4px;
+                font-size: 11px;
+                color: rgba(160, 82, 45, 0.7);
+                line-height: 1.3;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
 
-                .flow-main-container {
-                    background: rgba(255, 251, 235, 0.98);
-                    backdrop-filter: blur(20px);
-                    border: 1px solid rgba(205, 133, 63, 0.35);
-                    border-radius: 12px;
-                    box-shadow: 0 8px 24px rgba(160, 82, 45, 0.15);
-                    max-height: 400px;
-                    overflow-y: auto;
-                }
+            .preview-item {
+                display: inline;
+            }
 
-                .flow-view-selector {
-                    display: flex;
-                    background: rgba(218, 165, 32, 0.08);
-                    border-bottom: 1px solid rgba(205, 133, 63, 0.1);
-                    padding: 8px;
-                    gap: 4px;
-                }
+            .more-items {
+                color: rgba(160, 82, 45, 0.5);
+                font-style: italic;
+            }
 
-                .view-btn {
-                    flex: 1;
-                    padding: 6px 12px;
-                    border: none;
-                    border-radius: 6px;
-                    background: transparent;
-                    color: rgba(160, 82, 45, 0.7);
-                    font-size: 12px;
-                    font-weight: 600;
-                    cursor: pointer;
-                    transition: all 0.2s ease;
-                }
+            .flow-header-right {
+                display: flex;
+                align-items: center;
+                gap: 4px;
+            }
 
-                .view-btn:hover {
-                    background: rgba(218, 165, 32, 0.15);
-                    color: rgba(160, 82, 45, 0.9);
-                }
+            .flow-minimize-btn,
+            .flow-close-btn {
+                width: 24px;
+                height: 24px;
+                background: rgba(218, 165, 32, 0.12);
+                border: none;
+                border-radius: 6px;
+                color: rgba(160, 82, 45, 0.75);
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: all 0.2s ease;
+                font-size: 12px;
+                font-weight: bold;
+            }
 
-                .view-btn.active {
-                    background: rgba(218, 165, 32, 0.25);
-                    color: rgba(101, 67, 33, 0.95);
-                    box-shadow: 0 2px 4px rgba(160, 82, 45, 0.1);
-                }
+            .flow-minimize-btn:hover,
+            .flow-close-btn:hover {
+                background: rgba(218, 165, 32, 0.25);
+                color: rgba(160, 82, 45, 1);
+                transform: scale(1.1);
+            }
 
-                .flow-loading {
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    gap: 8px;
-                    padding: 20px;
-                    color: rgba(160, 82, 45, 0.7);
-                    font-size: 13px;
-                }
+            .flow-main-container {
+                background: rgba(255, 251, 235, 0.98);
+                backdrop-filter: blur(20px);
+                border: 1px solid rgba(205, 133, 63, 0.35);
+                border-radius: 12px;
+                box-shadow: 0 8px 24px rgba(160, 82, 45, 0.15);
+                max-height: 400px;
+                overflow-y: auto;
+            }
 
-                .spinning {
-                    animation: spin 1s linear infinite;
-                }
+            .flow-view-selector {
+                display: flex;
+                background: rgba(218, 165, 32, 0.08);
+                border-bottom: 1px solid rgba(205, 133, 63, 0.1);
+                padding: 8px;
+                gap: 4px;
+            }
 
-                @keyframes spin {
-                    0% { transform: rotate(0deg); }
-                    100% { transform: rotate(360deg); }
-                }
+            .view-btn {
+                flex: 1;
+                padding: 6px 12px;
+                border: none;
+                border-radius: 6px;
+                background: transparent;
+                color: rgba(160, 82, 45, 0.7);
+                font-size: 12px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.2s ease;
+            }
 
-                .flow-empty {
-                    text-align: center;
-                    padding: 20px;
-                    color: rgba(160, 82, 45, 0.5);
-                    font-size: 13px;
-                    font-style: italic;
-                }
+            .view-btn:hover {
+                background: rgba(218, 165, 32, 0.15);
+                color: rgba(160, 82, 45, 0.9);
+            }
 
-                .flow-item {
-                    display: flex;
-                    align-items: center;
-                    gap: 12px;
-                    padding: 10px 16px;
-                    border-bottom: 1px solid rgba(205, 133, 63, 0.1);
-                    transition: background-color 0.2s ease;
-                }
+            .view-btn.active {
+                background: rgba(218, 165, 32, 0.25);
+                color: rgba(101, 67, 33, 0.95);
+                box-shadow: 0 2px 4px rgba(160, 82, 45, 0.1);
+            }
 
-                .flow-item:hover {
-                    background: rgba(218, 165, 32, 0.08);
-                }
+            .flow-loading {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 8px;
+                padding: 20px;
+                color: rgba(160, 82, 45, 0.7);
+                font-size: 13px;
+            }
 
-                .flow-item:last-of-type {
-                    border-bottom: none;
-                }
+            .spinning {
+                animation: spin 1s linear infinite;
+            }
 
-                .task-check {
-                    width: 16px;
-                    height: 16px;
-                    background: none;
-                    border: 1.5px solid rgba(205, 133, 63, 0.4);
-                    border-radius: 4px;
-                    color: rgba(160, 82, 45, 0.6);
-                    cursor: pointer;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    transition: all 0.2s ease;
-                    flex-shrink: 0;
-                }
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
 
-                .task-check:hover {
-                    border-color: rgba(205, 133, 63, 0.6);
-                    background: rgba(218, 165, 32, 0.1);
-                }
+            .flow-empty {
+                text-align: center;
+                padding: 20px;
+                color: rgba(160, 82, 45, 0.5);
+                font-size: 13px;
+                font-style: italic;
+            }
 
-                .check-icon {
-                    opacity: 0;
-                    transition: opacity 0.2s ease;
-                }
+            .flow-item {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                padding: 10px 16px;
+                border-bottom: 1px solid rgba(205, 133, 63, 0.1);
+                transition: background-color 0.2s ease;
+            }
 
-                .flow-item.completed .task-check .check-icon {
-                    opacity: 1;
-                    color: rgba(34, 197, 94, 0.9);
-                }
+            .flow-item:hover {
+                background: rgba(218, 165, 32, 0.08);
+            }
 
-                .flow-item.completed .task-check {
-                    background: rgba(34, 197, 94, 0.1);
-                    border-color: rgba(34, 197, 94, 0.5);
-                }
+            .flow-item:last-of-type {
+                border-bottom: none;
+            }
 
-                .event-time {
-                    font-size: 11px;
-                    color: rgba(160, 82, 45, 0.8);
-                    font-weight: 600;
-                    min-width: 60px;
-                    flex-shrink: 0;
-                }
+            .task-check {
+                width: 16px;
+                height: 16px;
+                background: none;
+                border: 1.5px solid rgba(205, 133, 63, 0.4);
+                border-radius: 4px;
+                color: rgba(160, 82, 45, 0.6);
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: all 0.2s ease;
+                flex-shrink: 0;
+            }
 
-                .task-title {
-                    flex: 1;
-                    font-size: 13px;
-                    color: rgba(101, 67, 33, 0.95);
-                    font-weight: 500;
-                    line-height: 1.4;
-                    transition: all 0.3s ease;
-                }
+            .task-check:hover {
+                border-color: rgba(205, 133, 63, 0.6);
+                background: rgba(218, 165, 32, 0.1);
+            }
 
-                .task-title.completed {
-                    text-decoration: line-through;
-                    color: rgba(160, 82, 45, 0.5);
-                }
+            .check-icon {
+                opacity: 0;
+                transition: opacity 0.2s ease;
+            }
 
-                .task-delete-btn {
-                    width: 20px;
-                    height: 20px;
-                    background: rgba(239, 68, 68, 0.1);
-                    border: none;
-                    border-radius: 6px;
-                    color: rgba(239, 68, 68, 0.7);
-                    cursor: pointer;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    transition: all 0.2s ease;
-                    opacity: 0;
-                    flex-shrink: 0;
-                }
+            .flow-item.completed .task-check .check-icon {
+                opacity: 1;
+                color: rgba(34, 197, 94, 0.9);
+            }
 
-                .flow-item:hover .task-delete-btn {
-                    opacity: 1;
-                }
+            .flow-item.completed .task-check {
+                background: rgba(34, 197, 94, 0.1);
+                border-color: rgba(34, 197, 94, 0.5);
+            }
 
-                .task-delete-btn:hover {
-                    background: rgba(239, 68, 68, 0.2);
-                    color: rgba(239, 68, 68, 1);
-                }
+            .event-time {
+                font-size: 11px;
+                color: rgba(160, 82, 45, 0.8);
+                font-weight: 600;
+                min-width: 60px;
+                flex-shrink: 0;
+            }
 
-                .flow-add {
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    padding: 12px 16px;
-                    background: rgba(255, 248, 220, 0.6);
-                    border-top: 1px solid rgba(205, 133, 63, 0.1);
-                    transition: all 0.2s ease;
-                }
+            .task-title {
+                flex: 1;
+                font-size: 13px;
+                color: rgba(101, 67, 33, 0.95);
+                font-weight: 500;
+                line-height: 1.4;
+                transition: all 0.3s ease;
+            }
 
-                .flow-add:focus-within {
-                    background: rgba(255, 248, 220, 0.8);
-                }
+            .task-title.completed {
+                text-decoration: line-through;
+                color: rgba(160, 82, 45, 0.5);
+            }
 
-                .flow-add-icon {
-                    color: rgba(160, 82, 45, 0.6);
-                    flex-shrink: 0;
-                }
+            .task-delete-btn {
+                width: 20px;
+                height: 20px;
+                background: rgba(239, 68, 68, 0.1);
+                border: none;
+                border-radius: 6px;
+                color: rgba(239, 68, 68, 0.7);
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: all 0.2s ease;
+                opacity: 0;
+                flex-shrink: 0;
+            }
 
-                .flow-add-input {
-                    flex: 1;
-                    border: none;
-                    outline: none;
-                    background: none;
-                    font-size: 13px;
-                    color: rgba(101, 67, 33, 1);
-                    font-weight: 500;
-                }
+            .flow-item:hover .task-delete-btn {
+                opacity: 1;
+            }
 
-                .flow-add-input::placeholder {
-                    color: rgba(160, 82, 45, 0.5);
-                }
+            .task-delete-btn:hover {
+                background: rgba(239, 68, 68, 0.2);
+                color: rgba(239, 68, 68, 1);
+            }
 
-                .flow-add-input:focus {
-                    outline: none;
-                }
+            .flow-add {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                padding: 12px 16px;
+                background: rgba(255, 248, 220, 0.6);
+                border-top: 1px solid rgba(205, 133, 63, 0.1);
+                transition: all 0.2s ease;
+            }
 
-                .flow-time-input {
-                    border: none;
-                    outline: none;
-                    background: rgba(218, 165, 32, 0.15);
-                    color: rgba(101, 67, 33, 0.9);
-                    font-size: 10px;
-                    font-weight: 600;
-                    padding: 4px 6px;
-                    border-radius: 6px;
-                    cursor: text;
-                    transition: all 0.2s ease;
-                    width: 60px;
-                    font-family: inherit;
-                    text-align: center;
-                    flex-shrink: 0;
-                }
+            .flow-add:focus-within {
+                background: rgba(255, 248, 220, 0.8);
+            }
 
-                .flow-time-input:hover {
-                    background: rgba(218, 165, 32, 0.25);
-                }
+            .flow-add-icon {
+                color: rgba(160, 82, 45, 0.6);
+                flex-shrink: 0;
+            }
 
-                .flow-time-input:focus {
-                    background: rgba(218, 165, 32, 0.25);
-                    outline: none;
-                }
+            .flow-add-input {
+                flex: 1;
+                border: none;
+                outline: none;
+                background: none;
+                font-size: 13px;
+                color: rgba(101, 67, 33, 1);
+                font-weight: 500;
+            }
 
-                .flow-time-input::placeholder {
-                    color: rgba(160, 82, 45, 0.5);
-                }
-            `}</style>
+            .flow-add-input::placeholder {
+                color: rgba(160, 82, 45, 0.5);
+            }
+
+            .flow-add-input:focus {
+                outline: none;
+            }
+
+            .flow-time-input {
+                border: none;
+                outline: none;
+                background: rgba(218, 165, 32, 0.15);
+                color: rgba(101, 67, 33, 0.9);
+                font-size: 10px;
+                font-weight: 600;
+                padding: 4px 6px;
+                border-radius: 6px;
+                cursor: text;
+                transition: all 0.2s ease;
+                width: 60px;
+                font-family: inherit;
+                text-align: center;
+                flex-shrink: 0;
+            }
+
+            .flow-time-input:hover {
+                background: rgba(218, 165, 32, 0.25);
+            }
+
+            .flow-time-input:focus {
+                background: rgba(218, 165, 32, 0.25);
+                outline: none;
+            }
+
+            .flow-time-input::placeholder {
+                color: rgba(160, 82, 45, 0.5);
+            }
+        `}</style>
         </div>
     );
 };
 
-const FlowContainer: React.FC<FlowContainerProps> = ({
-    isVisible,
-    onClose,
-}) => {
-    const [user, setUser] = useState<AuthUser | null>(null);
-    const [showLoginScreen, setShowLoginScreen] = useState(true);
-    const [isLoading, setIsLoading] = useState(false);
-
-    useEffect(() => {
-        const messageListener = (
-            message: FlowMessage,
-            sender: chrome.runtime.MessageSender,
-            sendResponse: (response?: any) => void,
-        ) => {
-            console.log("🔔 FlowContainer received message:", message.type);
-
-            switch (message.type) {
-                case "AUTH_STATE_CHANGED":
-                    if (message.user) {
-                        setUser(message.user);
-                        setShowLoginScreen(false);
-                    } else {
-                        setUser(null);
-                        setShowLoginScreen(true);
-                    }
-                    sendResponse({ success: true });
-                    break;
-                default:
-                    break;
-            }
-        };
-
-        if (typeof chrome !== "undefined" && chrome.runtime) {
-            chrome.runtime.onMessage.addListener(messageListener);
-            checkInitialAuthState();
-
-            return () => {
-                chrome.runtime.onMessage.removeListener(messageListener);
-            };
-        }
-    }, []);
-
-    const checkInitialAuthState = async () => {
-        try {
-            if (typeof chrome !== "undefined" && chrome.runtime) {
-                const response = await chrome.runtime.sendMessage({
-                    type: "CHECK_AUTH_STATE",
-                });
-
-                if (response && response.user) {
-                    setUser(response.user);
-                    setShowLoginScreen(false);
-                }
-            }
-        } catch (error) {
-            console.log("🔍 No existing auth state found");
-        }
-    };
-
-    const handleGoogleLogin = async () => {
-        setIsLoading(true);
-
-        try {
-            console.log("🔐 Starting Google authentication...");
-
-            if (typeof chrome !== "undefined" && chrome.runtime) {
-                const response: AuthMessage = await chrome.runtime.sendMessage({
-                    type: "GOOGLE_AUTH",
-                });
-
-                if (response.success && response.user) {
-                    console.log(
-                        "✅ Authentication successful:",
-                        response.user.email,
-                    );
-                    setUser(response.user);
-                    setShowLoginScreen(false);
-                } else {
-                    console.error("❌ Authentication failed:", response.error);
-                }
-            } else {
-                console.error("❌ Chrome runtime not available");
-            }
-        } catch (error) {
-            console.error("❌ Authentication error:", error);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const handleContinueWithoutSignin = () => {
-        console.log("👤 Continuing without Google Calendar sync");
-        setShowLoginScreen(false);
-    };
-
-    const handleSignOut = async () => {
-        console.log("🚪 Signing out...");
-
-        try {
-            if (typeof chrome !== "undefined" && chrome.runtime) {
-                await chrome.runtime.sendMessage({ type: "SIGN_OUT" });
-            }
-
-            setUser(null);
-            setShowLoginScreen(true);
-        } catch (error) {
-            console.error("❌ Sign out error:", error);
-        }
-    };
-
-    if (!isVisible) {
-        return null;
-    }
-
-    return (
-        <>
-            {showLoginScreen ? (
-                <LoginScreen
-                    onGoogleLogin={handleGoogleLogin}
-                    onContinueWithoutSignin={handleContinueWithoutSignin}
-                    isLoading={isLoading}
-                />
-            ) : (
-                <FlowModal
-                    user={user}
-                    onClose={onClose}
-                    onSignOut={handleSignOut}
-                />
-            )}
-        </>
-    );
-};
-
-export default FlowContainer;
+export default FlowModal;

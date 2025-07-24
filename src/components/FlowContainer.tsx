@@ -131,42 +131,6 @@ const FlowContainer: React.FC = () => {
         }
     };
 
-    const handleSignOut = async () => {
-        console.log("🚪 Signing out...");
-
-        try {
-            if (typeof chrome !== "undefined" && chrome.runtime) {
-                // Clear storage
-                await chrome.storage.local.remove(["auth_user", "auth_tokens"]);
-
-                // Revoke Chrome tokens if they exist
-                try {
-                    const token = await chrome.identity.getAuthToken({
-                        interactive: false,
-                    });
-                    if (token) {
-                        await chrome.identity.removeCachedAuthToken({ token });
-                    }
-                } catch (error) {
-                    console.log("Note: Could not revoke cached token:", error);
-                }
-
-                // Update local state
-                setUser(null);
-
-                // Close Flow modal
-                setIsVisible(false);
-
-                console.log("✅ Sign out successful");
-            }
-        } catch (error) {
-            console.error("❌ Sign out error:", error);
-            // Always clear local state even if server fails
-            setUser(null);
-            setIsVisible(false);
-        }
-    };
-
     const handleClose = () => {
         console.log("❌ Closing Flow modal");
         setIsVisible(false);
@@ -178,14 +142,7 @@ const FlowContainer: React.FC = () => {
     }
 
     // Only render FlowModal - no more LoginScreen
-    return (
-        <FlowModal
-            isVisible={true}
-            user={user}
-            onClose={handleClose}
-            onSignOut={handleSignOut}
-        />
-    );
+    return <FlowModal user={user} onClose={handleClose} />;
 };
 
 export default FlowContainer;

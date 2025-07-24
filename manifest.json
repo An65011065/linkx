@@ -22,6 +22,9 @@
         "clipboardRead",
         "clipboardWrite"
     ],
+    "chrome_url_overrides": {
+        "newtab": "src/landing/landing.html"
+    },
     "host_permissions": [
         "<all_urls>",
         "https://www.googleapis.com/",
