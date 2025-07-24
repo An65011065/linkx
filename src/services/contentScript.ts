@@ -12,6 +12,10 @@ export function onExecute() {
         .then(() => console.log("✅ Hover navbar loaded"))
         .catch((error) => console.error("❌ Hover navbar failed:", error));
 
+    import("../content/FlowModalInjector")
+        .then(() => console.log("✅ Flow modal loaded"))
+        .catch((error) => console.error("❌ Flow modal failed:", error));
+
     import("../content/ExploreInjector")
         .then(() => console.log("✅ Explore modal auto-loaded and visible"))
         .catch((error) => console.error("❌ Explore modal failed:", error));
@@ -41,16 +45,9 @@ export function onExecute() {
         console.log("🔔 ContentScript received message:", message.type);
 
         if (message.type === "SHOW_FLOW_MODAL") {
-            // Load FlowModalInjector on-demand
-            import("../content/FlowModalInjector")
-                .then(() => {
-                    console.log("✅ FlowModalInjector loaded and triggered");
-                    sendResponse({ success: true });
-                })
-                .catch((error) => {
-                    console.error("❌ FlowModalInjector failed:", error);
-                    sendResponse({ success: false, error: error.message });
-                });
+            // FlowModalInjector is already loaded and listening
+            console.log("📅 SHOW_FLOW_MODAL handled by auto-loaded injector");
+            sendResponse({ success: true });
             return true;
         }
 

@@ -1,20 +1,16 @@
 import React, { useState, useEffect } from "react";
-import LoginScreen from "./LoginScreen";
 import FlowModal from "./FlowModal";
 
 interface AuthUser {
-    id: string;
+    uid: string;
     email: string;
-    name: string;
-    picture?: string;
+    displayName: string | null;
+    photoURL: string | null;
     accessToken: string;
-}
-
-interface AuthMessage {
-    type: string;
-    success?: boolean;
-    user?: AuthUser;
-    error?: string;
+    refreshToken: string | null;
+    plan: string;
+    subscriptionEnd: string | null;
+    createdAt: number;
 }
 
 interface FlowMessage {
@@ -24,12 +20,8 @@ interface FlowMessage {
 
 const FlowContainer: React.FC = () => {
     const [user, setUser] = useState<AuthUser | null>(null);
-    const [showLoginScreen, setShowLoginScreen] = useState(true);
     const [isVisible, setIsVisible] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
-
-    // REMOVED ALL THE OVERLAY CSS MANIPULATION LOGIC!
-    // No more pointer events manipulation, no more flow-visible classes
+    const [isCheckingAuth, setIsCheckingAuth] = useState(false);
 
     // Listen for messages from HoverNavbar and background script
     useEffect(() => {
@@ -48,11 +40,14 @@ const FlowContainer: React.FC = () => {
 
                 case "AUTH_STATE_CHANGED":
                     if (message.user) {
+                        console.log(
+                            "🔄 Auth state updated:",
+                            message.user.email,
+                        );
                         setUser(message.user);
-                        setShowLoginScreen(false);
                     } else {
+                        console.log("🔄 User signed out");
                         setUser(null);
-                        setShowLoginScreen(true);
                     }
                     sendResponse({ success: true });
                     break;
@@ -70,71 +65,70 @@ const FlowContainer: React.FC = () => {
         if (typeof chrome !== "undefined" && chrome.runtime) {
             chrome.runtime.onMessage.addListener(messageListener);
 
-            // Check initial auth state
-            checkInitialAuthState();
-
             return () => {
                 chrome.runtime.onMessage.removeListener(messageListener);
             };
         }
     }, []);
 
-    const checkInitialAuthState = async () => {
-        try {
-            if (typeof chrome !== "undefined" && chrome.runtime) {
-                const response = await chrome.runtime.sendMessage({
-                    type: "CHECK_AUTH_STATE",
-                });
+    const checkAuthState = async () => {
+        if (isCheckingAuth) return; // Prevent duplicate checks
 
-                if (response && response.user) {
-                    setUser(response.user);
-                    setShowLoginScreen(false);
-                }
-            }
-        } catch (error) {
-            console.log("🔍 No existing auth state found");
-        }
-    };
-
-    const handleShowFlow = () => {
-        console.log("📅 Showing Flow modal");
-        setIsVisible(true);
-    };
-
-    const handleGoogleLogin = async () => {
-        setIsLoading(true);
+        setIsCheckingAuth(true);
 
         try {
-            console.log("🔐 Starting Google authentication...");
+            console.log("🔍 Checking authentication state...");
 
-            if (typeof chrome !== "undefined" && chrome.runtime) {
-                const response: AuthMessage = await chrome.runtime.sendMessage({
-                    type: "GOOGLE_AUTH",
-                });
+            // Check if user is already authenticated
+            const result = await chrome.storage.local.get(["auth_user"]);
 
-                if (response.success && response.user) {
-                    console.log(
-                        "✅ Authentication successful:",
-                        response.user.email,
-                    );
-                    setUser(response.user);
-                    setShowLoginScreen(false);
-                } else {
-                    console.error("❌ Authentication failed:", response.error);
-                }
+            if (result.auth_user) {
+                console.log(
+                    "✅ User already authenticated:",
+                    result.auth_user.email,
+                );
+                setUser(result.auth_user);
+                // User can use Flow features immediately
+                return true;
             } else {
-                console.error("❌ Chrome runtime not available");
+                console.log("❌ User not authenticated, redirecting to login");
+
+                // Open login page in new tab
+                chrome.tabs.create({
+                    url: chrome.runtime.getURL("src/auth/login.html"),
+                });
+
+                // Close the current Flow modal
+                setIsVisible(false);
+                return false;
             }
         } catch (error) {
-            console.error("❌ Authentication error:", error);
+            console.error("❌ Error checking auth state:", error);
+
+            // Fallback: redirect to login
+            chrome.tabs.create({
+                url: chrome.runtime.getURL("src/auth/login.html"),
+            });
+
+            setIsVisible(false);
+            return false;
         } finally {
-            setIsLoading(false);
+            setIsCheckingAuth(false);
         }
     };
 
-    const handleContinueWithoutSignin = () => {
-        console.log("👤 Continuing without Google Calendar sync");
-        setShowLoginScreen(false);
+    const handleShowFlow = async () => {
+        console.log("📅 Flow modal requested - checking auth...");
+
+        const isAuthenticated = await checkAuthState();
+
+        if (isAuthenticated) {
+            console.log("✅ User authenticated, showing Flow modal");
+            setIsVisible(true);
+        } else {
+            console.log("❌ User not authenticated, redirected to login");
+            // Modal visibility already set to false in checkAuthState
+        }
     };
 
     const handleSignOut = async () => {
@@ -142,13 +136,34 @@ const FlowContainer: React.FC = () => {
 
         try {
             if (typeof chrome !== "undefined" && chrome.runtime) {
-                await chrome.runtime.sendMessage({ type: "SIGN_OUT" });
-            }
+                // Clear storage
+                await chrome.storage.local.remove(["auth_user", "auth_tokens"]);
 
-            setUser(null);
-            setShowLoginScreen(true);
+                // Revoke Chrome tokens if they exist
+                try {
+                    const token = await chrome.identity.getAuthToken({
+                        interactive: false,
+                    });
+                    if (token) {
+                        await chrome.identity.removeCachedAuthToken({ token });
+                    }
+                } catch (error) {
+                    console.log("Note: Could not revoke cached token:", error);
+                }
+
+                // Update local state
+                setUser(null);
+
+                // Close Flow modal
+                setIsVisible(false);
+
+                console.log("✅ Sign out successful");
+            }
         } catch (error) {
             console.error("❌ Sign out error:", error);
+            // Always clear local state even if server fails
+            setUser(null);
+            setIsVisible(false);
         }
     };
 
@@ -157,28 +172,19 @@ const FlowContainer: React.FC = () => {
         setIsVisible(false);
     };
 
-    // Don't render anything if not visible
-    if (!isVisible) {
+    // Don't render anything if not visible or checking auth
+    if (!isVisible || isCheckingAuth) {
         return null;
     }
 
+    // Only render FlowModal - no more LoginScreen
     return (
-        <>
-            {showLoginScreen ? (
-                <LoginScreen
-                    onGoogleLogin={handleGoogleLogin}
-                    onContinueWithoutSignin={handleContinueWithoutSignin}
-                    isLoading={isLoading}
-                />
-            ) : (
-                <FlowModal
-                    isVisible={true}
-                    user={user}
-                    onClose={handleClose}
-                    onSignOut={handleSignOut}
-                />
-            )}
-        </>
+        <FlowModal
+            isVisible={true}
+            user={user}
+            onClose={handleClose}
+            onSignOut={handleSignOut}
+        />
     );
 };
 

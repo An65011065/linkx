@@ -1,6 +1,5 @@
 import DataService from "./dataService";
 import { websiteBlocker } from "./websiteBlocker";
-import AuthService from "../services/authService";
 
 // Navigation source information for linking pages
 export interface SourceInfo {
@@ -857,100 +856,6 @@ class BackgroundTracker {
             }
 
             // ROBUST: Direct backend save for LyncX notes
-            if (
-                info.menuItemId === "addToLyncX" &&
-                info.selectionText &&
-                tab?.id &&
-                tab?.url
-            ) {
-                try {
-                    const domain = extractDomain(tab.url);
-                    const timestamp = new Date().toLocaleString();
-                    const selectedContent = `--- ${timestamp} ---\nFrom: ${tab.url}\n\n${info.selectionText}`;
-
-                    console.log(
-                        `📝 Saving selected text directly to backend for ${domain}`,
-                    );
-
-                    // Get AuthService instance
-                    const authService = AuthService.getInstance();
-
-                    // First, try to load existing note
-                    let existingContent = "";
-                    try {
-                        const response = await authService.makeApiCall(
-                            "GET",
-                            `/notes/${encodeURIComponent(domain)}`,
-                        );
-                        if (response.ok) {
-                            const noteData = await response.json();
-                            existingContent = noteData.content || "";
-                        }
-                    } catch {
-                        console.log("No existing note found, creating new one");
-                    }
-
-                    // Append new content to existing note
-                    const separator = existingContent.trim() ? "\n\n" : "";
-                    const updatedContent =
-                        existingContent + separator + selectedContent;
-
-                    // Save to backend
-                    const saveResponse = await authService.makeApiCall(
-                        "POST",
-                        "/notes",
-                        {
-                            domain,
-                            content: updatedContent,
-                        },
-                    );
-
-                    if (saveResponse.ok) {
-                        console.log(
-                            `✅ Selected text saved to backend for ${domain}`,
-                        );
-
-                        // Show success notification on the page
-                        chrome.tabs
-                            .sendMessage(tab.id, {
-                                action: "showNotification",
-                                message: "Added to Notes!",
-                                type: "success",
-                            })
-                            .catch(() => {
-                                // Fallback: Chrome notification if content script unavailable
-                                chrome.notifications.create({
-                                    type: "basic",
-                                    iconUrl: "/src/assets/icons/icon128.png",
-                                    title: "LyncX",
-                                    message: `Added selected text to ${domain} notes`,
-                                    priority: 1,
-                                });
-                            });
-                    } else {
-                        throw new Error("Failed to save to backend");
-                    }
-                } catch (error) {
-                    console.error("❌ Error saving selected text:", error);
-
-                    // Show error notification
-                    chrome.tabs
-                        .sendMessage(tab.id, {
-                            action: "showNotification",
-                            message: "Failed to save note",
-                            type: "error",
-                        })
-                        .catch(() => {
-                            chrome.notifications.create({
-                                type: "basic",
-                                iconUrl: "/src/assets/icons/icon128.png",
-                                title: "LyncX Error",
-                                message: "Failed to save selected text",
-                                priority: 1,
-                            });
-                        });
-                }
-            }
 
             // Smart Bookmark functionality remains unchanged
             if (
@@ -1583,30 +1488,102 @@ interface AuthStateResponse {
     error?: string;
 }
 
-async function handleGetAuthState(
-    sendResponse: (response: AuthStateResponse) => void,
-): Promise<void> {
-    try {
-        console.log("🔍 Background: Getting auth state for hover navbar");
+// Add this function anywhere in your file
+function handleAuthLogin(sendResponse: (response: any) => void) {
+    console.log("🔑 Processing authentication request...");
 
-        const authService = AuthService.getInstance();
-        const user = await authService.getCachedUser();
+    chrome.identity.getAuthToken(
+        {
+            interactive: true,
+            scopes: [
+                "openid",
+                "email",
+                "profile",
+                "https://www.googleapis.com/auth/calendar.readonly",
+                "https://www.googleapis.com/auth/calendar.events",
+            ],
+        },
+        async (token) => {
+            if (chrome.runtime.lastError) {
+                console.error("❌ Auth error:", chrome.runtime.lastError);
+                sendResponse({
+                    success: false,
+                    error: chrome.runtime.lastError.message,
+                });
+                return;
+            }
 
-        console.log(
-            "🔍 Background: Auth state result:",
-            user ? "authenticated" : "not authenticated",
-        );
+            if (!token) {
+                console.error("❌ No token received");
+                sendResponse({
+                    success: false,
+                    error: "No access token received",
+                });
+                return;
+            }
 
-        sendResponse({ user });
-    } catch (error) {
-        console.error("❌ Background: Failed to get auth state:", error);
-        sendResponse({
-            user: null,
-            error: error instanceof Error ? error.message : "Unknown error",
-        });
-    }
+            try {
+                // Get user info from Google
+                const userResponse = await fetch(
+                    "https://www.googleapis.com/oauth2/v2/userinfo",
+                    {
+                        headers: {
+                            Authorization: `Bearer ${token}`,
+                        },
+                    },
+                );
+
+                if (!userResponse.ok) {
+                    throw new Error(
+                        `Failed to get user info: ${userResponse.status}`,
+                    );
+                }
+
+                const userData = await userResponse.json();
+                console.log("👤 User data received:", userData.email);
+
+                // Create standardized user object
+                const user = {
+                    uid: userData.id,
+                    email: userData.email,
+                    displayName: userData.name || null,
+                    photoURL: userData.picture || null,
+                    accessToken: token,
+                    refreshToken: null,
+                    plan: "free",
+                    subscriptionEnd: null,
+                    createdAt: Date.now(),
+                };
+
+                // Store the user data
+                await chrome.storage.local.set({
+                    auth_user: user,
+                    auth_tokens: {
+                        accessToken: token,
+                        refreshToken: null,
+                        source: "chrome",
+                    },
+                });
+
+                console.log("✅ Authentication successful for:", user.email);
+
+                sendResponse({
+                    success: true,
+                    user: user,
+                });
+            } catch (error) {
+                console.error("❌ Error processing authentication:", error);
+                sendResponse({
+                    success: false,
+                    error:
+                        error instanceof Error
+                            ? error.message
+                            : "Authentication failed",
+                });
+            }
+        },
+    );
 }
-
 // ===============================
 // NAVBAR ACTION HANDLERS
 // ===============================
@@ -1897,169 +1874,10 @@ async function handleGetAllTabs(sendResponse: (response: any) => void) {
     }
 }
 
-async function handleLoadNote(
-    request: { domain: string },
-    sendResponse: (response: any) => void,
-): Promise<void> {
-    try {
-        console.log(`📝 Loading note for domain: ${request.domain}`);
-
-        const authService = AuthService.getInstance();
-        const response = await authService.makeApiCall(
-            "GET",
-            `/notes/${encodeURIComponent(request.domain)}`,
-        );
-
-        if (response.ok) {
-            const noteData = await response.json();
-            console.log(`✅ Loaded note from backend for ${request.domain}`);
-
-            const note = {
-                id: noteData.id,
-                domain: noteData.domain,
-                content: noteData.content,
-                lastModified: new Date(noteData.lastModified).getTime(),
-                createdAt: new Date(noteData.createdAt).getTime(),
-            };
-
-            sendResponse({
-                success: true,
-                note: note,
-            });
-        } else if (response.status === 404) {
-            // No note exists for this domain yet
-            console.log(`📝 No existing note for ${request.domain}`);
-            sendResponse({
-                success: true,
-                note: null,
-            });
-        } else {
-            throw new Error(`Failed to load note: ${response.status}`);
-        }
-    } catch (error) {
-        console.error("❌ Error loading note:", error);
-        sendResponse({
-            success: false,
-            error: error instanceof Error ? error.message : "Unknown error",
-        });
-    }
-}
-
 // Handle loading all notes for the sidebar
-async function handleLoadAllNotes(
-    sendResponse: (response: any) => void,
-): Promise<void> {
-    try {
-        console.log("📚 Loading all notes from backend - START");
-
-        const authService = AuthService.getInstance();
-        console.log("🔐 Auth service instance obtained");
-
-        console.log("🔄 Making API call to /notes");
-        const response = await authService.makeApiCall("GET", "/notes");
-        console.log("📡 API Response status:", response.status);
-
-        if (response.ok) {
-            const notesData = await response.json();
-            console.log("🔍 API Response type:", typeof notesData);
-            console.log("🔍 Is Array?", Array.isArray(notesData));
-            console.log(
-                "🔍 Raw response structure:",
-                JSON.stringify(notesData, null, 2),
-            );
-
-            let processedNotes;
-            if (!Array.isArray(notesData)) {
-                console.log("📦 Processing object response");
-                // Handle response format: { notes: [...] }
-                processedNotes = (notesData.notes || []).map(
-                    (noteData: any) => ({
-                        domain: noteData.domain,
-                        content: noteData.content,
-                        lastModified: new Date(noteData.lastModified).getTime(),
-                        createdAt: new Date(noteData.createdAt).getTime(),
-                    }),
-                );
-            } else {
-                console.log("📦 Processing array response");
-                // Handle response format: [...]
-                processedNotes = notesData.map((noteData: any) => ({
-                    domain: noteData.domain,
-                    content: noteData.content,
-                    lastModified: new Date(noteData.lastModified).getTime(),
-                    createdAt: new Date(noteData.createdAt).getTime(),
-                }));
-            }
-
-            console.log("✨ Final processed notes:", processedNotes);
-            sendResponse({
-                success: true,
-                notes: processedNotes,
-            });
-        } else {
-            console.error("❌ API call failed with status:", response.status);
-            const errorText = await response
-                .text()
-                .catch(() => "No error details available");
-            console.error("Error details:", errorText);
-            throw new Error(`Failed to load notes: ${response.status}`);
-        }
-    } catch (error) {
-        console.error("❌ Error in handleLoadAllNotes:", error);
-        console.error(
-            "Error stack:",
-            error instanceof Error ? error.stack : "No stack trace",
-        );
-        sendResponse({
-            success: false,
-            error: error instanceof Error ? error.message : "Unknown error",
-            notes: [],
-        });
-    }
-}
 
 // Handle saving a note
-async function handleSaveNote(
-    request: { domain: string; content: string },
-    sendResponse: (response: any) => void,
-): Promise<void> {
-    try {
-        console.log(`💾 Saving note for domain: ${request.domain}`);
 
-        const authService = AuthService.getInstance();
-        const response = await authService.makeApiCall("POST", "/notes", {
-            domain: request.domain,
-            content: request.content,
-        });
-
-        if (response.ok) {
-            const noteData = await response.json();
-            console.log(`✅ Note saved successfully for ${request.domain}`);
-
-            const note = {
-                id: noteData.id,
-                domain: noteData.domain,
-                content: noteData.content,
-                lastModified: new Date(noteData.lastModified).getTime(),
-                createdAt: new Date(noteData.createdAt).getTime(),
-            };
-
-            sendResponse({
-                success: true,
-                note: note,
-            });
-        } else {
-            const errorData = await response.json();
-            throw new Error(errorData.error || "Failed to save note");
-        }
-    } catch (error) {
-        console.error("❌ Error saving note:", error);
-        sendResponse({
-            success: false,
-            error: error instanceof Error ? error.message : "Unknown error",
-        });
-    }
-}
 // ============================
 // DAILY LIMITS
 // ============================
@@ -2332,242 +2150,12 @@ async function simulateAIResponse(
 // ===============================
 
 // Handle Google authentication for Flow
-async function handleGoogleAuth(sendResponse: (response: any) => void) {
-    try {
-        console.log(
-            "🔐 Starting Google authentication with calendar scopes...",
-        );
-
-        // Request auth token with calendar scopes
-        chrome.identity.getAuthToken(
-            {
-                interactive: true,
-                scopes: [
-                    "openid",
-                    "email",
-                    "profile",
-                    "https://www.googleapis.com/auth/calendar.readonly",
-                    "https://www.googleapis.com/auth/calendar.events",
-                    "https://www.googleapis.com/auth/userinfo.email",
-                    "https://www.googleapis.com/auth/userinfo.profile",
-                ],
-            },
-            async (token) => {
-                if (chrome.runtime.lastError) {
-                    console.error("❌ Auth error:", chrome.runtime.lastError);
-                    sendResponse({
-                        success: false,
-                        error: chrome.runtime.lastError.message,
-                    });
-                    return;
-                }
-
-                if (!token) {
-                    console.error("❌ No token received");
-                    sendResponse({
-                        success: false,
-                        error: "No access token received",
-                    });
-                    return;
-                }
-
-                console.log(
-                    "✅ Access token received:",
-                    token.substring(0, 20) + "...",
-                );
-
-                try {
-                    // Get user info
-                    const userResponse = await fetch(
-                        "https://www.googleapis.com/oauth2/v2/userinfo",
-                        {
-                            headers: {
-                                Authorization: `Bearer ${token}`,
-                            },
-                        },
-                    );
-
-                    if (!userResponse.ok) {
-                        throw new Error(
-                            `Failed to get user info: ${userResponse.status}`,
-                        );
-                    }
-
-                    const userData = await userResponse.json();
-                    console.log("👤 User data received:", userData.email);
-
-                    const user = {
-                        id: userData.id,
-                        email: userData.email,
-                        name: userData.name,
-                        picture: userData.picture,
-                        accessToken: token,
-                    };
-
-                    // Store the user data
-                    await chrome.storage.local.set({ user });
-
-                    // Broadcast auth state change to all tabs
-                    const tabs = await chrome.tabs.query({});
-                    tabs.forEach((tab) => {
-                        if (tab.id) {
-                            chrome.tabs
-                                .sendMessage(tab.id, {
-                                    type: "AUTH_STATE_CHANGED",
-                                    user: user,
-                                })
-                                .catch(() => {
-                                    // Ignore errors for tabs that don't have content script
-                                });
-                        }
-                    });
-
-                    sendResponse({
-                        success: true,
-                        user: user,
-                    });
-                } catch (error) {
-                    console.error("❌ Error getting user info:", error);
-                    sendResponse({
-                        success: false,
-                        error: error.message,
-                    });
-                }
-            },
-        );
-    } catch (error) {
-        console.error("❌ Authentication failed:", error);
-        sendResponse({
-            success: false,
-            error: error.message,
-        });
-    }
-}
 
 //checkpoint
 
 // Handle checking authentication state
-async function handleCheckAuthState(sendResponse: (response: any) => void) {
-    try {
-        // First check Flow-specific storage
-        const result = await chrome.storage.local.get(["user"]);
-
-        if (result.user && result.user.accessToken) {
-            console.log("✅ Found Flow user in storage:", result.user.email);
-
-            // Verify the token still works with calendar API
-            try {
-                const testResponse = await fetch(
-                    "https://www.googleapis.com/oauth2/v2/userinfo",
-                    {
-                        headers: {
-                            Authorization: `Bearer ${result.user.accessToken}`,
-                        },
-                    },
-                );
-
-                if (testResponse.ok) {
-                    console.log("✅ Flow token is still valid");
-                    sendResponse({ user: result.user });
-                    return;
-                } else {
-                    console.log("❌ Flow token is invalid, clearing...");
-                    await chrome.storage.local.remove(["user"]);
-                }
-            } catch (error) {
-                console.log("❌ Token verification failed, clearing...");
-                await chrome.storage.local.remove(["user"]);
-            }
-        }
-
-        // Fallback: try to get from AuthService
-        try {
-            const authService = AuthService.getInstance();
-            const authUser = authService.getCurrentUser();
-
-            if (authUser && authUser.gmailToken) {
-                console.log("📋 Using AuthService user for Flow");
-
-                // Convert AuthService format to Flow format
-                const flowUser = {
-                    id: authUser.uid,
-                    email: authUser.email,
-                    name: authUser.displayName || authUser.email,
-                    picture: authUser.photoURL,
-                    accessToken: authUser.gmailToken,
-                };
-
-                // Store in Flow format for next time
-                await chrome.storage.local.set({ user: flowUser });
-
-                sendResponse({ user: flowUser });
-                return;
-            }
-        } catch (error) {
-            console.log("No AuthService user available:", error);
-        }
-
-        // No valid user found
-        sendResponse({ user: null });
-    } catch (error) {
-        console.error("❌ Error checking Flow auth state:", error);
-        sendResponse({ user: null });
-    }
-}
 
 // Handle sign out
-async function handleSignOut(sendResponse: (response: any) => void) {
-    try {
-        console.log("🚪 Flow: Signing out...");
-
-        // Clear Flow-specific storage
-        await chrome.storage.local.remove(["user"]);
-
-        // Also sign out from AuthService if available
-        try {
-            const authService = AuthService.getInstance();
-            await authService.signOut();
-        } catch (error) {
-            console.log("Note: Could not sign out from AuthService:", error);
-        }
-
-        // Revoke Chrome identity tokens
-        try {
-            const token = await chrome.identity.getAuthToken({
-                interactive: false,
-            });
-            if (token) {
-                await chrome.identity.removeCachedAuthToken({ token });
-            }
-        } catch (error) {
-            console.log("Note: Could not revoke cached token:", error);
-        }
-
-        // Broadcast sign out to all tabs
-        const tabs = await chrome.tabs.query({});
-        tabs.forEach((tab) => {
-            if (tab.id) {
-                chrome.tabs
-                    .sendMessage(tab.id, {
-                        type: "AUTH_STATE_CHANGED",
-                        user: null,
-                    })
-                    .catch(() => {
-                        // Ignore errors
-                    });
-            }
-        });
-
-        console.log("✅ Flow: Sign out successful");
-        sendResponse({ success: true });
-    } catch (error) {
-        console.error("❌ Flow: Sign out failed:", error);
-        sendResponse({
-            success: false,
-            error: error instanceof Error ? error.message : "Sign out failed",
-        });
-    }
-}
 
 // Add this function
 async function handleShowExploreModal(sendResponse: (response: any) => void) {
@@ -2592,6 +2180,11 @@ async function handleShowExploreModal(sendResponse: (response: any) => void) {
 // Centralized message listener - handles ALL messages
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     console.log("Background received message:", request);
+
+    if (request.type === "AUTH_LOGIN") {
+        handleAuthLogin(sendResponse);
+        return true; // Keep message channel open for async response
+    }
 
     if (request.type === "OPEN_SETTINGS_PAGE") {
         chrome.tabs.create({
@@ -2627,20 +2220,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 
     // Note loading/saving messages
-    if (request.type === "LOAD_NOTE") {
-        handleLoadNote(request, sendResponse);
-        return true;
-    }
-
-    if (request.type === "LOAD_ALL_NOTES") {
-        handleLoadAllNotes(sendResponse);
-        return true;
-    }
-
-    if (request.type === "SAVE_NOTE") {
-        handleSaveNote(request, sendResponse);
-        return true;
-    }
 
     if (request.type === "SHOW_TIMER") {
         chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -2712,12 +2291,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return true;
     }
 
-    // Auth state messages for hover navbar
-    if (request.type === "GET_AUTH_STATE") {
-        handleGetAuthState(sendResponse);
-        return true;
-    }
-
     // Screenshot capture message
     if (request.type === "CAPTURE_SCREENSHOT") {
         handleCaptureScreenshot(sendResponse);
@@ -2781,20 +2354,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return true;
     }
 
-    if (request.type === "GOOGLE_AUTH") {
-        handleGoogleAuth(sendResponse);
-        return true;
-    }
-
-    if (request.type === "CHECK_AUTH_STATE") {
-        handleCheckAuthState(sendResponse);
-        return true;
-    }
-
-    if (request.type === "SIGN_OUT") {
-        handleSignOut(sendResponse);
-        return true;
-    }
     if (request.type === "SHOW_CLIPBOARD_MANAGER") {
         if (sender.tab?.id) {
             chrome.tabs.sendMessage(sender.tab.id, {
@@ -3043,7 +2602,7 @@ chrome.runtime.onStartup.addListener(async () => {
     }
 });
 
-chrome.runtime.onInstalled.addListener(async () => {
+chrome.runtime.onInstalled.addListener(async (details) => {
     console.log("🟢 Extension installed/updated");
 
     // Ensure we have a fresh instance
@@ -3051,6 +2610,26 @@ chrome.runtime.onInstalled.addListener(async () => {
         backgroundTracker.destroy();
     }
     backgroundTracker = BackgroundTracker.getInstance();
+
+    // NEW: Open login page on fresh install
+    if (details?.reason === "install") {
+        console.log("🔑 Opening login page for new user...");
+
+        // Check if user is already authenticated
+        const result = await chrome.storage.local.get(["auth_user"]);
+
+        if (!result.auth_user) {
+            // User not authenticated, show login page
+            chrome.tabs.create({
+                url: chrome.runtime.getURL("src/auth/login.html"),
+            });
+        } else {
+            console.log(
+                "✅ User already authenticated:",
+                result.auth_user.email,
+            );
+        }
+    }
 
     // Clean up any existing timers on install
     chrome.storage.local.get(null, (items) => {
@@ -3108,29 +2687,6 @@ chrome.runtime.onInstalled.addListener(async () => {
 });
 
 // Set up auth state change listener for hover navbar
-const authService = AuthService.getInstance();
-authService.onAuthStateChanged((user) => {
-    console.log(
-        "🔄 Background: Auth state changed, notifying content scripts:",
-        user ? "authenticated" : "not authenticated",
-    );
-
-    // Notify all content scripts about auth state changes
-    chrome.tabs.query({}, (tabs) => {
-        tabs.forEach((tab) => {
-            if (tab.id) {
-                chrome.tabs
-                    .sendMessage(tab.id, {
-                        type: "AUTH_STATE_CHANGED",
-                        user: user,
-                    })
-                    .catch(() => {
-                        // Ignore errors - content script may not be loaded
-                    });
-            }
-        });
-    });
-});
 
 // ===============================
 // ANALYTICS MODAL HANDLER

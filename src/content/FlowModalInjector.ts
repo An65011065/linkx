@@ -1,161 +1,172 @@
-// FlowModalInjector.ts - Clean, on-demand Flow modal injection
+// FlowModalInjector.ts - Refactored to Analytics pattern for instant response
 import React from "react";
-import { createRoot } from "react-dom/client";
+import ReactDOM from "react-dom/client";
 import FlowContainer from "../components/FlowContainer";
 
-class FlowModalInjector {
-    private static instance: FlowModalInjector | null = null;
+class FlowInjector {
     private container: HTMLDivElement | null = null;
-    private root: ReturnType<typeof createRoot> | null = null;
+    private root: ReactDOM.Root | null = null;
     private isInjected = false;
+    private isVisible = false;
 
-    private constructor() {
-        console.log("📅 FlowModalInjector initialized");
+    constructor() {
+        console.log("📅 FlowInjector created at:", new Date().toISOString());
     }
 
-    static getInstance(): FlowModalInjector {
-        if (!FlowModalInjector.instance) {
-            FlowModalInjector.instance = new FlowModalInjector();
+    private injectFlow() {
+        if (this.isInjected) {
+            console.log("⚠️ Flow modal already injected, skipping");
+            return;
         }
-        return FlowModalInjector.instance;
+
+        console.log("📅 Starting flow modal injection...");
+
+        try {
+            // Create container
+            this.container = document.createElement("div");
+            this.container.id = "lyncx-flow-root";
+            this.container.style.cssText = `
+                position: fixed !important;
+                top: 0 !important;
+                left: 0 !important;
+                z-index: 9999999 !important;
+                pointer-events: none !important;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif !important;
+            `;
+
+            // Create shadow DOM for style isolation
+            const shadowRoot = this.container.attachShadow({ mode: "open" });
+
+            // Create React root container
+            const reactContainer = document.createElement("div");
+            reactContainer.style.pointerEvents = "auto";
+            shadowRoot.appendChild(reactContainer);
+
+            // Append to body
+            document.body.appendChild(this.container);
+
+            // Create React root and render
+            this.root = ReactDOM.createRoot(reactContainer);
+            this.renderFlow();
+
+            this.isInjected = true;
+            console.log("✅ Flow modal injected successfully");
+        } catch (error) {
+            console.error("❌ Failed to inject flow modal:", error);
+        }
     }
 
-    public showFlow(): void {
-        console.log("📅 Showing Flow modal");
+    private renderFlow() {
+        if (this.root) {
+            this.root.render(
+                React.createElement(FlowContainer, {
+                    isVisible: this.isVisible,
+                    onClose: () => {
+                        console.log("📅 Flow modal close requested");
+                        this.isVisible = false;
+                        this.renderFlow();
+                    },
+                }),
+            );
+            console.log(
+                "📅 Flow modal rendered with isVisible:",
+                this.isVisible,
+            );
+        }
+    }
+
+    public show() {
+        console.log("📅 Flow show() called");
 
         if (!this.isInjected) {
             this.injectFlow();
         }
 
-        // Flow visibility is handled by FlowContainer's internal state
-        // Send message to trigger show
-        if (this.container) {
-            const event = new CustomEvent("lyncx-show-flow");
-            this.container.dispatchEvent(event);
-        }
+        this.isVisible = true;
+        this.renderFlow();
     }
 
-    private injectFlow(): void {
-        if (this.isInjected) {
-            console.log("⚠️ Flow already injected, skipping");
-            return;
-        }
-
-        console.log("📅 Injecting Flow modal...");
-
-        try {
-            // Create container with ZERO footprint when invisible
-            this.container = document.createElement("div");
-            this.container.id = "lyncx-flow-modal";
-
-            // IMPORTANT: No positioning until Flow is actually shown
-            this.container.style.cssText = `
-                position: fixed !important;
-                top: 60px !important;
-                right: 20px !important;
-                width: auto !important;
-                height: auto !important;
-                z-index: 10000000 !important;
-                pointer-events: none !important;
-                background: none !important;
-                border: none !important;
-                margin: 0 !important;
-                padding: 0 !important;
-                box-shadow: none !important;
-                backdrop-filter: none !important;
-                opacity: 1 !important;
-                overflow: visible !important;
-            `;
-
-            document.body.appendChild(this.container);
-
-            // Create React root and render FlowContainer
-            this.root = createRoot(this.container);
-            this.root.render(React.createElement(FlowContainer));
-
-            this.isInjected = true;
-            console.log("✅ Flow modal injected successfully");
-        } catch (error) {
-            console.error("❌ Failed to inject Flow modal:", error);
-        }
+    public hide() {
+        console.log("📅 Flow hide() called");
+        this.isVisible = false;
+        this.renderFlow();
     }
 
-    public hideFlow(): void {
-        console.log("📅 Hiding Flow modal");
-
-        if (this.container) {
-            const event = new CustomEvent("lyncx-hide-flow");
-            this.container.dispatchEvent(event);
-        }
-    }
-
-    public destroy(): void {
-        console.log("🗑️ Destroying Flow modal");
-
-        if (this.root) {
-            this.root.unmount();
-            this.root = null;
-        }
-
+    public destroy() {
         if (this.container && this.container.parentNode) {
             this.container.parentNode.removeChild(this.container);
         }
-
         this.container = null;
+        this.root = null;
         this.isInjected = false;
-        FlowModalInjector.instance = null;
+        this.isVisible = false;
+        console.log("📅 Flow injector destroyed");
     }
 }
 
-// Listen for messages from background script
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    console.log("🔔 FlowModalInjector received message:", message.type);
+// Auto-initialize when module loads
+console.log("📅 FlowModalInjector module loading...");
+const flowInjector = new FlowInjector();
+console.log("📅 FlowInjector instance created:", flowInjector);
+
+// Set up message listener
+console.log("📅 Setting up flow message listener...");
+
+const messageListener = (message: any, sender: any, sendResponse: any) => {
+    console.log("📅 Flow injector received message:", message.type);
 
     if (message.type === "SHOW_FLOW_MODAL") {
+        console.log("📅 SHOW_FLOW_MODAL message received in injector!");
         try {
-            const injector = FlowModalInjector.getInstance();
-            injector.showFlow();
+            flowInjector.show();
             sendResponse({ success: true });
+            console.log("📅 Flow show() completed successfully");
         } catch (error) {
-            console.error("❌ Error showing Flow modal:", error);
+            console.error("❌ Error showing flow:", error);
             sendResponse({ success: false, error: error.message });
         }
         return true;
     }
 
     if (message.type === "HIDE_FLOW_MODAL") {
+        console.log("📅 HIDE_FLOW_MODAL message received in injector!");
         try {
-            const injector = FlowModalInjector.getInstance();
-            injector.hideFlow();
+            flowInjector.hide();
             sendResponse({ success: true });
+            console.log("📅 Flow hide() completed successfully");
         } catch (error) {
-            console.error("❌ Error hiding Flow modal:", error);
+            console.error("❌ Error hiding flow:", error);
             sendResponse({ success: false, error: error.message });
         }
         return true;
     }
 
     if (message.type === "CLEANUP_FLOW") {
-        try {
-            if (FlowModalInjector.instance) {
-                FlowModalInjector.instance.destroy();
-            }
-            sendResponse({ success: true });
-        } catch (error) {
-            console.error("❌ Error cleaning up Flow modal:", error);
-            sendResponse({ success: false, error: error.message });
-        }
+        flowInjector.destroy();
+        sendResponse({ success: true });
         return true;
     }
 
-    return false;
-});
+    return false; // Let other listeners handle other message types
+};
 
-// Cleanup on page unload
-window.addEventListener("beforeunload", () => {
-    if (FlowModalInjector.instance) {
-        FlowModalInjector.instance.destroy();
-    }
-});
+// Add the listener
+chrome.runtime.onMessage.addListener(messageListener);
+console.log("📅 Flow message listener registered");
 
-export default FlowModalInjector;
+// Test that the listener is working
+setTimeout(() => {
+    console.log("📅 Flow injector status check:");
+    console.log("  - Instance exists:", !!flowInjector);
+    console.log(
+        "  - Message listener active:",
+        chrome.runtime.onMessage.hasListeners(),
+    );
+    console.log(
+        "  - Container in DOM:",
+        !!document.getElementById("lyncx-flow-root"),
+    );
+}, 1000);
+
+// Export for consistency
+export default flowInjector;

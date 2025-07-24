@@ -7,7 +7,7 @@ import dotenv from "dotenv";
 dotenv.config();
 export default defineConfig(function (_a) {
     var mode = _a.mode;
-    return ({
+    return {
         plugins: [
             react(),
             crx({
@@ -21,7 +21,9 @@ export default defineConfig(function (_a) {
             },
         },
         define: {
-            "process.env.OPENAI_API_KEY": JSON.stringify(process.env.OPENAI_API_KEY),
+            "process.env.OPENAI_API_KEY": JSON.stringify(
+                process.env.OPENAI_API_KEY,
+            ),
         },
         css: {
             postcss: "./postcss.config.js",
@@ -32,14 +34,18 @@ export default defineConfig(function (_a) {
                 input: {
                     popup: resolve(__dirname, "src/popup/popup.html"),
                     graph: resolve(__dirname, "src/graph/graph.html"),
-                    dashboard: resolve(__dirname, "src/dashboard/dashboard.html"),
+                    dashboard: resolve(
+                        __dirname,
+                        "src/dashboard/dashboard.html",
+                    ),
                     main: resolve(__dirname, "src/main/main.html"),
                     landing: resolve(__dirname, "src/landing/landing.html"),
                     waterfall: resolve(__dirname, "waterfall.html"),
                     // Fixed settings path
                     settings: resolve(__dirname, "src/settings/settings.html"),
+                    login: resolve(__dirname, "src/auth/login.html"),
                 },
             },
         },
-    });
+    };
 });

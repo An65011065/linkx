@@ -133,10 +133,6 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
             </div>
 
             <style jsx>{`
-                * {
-                    color: inherit !important;
-                }
-
                 .flow-login-modal {
                     position: fixed;
                     top: 60px;
@@ -145,7 +141,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
                     max-width: 90vw;
                     background: rgba(255, 251, 235, 0.98);
                     backdrop-filter: blur(20px);
-                    border: 1px solid rgba(205, 133, 63, 0.35);
+                    border: 1px solid rgba(205, 133, 63, 0.9);
                     border-radius: 16px;
                     overflow: hidden;
                     box-shadow: 0 24px 48px rgba(160, 82, 45, 0.15);
@@ -153,7 +149,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({
                     z-index: 10000000;
                     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
                         system-ui, sans-serif;
-                    /* NO FULL-SCREEN CONTAINER OR BACKDROP */
+                    pointer-events: auto;
                 }
 
                 @keyframes slideUp {

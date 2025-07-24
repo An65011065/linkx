@@ -40,6 +40,7 @@ export default defineConfig(({ mode }) => ({
                 waterfall: resolve(__dirname, "waterfall.html"),
                 // Fixed settings path
                 settings: resolve(__dirname, "src/settings/settings.html"),
+                login: resolve(__dirname, "src/auth/login.html"),
             },
         },
     },

@@ -62,7 +62,8 @@
                 "src/main/main.html",
                 "src/landing/landing.html",
                 "src/assets/fonts/*.ttf",
-                "src/assets/leaves.png"
+                "src/assets/leaves.png",
+                "src/auth/login.html"
             ],
             "matches": ["<all_urls>"]
         }
