@@ -51,7 +51,9 @@ export interface GraphVisualizationProps extends BaseComponentProps {
     orientation?: "vertical" | "horizontal";
     isStandalone?: boolean;
     searchTerm?: string;
+    selectedNodeId?: string | null;
     onSearchResults?: (count: number) => void;
+    onSearchChange?: (term: string) => void;
 }
 
 // GraphCanvas props
@@ -76,6 +78,8 @@ export interface GraphCanvasProps extends BaseComponentProps, GraphStateProps {
     onNodeHover?: (event: MouseEvent, node: SimulationNode) => void;
     onNodeLeave?: () => void;
     onCanvasClick?: () => void;
+    onZoomChange?: (zoom: number) => void;
+    onZoomReset?: () => void;
 }
 
 // NetworkRenderer props
@@ -116,14 +120,6 @@ export interface TimelineAxisProps extends BaseComponentProps, GraphStateProps {
 }
 
 // Control components props
-export interface SearchPanelProps extends BaseComponentProps, GraphStateProps {
-    searchTerm: string;
-    searchResults: Set<string>;
-    isSearchFocused: boolean;
-    onSearchChange: (value: string) => void;
-    onSearchFocus: (focused: boolean) => void;
-    onSearchClear: () => void;
-}
 
 export interface EvolutionPlayerProps
     extends BaseComponentProps,

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import type { GraphVisualizationProps } from "./GraphCanvas/types/component.types";
 import { useNetworkData } from "../hooks/useNetworkData";
 import { useTimelineLayout } from "./GraphCanvas/hooks/useTimelineLayout";
@@ -6,12 +6,14 @@ import { useDimensions } from "./GraphCanvas/hooks/useDimensions";
 import { usePathTracing } from "./GraphCanvas/hooks/usePathTracing";
 import { useExternalSearch } from "./GraphCanvas/hooks/useSearch";
 import { useEvolutionPlayer } from "./GraphCanvas/hooks/useEvolutionPlayer";
-import GraphCanvas from "./GraphCanvas/Canvas/GraphCanvas";
+import GraphCanvas, { type GraphCanvasRef } from "./GraphCanvas/Canvas/GraphCanvas";
 import { useTooltip } from "./GraphCanvas/hooks/useTooltip";
-import SearchPanel from "./GraphCanvas/Controls/SearchPanel";
+import GraphSearch from "./GraphSearch";
 import ActionButtons from "./GraphCanvas/Controls/ActionButtons";
 import InfoDisplay from "./GraphCanvas/Controls/InfoDisplay";
 import EvolutionPlayer from "./GraphCanvas/Controls/EvolutionPlayer";
+import ZoomControl from "./GraphCanvas/Controls/ZoomControl";
+import BackToTop from "./GraphCanvas/Controls/BackToTop";
 import LoadingState from "./GraphCanvas/UI/LoadingState";
 import EmptyState from "./GraphCanvas/UI/EmptyState";
 import ErrorState from "./GraphCanvas/UI/ErrorState";
@@ -32,7 +34,9 @@ const GraphVisualization: React.FC<GraphVisualizationProps> = ({
     orientation = "vertical",
     isStandalone = false,
     searchTerm = "",
+    selectedNodeId = null,
     onSearchResults,
+    onSearchChange,
     className,
     style,
 }) => {
@@ -43,6 +47,10 @@ const GraphVisualization: React.FC<GraphVisualizationProps> = ({
     const [viewOrientation, setViewOrientation] = useState<
         "vertical" | "horizontal"
     >(orientation);
+
+    // Zoom state
+    const [currentZoom, setCurrentZoom] = useState(isStandalone ? 0.8 : 0.7);
+    const graphCanvasRef = useRef<GraphCanvasRef>(null);
 
     // Fetch network data
     const {
@@ -260,10 +268,49 @@ const GraphVisualization: React.FC<GraphVisualizationProps> = ({
         }
     }, [containerRef]);
 
+    const handleZoomChange = useCallback((zoom: number) => {
+        setCurrentZoom(zoom);
+    }, []);
+
+    const handleZoomReset = useCallback(() => {
+        const initialZoom = isStandalone ? 0.8 : 0.7;
+        setCurrentZoom(initialZoom);
+    }, [isStandalone]);
+
+    const handleBackToTop = useCallback(() => {
+        // Force scroll to absolute top with multiple approaches
+        const scrollToTop = () => {
+            // Method 1: Direct window scroll
+            window.scrollTo({ 
+                top: 0, 
+                left: 0,
+                behavior: 'smooth' 
+            });
+            
+            // Method 2: Document element scroll
+            document.documentElement.scrollTop = 0;
+            document.body.scrollTop = 0;
+        };
+        
+        scrollToTop();
+        
+        // Fallback: Force scroll after a short delay
+        setTimeout(() => {
+            window.scrollTo({ top: 0, behavior: 'instant' });
+        }, 100);
+    }, []);
+
     // Update view orientation when prop changes
     useEffect(() => {
         setViewOrientation(orientation);
     }, [orientation]);
+
+    // Trigger pathfinding when selectedNodeId prop changes
+    useEffect(() => {
+        if (selectedNodeId && filteredNodes.some(node => node.id === selectedNodeId)) {
+            tracePathToNode(selectedNodeId);
+        }
+    }, [selectedNodeId, filteredNodes, tracePathToNode]);
 
     // Keyboard shortcuts
     useEffect(() => {
@@ -370,6 +417,7 @@ const GraphVisualization: React.FC<GraphVisualizationProps> = ({
         >
             {/* Main Graph Canvas */}
             <GraphCanvas
+                ref={graphCanvasRef}
                 nodes={filteredNodes}
                 links={filteredLinks}
                 dimensions={dimensions}
@@ -390,19 +438,23 @@ const GraphVisualization: React.FC<GraphVisualizationProps> = ({
                 onNodeHover={handleNodeHover}
                 onNodeLeave={handleNodeLeave}
                 onCanvasClick={handleCanvasClick}
+                onZoomChange={handleZoomChange}
+                onZoomReset={handleZoomReset}
             />
 
             {/* Control Components - only show if controls are enabled */}
             {showControls && (
                 <>
-                    {/* Search Results Panel */}
-                    {!isStandalone && (
-                        <SearchPanel
-                            searchTerm={searchTerm}
-                            searchResults={searchResults}
-                            isDarkMode={isDarkMode}
-                        />
-                    )}
+                    {/* Graph Search Input */}
+                    <GraphSearch
+                        searchTerm={searchTerm}
+                        onSearchChange={onSearchChange || (() => {})}
+                        searchResults={searchResults}
+                        nodes={filteredNodes}
+                        onNodeSelect={tracePathToNode}
+                        isDarkMode={isDarkMode}
+                    />
+
 
                     {/* Action Buttons */}
                     <ActionButtons
@@ -445,6 +497,28 @@ const GraphVisualization: React.FC<GraphVisualizationProps> = ({
                         isDarkMode={isDarkMode}
                         onClearPath={clearPath}
                     />
+
+                    {/* Zoom Control - only show in standalone mode */}
+                    {isStandalone && (
+                        <ZoomControl
+                            isDarkMode={isDarkMode}
+                            zoom={currentZoom}
+                            onZoomChange={(zoom) => {
+                                graphCanvasRef.current?.setZoom(zoom);
+                            }}
+                            onReset={() => {
+                                graphCanvasRef.current?.reset();
+                            }}
+                        />
+                    )}
+
+                    {/* Back to Top Button - only show in standalone mode */}
+                    {isStandalone && (
+                        <BackToTop
+                            isDarkMode={isDarkMode}
+                            onClick={handleBackToTop}
+                        />
+                    )}
                 </>
             )}
         </div>

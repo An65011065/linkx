@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useCallback, useState } from "react";
+import React, { useRef, useEffect, useCallback, useState, useImperativeHandle, forwardRef } from "react";
 import * as d3 from "d3";
 import type { NetworkNode, NetworkLink } from "../../../types/network.types";
 import type { GraphCanvasProps } from "../types/component.types";
@@ -8,11 +8,17 @@ import NetworkRenderer from "./NetworkRenderer";
 import TimelineAxis from "./TimelineAxis";
 import { ZOOM_CONSTANTS } from "../utils/constants";
 
+export interface GraphCanvasRef {
+    setZoom: (zoom: number) => void;
+    reset: () => void;
+    getCurrentZoom: () => number;
+}
+
 /**
  * Updated GraphCanvas component that orchestrates the rendering pipeline
  * Uses shared layout engine to coordinate NetworkRenderer and TimelineAxis
  */
-const GraphCanvas: React.FC<GraphCanvasProps> = ({
+const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
     nodes,
     links,
     maxNodesPerRow,
@@ -32,9 +38,11 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({
     onNodeHover,
     onNodeLeave,
     onCanvasClick,
+    onZoomChange,
+    onZoomReset,
     className,
     style,
-}) => {
+}, ref) => {
     const svgRef = useRef<SVGSVGElement>(null);
     const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(
         null,
@@ -48,6 +56,10 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({
         undefined
     > | null>(null);
     const [svgReady, setSvgReady] = useState(false);
+
+    // Zoom and pan state
+    const [currentZoom, setCurrentZoom] = useState(isStandalone ? ZOOM_CONSTANTS.STANDALONE_SCALE : ZOOM_CONSTANTS.DEFAULT_SCALE);
+    const [currentTransform, setCurrentTransform] = useState<d3.ZoomTransform | null>(null);
 
     // Get container dimensions
     const { dimensions, containerRef, isReady } = useDimensions();
@@ -75,6 +87,61 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({
         },
         [layoutResult.simulationNodes],
     );
+
+    // Handle external zoom change
+    const handleExternalZoomChange = useCallback((zoomLevel: number) => {
+        if (!svgRef.current || !zoomRef.current) return;
+        
+        const svg = d3.select(svgRef.current);
+        const currentTransform = d3.zoomTransform(svgRef.current);
+        
+        // Create new transform with same translation but new scale
+        const newTransform = d3.zoomIdentity
+            .translate(currentTransform.x, currentTransform.y)
+            .scale(zoomLevel);
+            
+        svg.transition()
+            .duration(200)
+            .call(zoomRef.current.transform, newTransform);
+            
+        setCurrentZoom(zoomLevel);
+        onZoomChange?.(zoomLevel);
+    }, [onZoomChange]);
+
+    // Handle zoom reset
+    const handleZoomReset = useCallback(() => {
+        if (!svgRef.current || !zoomRef.current) return;
+        
+        const svg = d3.select(svgRef.current);
+        const initialScale = isStandalone ? ZOOM_CONSTANTS.STANDALONE_SCALE : ZOOM_CONSTANTS.DEFAULT_SCALE;
+        
+        let initialTransform;
+        if (isStandalone) {
+            const translateX = (dimensions.width * (1 - initialScale)) / 2;
+            const translateY = (dimensions.height * (1 - initialScale)) / 2;
+            initialTransform = d3.zoomIdentity
+                .translate(translateX, translateY)
+                .scale(initialScale);
+        } else {
+            initialTransform = d3.zoomIdentity
+                .translate(0, 0)
+                .scale(initialScale);
+        }
+        
+        svg.transition()
+            .duration(300)
+            .call(zoomRef.current.transform, initialTransform);
+            
+        setCurrentZoom(initialScale);
+        onZoomReset?.();
+    }, [isStandalone, dimensions, onZoomReset]);
+
+    // Expose zoom control functions via ref
+    useImperativeHandle(ref, () => ({
+        setZoom: handleExternalZoomChange,
+        reset: handleZoomReset,
+        getCurrentZoom: () => currentZoom
+    }), [handleExternalZoomChange, handleZoomReset, currentZoom]);
 
     // Setup SVG and zoom behavior
     useEffect(() => {
@@ -110,59 +177,58 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({
         // Create main group for all content
         const mainGroup = svg.append("g").attr("class", "main-group");
 
-        // Setup zoom behavior (only in non-standalone mode)
-        if (!isStandalone) {
-            const zoom = d3
-                .zoom<SVGSVGElement, unknown>()
-                .scaleExtent([
-                    ZOOM_CONSTANTS.MIN_SCALE,
-                    ZOOM_CONSTANTS.MAX_SCALE,
-                ])
-                .filter((event) => {
-                    // Properly handle touch events to avoid passive listener warnings
-                    if (
-                        event.type === "touchstart" ||
-                        event.type === "touchmove"
-                    ) {
-                        // Only prevent default if we're actually in a drag/zoom area
-                        const target = event.target as Element;
-                        const isNodeGroup = target.closest(".node-group");
+        // Setup zoom behavior (now enabled for both standalone and non-standalone mode)
+        const zoom = d3
+            .zoom<SVGSVGElement, unknown>()
+            .scaleExtent([
+                ZOOM_CONSTANTS.MIN_SCALE,
+                ZOOM_CONSTANTS.MAX_SCALE,
+            ])
+            .filter((event) => {
+                // Properly handle touch events to avoid passive listener warnings
+                if (
+                    event.type === "touchstart" ||
+                    event.type === "touchmove"
+                ) {
+                    // Only prevent default if we're actually in a drag/zoom area
+                    const target = event.target as Element;
+                    const isNodeGroup = target.closest(".node-group");
 
-                        if (isNodeGroup) {
-                            // Let node drag handle this
-                            return false;
-                        }
-
-                        // For canvas touches, we want to handle zoom/pan
-                        // But mark as passive-friendly by not calling preventDefault unnecessarily
-                        return true;
+                    if (isNodeGroup) {
+                        // Let node drag handle this
+                        return false;
                     }
 
-                    // For mouse events, exclude node groups
-                    return !event.target.closest(".node-group");
-                })
-                .on("zoom", (event) => {
-                    mainGroup.attr("transform", event.transform);
-                });
+                    // For canvas touches, we want to handle zoom/pan
+                    // But mark as passive-friendly by not calling preventDefault unnecessarily
+                    return true;
+                }
 
-            // For horizontal dynamic width, limit zoom behavior
-            if (hasDynamicWidth && viewOrientation === "horizontal") {
-                zoom.translateExtent([
-                    [0, 0],
-                    [dynamicWidth, dimensions.height],
-                ]);
-            }
+                // For mouse events, exclude node groups
+                return !event.target.closest(".node-group");
+            })
+            .on("zoom", (event) => {
+                mainGroup.attr("transform", event.transform);
+                setCurrentZoom(event.transform.k);
+                setCurrentTransform(event.transform);
+                onZoomChange?.(event.transform.k);
+            });
 
-            // Apply zoom behavior
-            svg.call(zoom).on("dblclick.zoom", null);
-            zoomRef.current = zoom;
+        // For horizontal dynamic width, limit zoom behavior
+        if (hasDynamicWidth && viewOrientation === "horizontal") {
+            zoom.translateExtent([
+                [0, 0],
+                [dynamicWidth, dimensions.height],
+            ]);
+        }
 
-            // Set initial transform - no centering here, let layout handle it
-            const initialTransform = d3.zoomIdentity
-                .translate(0, 0) // No initial offset - layout will center itself
-                .scale(ZOOM_CONSTANTS.DEFAULT_SCALE);
-            svg.call(zoom.transform, initialTransform);
-        } else {
+        // Apply zoom behavior
+        svg.call(zoom).on("dblclick.zoom", null);
+        zoomRef.current = zoom;
+
+        // Set initial transform
+        let initialTransform;
+        if (isStandalone) {
             // FIXED: In standalone mode, scale down and center the result
             const scale = ZOOM_CONSTANTS.STANDALONE_SCALE;
 
@@ -182,11 +248,19 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({
                 viewOrientation,
             });
 
-            const standaloneTransform = d3.zoomIdentity
+            initialTransform = d3.zoomIdentity
                 .translate(translateX, translateY)
                 .scale(scale);
-            mainGroup.attr("transform", standaloneTransform);
+        } else {
+            // Set initial transform - no centering here, let layout handle it
+            initialTransform = d3.zoomIdentity
+                .translate(0, 0) // No initial offset - layout will center itself
+                .scale(ZOOM_CONSTANTS.DEFAULT_SCALE);
         }
+        
+        svg.call(zoom.transform, initialTransform);
+        setCurrentZoom(initialTransform.k);
+        setCurrentTransform(initialTransform);
 
         // Create arrow marker for links
         const arrowColor = isDarkMode
@@ -269,11 +343,7 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({
                 ref={svgRef}
                 width="100%"
                 height="100%"
-                className={`block absolute top-0 left-0 ${
-                    isStandalone
-                        ? "cursor-default"
-                        : "cursor-grab active:cursor-grabbing"
-                }`}
+                className="block absolute top-0 left-0 cursor-grab active:cursor-grabbing"
                 onClick={handleCanvasClick}
             >
                 {/* TimelineAxis and NetworkRenderer will render into the mainGroup */}
@@ -332,6 +402,8 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({
             )}
         </div>
     );
-};
+});
+
+GraphCanvas.displayName = 'GraphCanvas';
 
 export default GraphCanvas;

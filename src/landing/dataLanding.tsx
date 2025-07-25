@@ -7,7 +7,7 @@ import type { BrowsingSession } from "../data/dataService";
 
 interface DomainData {
     domain: string;
-    time: number;
+    time: number; // Now in milliseconds
     category: "productive" | "leisure";
 }
 
@@ -101,7 +101,7 @@ const DataLandingPage: React.FC<DataLandingPageProps> = ({
         .slice(0, 16)
         .map((domain) => ({
             domain: domain.domain,
-            time: Math.round(domain.time / (1000 * 60)), // Convert ms to minutes
+            time: domain.time, // Keep in milliseconds for formatTime function
             category:
                 domain.category === "work" || domain.category === "other"
                     ? "productive"
@@ -340,7 +340,7 @@ const DataLandingPage: React.FC<DataLandingPageProps> = ({
                                             800 + index * 50
                                         }ms`,
                                     }}
-                                    title={`${domain.domain} - ${domain.time}m`}
+                                    title={`${domain.domain} - ${formatTime(domain.time)}`}
                                 >
                                     <div className="w-8 h-8 flex items-center justify-center">
                                         <img
@@ -384,7 +384,7 @@ const DataLandingPage: React.FC<DataLandingPageProps> = ({
                                                 : "text-purple-600 group-hover:text-purple-700"
                                         }`}
                                     >
-                                        {domain.time}m
+                                        {formatTime(domain.time)}
                                     </span>
                                 </div>
                             ))}

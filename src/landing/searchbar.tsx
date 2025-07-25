@@ -229,12 +229,12 @@ const SearchBar: React.FC<SearchBarProps> = ({
         }
     }, [searchQuery, searchType, generateNetworkSuggestions, isSearchFocused]);
 
-    // Auto-select Network type when on network page
+    // Auto-select Network type when on network page (only on initial load)
     useEffect(() => {
-        if (isNetworkPage && onSearchTypeChange && searchType !== "Network") {
+        if (isNetworkPage && onSearchTypeChange && searchType !== "Network" && searchType === "Search") {
             onSearchTypeChange("Network");
         }
-    }, [isNetworkPage, onSearchTypeChange, searchType]);
+    }, [isNetworkPage, onSearchTypeChange]);
 
     // Rotate placeholder text for insights
     useEffect(() => {
@@ -275,12 +275,42 @@ const SearchBar: React.FC<SearchBarProps> = ({
             document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
+    const truncateTitle = (title: string, maxLength: number = 40) => {
+        if (title.length <= maxLength) return title;
+        return title.substring(0, maxLength).trim() + '...';
+    };
+
+    const scrollToGraph = useCallback(() => {
+        const graphElement = document.querySelector('[data-graph-section]') as HTMLElement;
+        if (graphElement) {
+            graphElement.scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'start'
+            });
+        } else {
+            window.scrollTo({ 
+                top: window.innerHeight, 
+                behavior: 'smooth' 
+            });
+        }
+    }, []);
+
     // Handle network URL selection
     const handleNetworkUrlSelect = (suggestion: UrlSuggestion) => {
-        onSearchQueryChange(suggestion.domain); // Show domain in search bar
+        console.log('📋 Dropdown item selected:', suggestion.title);
+        const truncatedTitle = truncateTitle(suggestion.title);
+        onSearchQueryChange(truncatedTitle); // Show truncated tab title in search bar
         setShowNetworkSuggestions(false);
         setIsSearchFocused(false);
         onNetworkUrlSelect?.(suggestion.url, suggestion.id);
+        
+        // Scroll to graph when dropdown item is selected
+        if (isNetworkPage) {
+            console.log('🔽 Dropdown selection - triggering scroll');
+            setTimeout(() => {
+                scrollToGraph();
+            }, 100);
+        }
     };
 
     // Handle keyboard navigation for network suggestions
@@ -330,7 +360,16 @@ const SearchBar: React.FC<SearchBarProps> = ({
     const handleKeyPress = (e: React.KeyboardEvent) => {
         // handleKeyDown already handles Enter for network suggestions
         if (searchType !== "Network" && e.key === "Enter") {
+            console.log('⏎ Enter key pressed - triggering search and scroll');
             onSearch();
+            
+            // Scroll to graph when Enter is pressed
+            if (isNetworkPage && (searchType === "Insights" || searchType === "Network") && searchQuery.trim()) {
+                console.log('🔽 Enter key - triggering scroll');
+                setTimeout(() => {
+                    scrollToGraph();
+                }, 100);
+            }
         }
     };
 
@@ -518,7 +557,16 @@ const SearchBar: React.FC<SearchBarProps> = ({
 
                         {/* Enhanced send button */}
                         <button
-                            onClick={onSearch}
+                            onClick={() => {
+                                onSearch();
+                                // Trigger scroll to graph if it's a search on network page
+                                if (isNetworkPage && (searchType === "Insights" || searchType === "Network") && searchQuery.trim()) {
+                                    console.log('🟡 Yellow button clicked - triggering scroll');
+                                    setTimeout(() => {
+                                        scrollToGraph();
+                                    }, 100);
+                                }
+                            }}
                             className={`p-2 rounded-lg transition-all duration-300 hover:scale-110 active:scale-95 hover:rotate-6 group ${buttonColors.base} shadow-lg ${buttonColors.hoverShadow}`}
                             style={{ boxShadow: buttonColors.shadow }}
                         >

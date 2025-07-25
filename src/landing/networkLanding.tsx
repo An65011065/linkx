@@ -194,12 +194,43 @@ const NetworkLandingPage: React.FC<NetworkLandingPageProps> = ({
         setSearchQuery(searchTerm);
     }, []);
 
-    const handleNetworkUrlSelect = (url: string, nodeId: string) => {
-        setSelectedNodeId(nodeId);
-        setSearchQuery(new URL(url).hostname);
+    const truncateTitle = (title: string, maxLength: number = 40) => {
+        if (title.length <= maxLength) return title;
+        return title.substring(0, maxLength).trim() + '...';
     };
 
+    const handleNetworkUrlSelect = (url: string, nodeId: string) => {
+        console.log('🔗 Network URL selected:', url, nodeId);
+        setSelectedNodeId(nodeId);
+        // Find the node to get its title instead of just the domain
+        const selectedNode = networkNodes?.find(node => node.id === nodeId);
+        const displayText = selectedNode?.title || new URL(url).hostname;
+        const truncatedTitle = truncateTitle(displayText);
+        setSearchQuery(truncatedTitle);
+        // Auto-scroll to graph section when a network URL is selected
+        scrollToGraph();
+    };
+
+    const scrollToGraph = useCallback(() => {
+        console.log('🔽 Scroll to graph triggered');
+        const graphElement = document.querySelector('[data-graph-section]') as HTMLElement;
+        if (graphElement) {
+            console.log('📍 Graph element found, scrolling...');
+            graphElement.scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'start'
+            });
+        } else {
+            console.log('❌ Graph element not found, using fallback');
+            window.scrollTo({ 
+                top: window.innerHeight, 
+                behavior: 'smooth' 
+            });
+        }
+    }, []);
+
     const handleSearch = () => {
+        console.log('🔍 Search triggered:', searchQuery, 'Type:', searchType);
         if (searchQuery.trim()) {
             if (searchType === "Search") {
                 if (searchQuery.includes(".") && !searchQuery.includes(" ")) {
@@ -213,7 +244,13 @@ const NetworkLandingPage: React.FC<NetworkLandingPageProps> = ({
                     );
                 }
             } else if (searchType === "Insights") {
+                console.log('📊 Insights search - triggering scroll');
                 handleGraphSearch(searchQuery);
+                scrollToGraph();
+            } else if (searchType === "Network") {
+                console.log('🌐 Network search - triggering scroll');
+                handleGraphSearch(searchQuery);
+                scrollToGraph();
             }
         }
     };
@@ -458,6 +495,7 @@ const NetworkLandingPage: React.FC<NetworkLandingPageProps> = ({
 
             {/* GraphVisualization */}
             <div
+                data-graph-section
                 className={`w-full h-screen relative z-[9000] transition-all duration-700 ease-out ${
                     isInitialLoad
                         ? "opacity-0 translate-y-4"
@@ -468,10 +506,19 @@ const NetworkLandingPage: React.FC<NetworkLandingPageProps> = ({
                 <GraphVisualization
                     orientation="horizontal"
                     isStandalone={true}
-                    searchTerm={searchType === "Insights" ? searchQuery : ""}
+                    searchTerm={searchQuery}
+                    selectedNodeId={selectedNodeId}
                     onSearchResults={(count) =>
                         console.log(`Found ${count} results`)
                     }
+                    onSearchChange={(term) => {
+                        setSearchQuery(term);
+                        setSearchType("Insights");
+                        // Auto-scroll when search changes in the graph
+                        if (term.trim()) {
+                            scrollToGraph();
+                        }
+                    }}
                     className="w-full h-full"
                     style={{
                         position: "absolute",
@@ -486,7 +533,40 @@ const NetworkLandingPage: React.FC<NetworkLandingPageProps> = ({
             {/* Global styles */}
             <style>{`
                 * { margin: 0; padding: 0; box-sizing: border-box; }
-                html, body { height: 100%; overflow-x: hidden; scroll-behavior: smooth; }
+                html, body { 
+                    height: 100%; 
+                    overflow-x: hidden; 
+                    scroll-behavior: smooth;
+                    /* Disable browser zoom */
+                    touch-action: pan-x pan-y;
+                    -ms-touch-action: pan-x pan-y;
+                }
+                
+                /* Disable zoom on double tap and pinch */
+                * {
+                    -webkit-touch-callout: none;
+                    -webkit-user-select: none;
+                    -khtml-user-select: none;
+                    -moz-user-select: none;
+                    -ms-user-select: none;
+                    user-select: none;
+                    -webkit-tap-highlight-color: transparent;
+                }
+                
+                /* Re-enable text selection for inputs and text elements */
+                input, textarea, [contenteditable] {
+                    -webkit-user-select: text;
+                    -khtml-user-select: text;
+                    -moz-user-select: text;
+                    -ms-user-select: text;
+                    user-select: text;
+                }
+                
+                /* Prevent zoom on input focus (iOS Safari) */
+                input, select, textarea {
+                    font-size: 16px !important;
+                }
+                
                 input::placeholder { color: ${
                     isDarkMode
                         ? "rgba(148, 163, 184, 0.5)"
