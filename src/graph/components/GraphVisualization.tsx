@@ -288,7 +288,7 @@ const GraphVisualization: React.FC<GraphVisualizationProps> = ({
                 className={`w-full h-screen flex items-center justify-center transition-all duration-300 ${
                     isDarkMode
                         ? "bg-gradient-to-br from-gray-900 to-slate-800"
-                        : "bg-gradient-to-br from-amber-50 to-orange-50"
+                        : "bg-gray-50"
                 } ${className || ""}`}
                 style={style}
             >
@@ -364,7 +364,7 @@ const GraphVisualization: React.FC<GraphVisualizationProps> = ({
             className={`w-full h-screen relative overflow-hidden transition-all duration-300 ${
                 isDarkMode
                     ? "bg-gradient-to-br from-gray-900 to-slate-800"
-                    : "bg-gradient-to-br from-amber-50 to-orange-50"
+                    : "bg-gray-50"
             } ${className || ""}`}
             style={style}
         >

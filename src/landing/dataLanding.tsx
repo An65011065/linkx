@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { Search, ArrowRight, Moon, Sun, ArrowLeft, Globe } from "lucide-react";
+import { Calendar, Globe, TrendingUp, Clock, Focus } from "lucide-react";
+import SearchBar from "./searchbar";
+import FloatingHeader from "./FloatingHeader";
 import DataService from "../data/dataService";
 import type { BrowsingSession } from "../data/dataService";
-import "./landing.css";
 
 interface DomainData {
     domain: string;
@@ -12,6 +13,7 @@ interface DomainData {
 
 interface DataLandingPageProps {
     isDarkMode: boolean;
+    onToggleDarkMode: () => void;
     currentPage: "main" | "data" | "network";
     onNavigate: (page: "main" | "data" | "network") => void;
 }
@@ -28,11 +30,15 @@ interface AnalyticsData {
 
 const DataLandingPage: React.FC<DataLandingPageProps> = ({
     isDarkMode,
+    onToggleDarkMode,
     currentPage,
     onNavigate,
 }) => {
     const [searchQuery, setSearchQuery] = useState("");
-    const [isSearchFocused, setIsSearchFocused] = useState(false);
+    const [searchType, setSearchType] = useState<"Search" | "Insights">(
+        "Search",
+    );
+    const [isInitialLoad, setIsInitialLoad] = useState(true);
 
     // Real data state
     const [analyticsData, setAnalyticsData] = useState<AnalyticsData>({
@@ -96,14 +102,13 @@ const DataLandingPage: React.FC<DataLandingPageProps> = ({
         .map((domain) => ({
             domain: domain.domain,
             time: Math.round(domain.time / (1000 * 60)), // Convert ms to minutes
-            // Fix category mapping: work + other = productive, social = leisure
             category:
                 domain.category === "work" || domain.category === "other"
                     ? "productive"
                     : "leisure",
         }));
 
-    // Calculate totals from real data (fixed to match new category logic)
+    // Calculate totals from real data
     const totalTime = analyticsData.currentSession?.stats.totalTime || 0;
     const productiveTime =
         (analyticsData.currentSession?.stats.workTime || 0) +
@@ -121,16 +126,17 @@ const DataLandingPage: React.FC<DataLandingPageProps> = ({
     const productivePercentage =
         totalTime > 0 ? Math.round((productiveTime / totalTime) * 100) : 0;
 
+    // Handle initial load animation
+    useEffect(() => {
+        const timer = setTimeout(() => setIsInitialLoad(false), 100);
+        return () => clearTimeout(timer);
+    }, []);
+
     const getGreeting = () => {
-        const now = new Date();
-        const hour = now.getHours();
-        let greeting = "Hello";
-
-        if (hour < 12) greeting = "Good morning";
-        else if (hour < 17) greeting = "Good afternoon";
-        else greeting = "Good evening";
-
-        return greeting;
+        const hour = new Date().getHours();
+        if (hour < 12) return "Your morning focus";
+        if (hour < 17) return "Your afternoon insights";
+        return "Your daily journey";
     };
 
     const handleSearch = () => {
@@ -148,6 +154,23 @@ const DataLandingPage: React.FC<DataLandingPageProps> = ({
         }
     };
 
+    // Show loading state
+    if (analyticsData.loading) {
+        return (
+            <div
+                className={`min-h-screen flex items-center justify-center transition-all duration-500 ${
+                    isDarkMode ? "bg-slate-950" : "bg-gray-50"
+                }`}
+            >
+                <div
+                    className={`animate-spin rounded-full h-12 w-12 border-b-2 ${
+                        isDarkMode ? "border-slate-400" : "border-gray-600"
+                    }`}
+                />
+            </div>
+        );
+    }
+
     const formatTime = (milliseconds: number): string => {
         const totalMinutes = Math.round(milliseconds / (1000 * 60));
         const hours = Math.floor(totalMinutes / 60);
@@ -157,124 +180,79 @@ const DataLandingPage: React.FC<DataLandingPageProps> = ({
         return `${hours}h ${mins}m`;
     };
 
-    // Show loading state
-    if (analyticsData.loading) {
-        return (
-            <div
-                className={`min-h-screen flex items-center justify-center transition-all duration-500 ${
-                    isDarkMode
-                        ? "bg-slate-950"
-                        : "bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100"
-                }`}
-            >
-                <div
-                    className={`animate-spin rounded-full h-12 w-12 border-b-2 ${
-                        isDarkMode ? "border-slate-400" : "border-amber-600"
-                    }`}
-                />
-            </div>
-        );
-    }
-
     return (
         <div
-            className={`min-h-screen transition-all duration-500 ${
-                isDarkMode
-                    ? "bg-slate-950"
-                    : "bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100"
+            className={`min-h-screen h-screen w-full transition-all duration-700 ease-out ${
+                isDarkMode ? "bg-slate-950" : "bg-gray-50"
             }`}
+            style={{
+                margin: 0,
+                padding: 0,
+                position: "relative",
+                overflow: "hidden",
+            }}
         >
-            {/* Header - Using same spacing and styling as main page */}
-            <div className="flex justify-between items-center p-6">
-                <div
-                    className={`flex items-center gap-1 p-1 rounded-xl backdrop-blur-sm border ${
-                        isDarkMode
-                            ? "bg-slate-800/40 border-slate-700/30"
-                            : "bg-white/50 border-amber-200/30"
-                    }`}
-                >
-                    <button
-                        onClick={() => onNavigate("main")}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
-                            currentPage === "main"
-                                ? isDarkMode
-                                    ? "bg-slate-700/60 text-slate-200"
-                                    : "bg-amber-100/60 text-amber-800"
-                                : isDarkMode
-                                ? "text-slate-400 hover:text-slate-300"
-                                : "text-amber-600 hover:text-amber-700"
-                        }`}
-                    >
-                        Home
-                    </button>
-                    <button
-                        onClick={() => onNavigate("data")}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
-                            currentPage === "data"
-                                ? isDarkMode
-                                    ? "bg-slate-700/60 text-slate-200"
-                                    : "bg-amber-100/60 text-amber-800"
-                                : isDarkMode
-                                ? "text-slate-400 hover:text-slate-300"
-                                : "text-amber-600 hover:text-amber-700"
-                        }`}
-                    >
-                        Data
-                    </button>
-                    <button
-                        onClick={() => onNavigate("network")}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
-                            currentPage === "network"
-                                ? isDarkMode
-                                    ? "bg-slate-700/60 text-slate-200"
-                                    : "bg-amber-100/60 text-amber-800"
-                                : isDarkMode
-                                ? "text-slate-400 hover:text-slate-300"
-                                : "text-amber-600 hover:text-amber-700"
-                        }`}
-                    >
-                        Network
-                    </button>
-                </div>
-            </div>
+            {/* Floating Header Component */}
+            <FloatingHeader
+                isDarkMode={isDarkMode}
+                onToggleDarkMode={onToggleDarkMode}
+                currentPage={currentPage}
+                onNavigate={onNavigate}
+                isInitialLoad={isInitialLoad}
+            />
 
-            {/* Main Content */}
-            <div className="flex flex-col items-center justify-start min-h-[60vh] px-6">
-                {/* Header Stats - Matching main page typography */}
-                <div className="text-center mb-12 animate-in fade-in duration-800">
+            {/* Main content with staggered animations */}
+            <div className="flex flex-col items-center justify-center min-h-screen px-6 -mt-16">
+                {/* Greeting with fade-in animation - Matching main page */}
+                <div
+                    className={`text-center mb-8 transition-all duration-700 ease-out ${
+                        isInitialLoad
+                            ? "opacity-0 translate-y-4"
+                            : "opacity-100 translate-y-0"
+                    }`}
+                    style={{ animationDelay: "400ms" }}
+                >
                     <h1
-                        className={`text-3xl font-light mb-3 animate-in slide-in-from-top-4 duration-600 delay-200 ${
-                            isDarkMode ? "text-slate-200" : "text-amber-900"
+                        className={`text-xl font-light mb-6 transition-colors duration-500 ${
+                            isDarkMode ? "text-slate-400" : "text-gray-600"
                         }`}
                     >
                         {getGreeting()}
                     </h1>
-                    <p
-                        className={`text-base mb-8 animate-in fade-in duration-500 delay-400 ${
-                            isDarkMode ? "text-slate-400" : "text-amber-600"
-                        }`}
-                    >
-                        Your digital activity today
-                    </p>
+
+                    {/* Enhanced time display - Matching main page style */}
                     <div
-                        className={`text-6xl font-extralight mb-4 tracking-tight animate-in zoom-in duration-700 delay-500 ${
-                            isDarkMode ? "text-slate-300" : "text-amber-800"
+                        className={`text-7xl font-extralight tracking-tight mb-2 transition-all duration-500 ${
+                            isDarkMode ? "text-slate-200" : "text-gray-900"
                         }`}
-                        style={{ fontVariantNumeric: "tabular-nums" }}
+                        style={{
+                            fontVariantNumeric: "tabular-nums",
+                            textShadow: isDarkMode
+                                ? "0 0 20px rgba(148, 163, 184, 0.1)"
+                                : "0 0 20px rgba(0, 0, 0, 0.05)",
+                        }}
                     >
                         {formatTime(totalTime)}
                     </div>
+
                     <div
-                        className={`text-lg font-light animate-in fade-in duration-500 delay-600 ${
-                            isDarkMode ? "text-slate-400" : "text-amber-600"
+                        className={`text-base transition-colors duration-500 ${
+                            isDarkMode ? "text-slate-500" : "text-gray-500"
                         }`}
                     >
-                        across {totalSites} websites
+                        across {totalSites} websites today
                     </div>
                 </div>
 
-                {/* Productive vs Leisure Stats */}
-                <div className="flex items-center gap-12 mb-12 animate-in fade-in duration-600 delay-700">
+                {/* Productive vs Leisure Stats - Enhanced for visual hierarchy */}
+                <div
+                    className={`flex items-center gap-12 mb-8 transition-all duration-700 ease-out ${
+                        isInitialLoad
+                            ? "opacity-0 translate-y-4"
+                            : "opacity-100 translate-y-0"
+                    }`}
+                    style={{ animationDelay: "500ms" }}
+                >
                     <div className="text-center">
                         <div
                             className={`text-2xl font-light mb-2 ${
@@ -297,7 +275,7 @@ const DataLandingPage: React.FC<DataLandingPageProps> = ({
                     </div>
                     <div
                         className={`w-px h-12 ${
-                            isDarkMode ? "bg-slate-600" : "bg-amber-300"
+                            isDarkMode ? "bg-slate-600" : "bg-gray-300"
                         }`}
                     ></div>
                     <div className="text-center">
@@ -322,79 +300,54 @@ const DataLandingPage: React.FC<DataLandingPageProps> = ({
                     </div>
                 </div>
 
-                {/* Search - Exactly matching main page */}
-                <div className="w-full max-w-2xl mb-12 animate-in slide-in-from-bottom-4 duration-600 delay-800">
-                    <div
-                        className={`flex items-center gap-4 px-6 py-4 rounded-2xl backdrop-blur-xl shadow-lg transition-all duration-300 border ${
-                            isDarkMode
-                                ? "bg-slate-800/50 border-slate-700/30"
-                                : "bg-white/70 border-amber-200/40"
-                        } ${isSearchFocused ? "scale-[1.02] shadow-2xl" : ""}`}
-                    >
-                        <Search
-                            size={18}
-                            className={`transition-colors duration-200 ${
-                                isSearchFocused
-                                    ? isDarkMode
-                                        ? "text-slate-200"
-                                        : "text-amber-800"
-                                    : isDarkMode
-                                    ? "text-slate-400"
-                                    : "text-amber-500"
-                            }`}
-                        />
-                        <input
-                            type="text"
-                            placeholder="Search or enter address"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            onFocus={() => setIsSearchFocused(true)}
-                            onBlur={() => setIsSearchFocused(false)}
-                            onKeyPress={(e) =>
-                                e.key === "Enter" && handleSearch()
-                            }
-                            className={`flex-1 bg-transparent outline-none text-lg ${
-                                isDarkMode ? "text-slate-200" : "text-amber-900"
-                            }`}
-                        />
-                        {searchQuery && (
-                            <button
-                                onClick={handleSearch}
-                                className={`transition-all duration-200 hover:scale-110 ${
-                                    isDarkMode
-                                        ? "text-slate-300"
-                                        : "text-amber-600"
-                                }`}
-                            >
-                                <ArrowRight size={18} />
-                            </button>
-                        )}
-                    </div>
-                </div>
+                {/* Search using SearchBar component */}
+                <SearchBar
+                    isDarkMode={isDarkMode}
+                    searchQuery={searchQuery}
+                    onSearchQueryChange={setSearchQuery}
+                    onSearch={handleSearch}
+                    placeholder="Search or enter address"
+                    searchType={searchType}
+                    onSearchTypeChange={setSearchType}
+                    showTypeSelector={true}
+                    isInitialLoad={isInitialLoad}
+                    variant="main"
+                    animationDelay="600ms"
+                />
 
-                {/* Domain Grid - Clean favicons without backgrounds */}
-                <div className="w-full max-w-md animate-in fade-in duration-600 delay-900">
+                {/* Domain Grid - Clean favicons with improved layout */}
+                <div
+                    className={`w-full max-w-md mb-8 transition-all duration-700 ease-out ${
+                        isInitialLoad
+                            ? "opacity-0 translate-y-4"
+                            : "opacity-100 translate-y-0"
+                    }`}
+                    style={{ animationDelay: "700ms" }}
+                >
                     {domainData.length > 0 ? (
-                        <div className="flex flex-wrap justify-center gap-3 mb-8">
-                            {domainData.map((domain, index) => (
+                        <div className="flex flex-wrap justify-center gap-4">
+                            {domainData.slice(0, 16).map((domain, index) => (
                                 <div
                                     key={domain.domain}
-                                    className="group flex flex-col items-center gap-2 cursor-pointer animate-in slide-in-from-bottom-4"
+                                    className={`group flex flex-col items-center gap-1.5 cursor-pointer transition-all duration-300 hover:scale-110 ${
+                                        isInitialLoad
+                                            ? "opacity-0 translate-y-2"
+                                            : "opacity-100 translate-y-0"
+                                    }`}
                                     style={{
-                                        animationDuration: "400ms",
-                                        animationDelay: `${
-                                            1000 + index * 30
+                                        animationDelay: `${800 + index * 50}ms`,
+                                        transition: `all 0.4s ease-out ${
+                                            800 + index * 50
                                         }ms`,
                                     }}
-                                    title={domain.domain}
+                                    title={`${domain.domain} - ${domain.time}m`}
                                 >
-                                    <div className="w-8 h-8 flex items-center justify-center transition-all duration-200 hover:scale-110">
+                                    <div className="w-8 h-8 flex items-center justify-center">
                                         <img
                                             src={`https://www.google.com/s2/favicons?domain=${domain.domain}&sz=32`}
                                             alt={domain.domain}
                                             className="w-6 h-6 rounded-sm"
                                             onError={(e) => {
-                                                // Fallback to a generic globe icon if favicon fails
                                                 const target =
                                                     e.target as HTMLImageElement;
                                                 target.style.display = "none";
@@ -411,10 +364,8 @@ const DataLandingPage: React.FC<DataLandingPageProps> = ({
                                                             "div",
                                                         );
                                                     fallback.className =
-                                                        "fallback-icon";
+                                                        "fallback-icon text-xs";
                                                     fallback.innerHTML = "🌐";
-                                                    fallback.style.fontSize =
-                                                        "12px";
                                                     parent.appendChild(
                                                         fallback,
                                                     );
@@ -423,14 +374,14 @@ const DataLandingPage: React.FC<DataLandingPageProps> = ({
                                         />
                                     </div>
                                     <span
-                                        className={`text-xs font-medium ${
+                                        className={`text-xs font-medium transition-colors duration-200 ${
                                             domain.category === "productive"
                                                 ? isDarkMode
-                                                    ? "text-emerald-400"
-                                                    : "text-emerald-600"
+                                                    ? "text-emerald-400 group-hover:text-emerald-300"
+                                                    : "text-emerald-600 group-hover:text-emerald-700"
                                                 : isDarkMode
-                                                ? "text-purple-400"
-                                                : "text-purple-600"
+                                                ? "text-purple-400 group-hover:text-purple-300"
+                                                : "text-purple-600 group-hover:text-purple-700"
                                         }`}
                                     >
                                         {domain.time}m
@@ -441,7 +392,7 @@ const DataLandingPage: React.FC<DataLandingPageProps> = ({
                     ) : (
                         <div
                             className={`text-center p-8 ${
-                                isDarkMode ? "text-slate-400" : "text-amber-600"
+                                isDarkMode ? "text-slate-400" : "text-gray-600"
                             }`}
                         >
                             <Globe
@@ -455,102 +406,128 @@ const DataLandingPage: React.FC<DataLandingPageProps> = ({
                     )}
                 </div>
 
-                {/* Bottom Stats - Using real calculated data */}
-                <div className="w-full max-w-2xl animate-in fade-in duration-600 delay-1200">
-                    <div className="grid grid-cols-3 gap-3">
-                        <div
-                            className={`text-center p-4 rounded-xl backdrop-blur-xl border transition-all duration-200 hover:scale-105 ${
-                                isDarkMode
-                                    ? "bg-slate-800/40 border-slate-700/30"
-                                    : "bg-white/50 border-amber-200/30"
-                            }`}
-                        >
+                {/* Bottom Stats - Minimal, borderless design */}
+                <div
+                    className={`w-full max-w-lg transition-all duration-700 ease-out ${
+                        isInitialLoad
+                            ? "opacity-0 translate-y-4"
+                            : "opacity-100 translate-y-0"
+                    }`}
+                    style={{ animationDelay: "900ms" }}
+                >
+                    <div className="flex justify-between items-end">
+                        <div className="text-center group cursor-pointer">
                             <div
-                                className={`text-2xl font-light mb-1 ${
+                                className={`text-3xl font-extralight mb-1 transition-colors duration-300 ${
                                     isDarkMode
-                                        ? "text-slate-200"
-                                        : "text-amber-900"
+                                        ? "text-slate-200 group-hover:text-blue-400"
+                                        : "text-gray-900 group-hover:text-blue-600"
                                 }`}
+                                style={{ fontVariantNumeric: "tabular-nums" }}
                             >
-                                {focusSessions}
+                                {analyticsData.currentSession?.stats
+                                    .totalUrls || 0}
                             </div>
                             <div
-                                className={`text-xs font-medium ${
+                                className={`text-xs font-medium uppercase tracking-wide transition-colors duration-300 ${
                                     isDarkMode
-                                        ? "text-slate-400"
-                                        : "text-amber-600"
+                                        ? "text-slate-500 group-hover:text-slate-400"
+                                        : "text-gray-500 group-hover:text-gray-600"
                                 }`}
                             >
-                                Focus sessions
+                                URLs
                             </div>
                         </div>
-                        <div
-                            className={`text-center p-4 rounded-xl backdrop-blur-xl border transition-all duration-200 hover:scale-105 ${
-                                isDarkMode
-                                    ? "bg-slate-800/40 border-slate-700/30"
-                                    : "bg-white/50 border-amber-200/30"
-                            }`}
-                        >
+
+                        <div className="text-center group cursor-pointer">
                             <div
-                                className={`text-2xl font-light mb-1 ${
+                                className={`text-3xl font-extralight mb-1 transition-colors duration-300 ${
                                     isDarkMode
-                                        ? "text-emerald-400"
-                                        : "text-emerald-600"
+                                        ? "text-emerald-400 group-hover:text-emerald-300"
+                                        : "text-emerald-600 group-hover:text-emerald-700"
                                 }`}
+                                style={{ fontVariantNumeric: "tabular-nums" }}
                             >
                                 {productivePercentage}%
                             </div>
                             <div
-                                className={`text-xs font-medium ${
+                                className={`text-xs font-medium uppercase tracking-wide transition-colors duration-300 ${
                                     isDarkMode
-                                        ? "text-slate-400"
-                                        : "text-amber-600"
+                                        ? "text-slate-500 group-hover:text-slate-400"
+                                        : "text-gray-500 group-hover:text-gray-600"
                                 }`}
                             >
                                 Productive
                             </div>
                         </div>
-                        <div
-                            className={`text-center p-4 rounded-xl backdrop-blur-xl border transition-all duration-200 hover:scale-105 ${
-                                isDarkMode
-                                    ? "bg-slate-800/40 border-slate-700/30"
-                                    : "bg-white/50 border-amber-200/30"
-                            }`}
-                        >
+
+                        <div className="text-center group cursor-pointer">
                             <div
-                                className={`text-2xl font-light mb-1 ${
+                                className={`text-3xl font-extralight mb-1 transition-colors duration-300 ${
                                     isDarkMode
-                                        ? "text-slate-200"
-                                        : "text-amber-900"
+                                        ? "text-slate-200 group-hover:text-purple-400"
+                                        : "text-gray-900 group-hover:text-purple-600"
                                 }`}
                                 style={{ fontVariantNumeric: "tabular-nums" }}
                             >
                                 {formatTime(analyticsData.longestStreakTime)}
                             </div>
                             <div
-                                className={`text-xs font-medium ${
+                                className={`text-xs font-medium uppercase tracking-wide transition-colors duration-300 ${
                                     isDarkMode
-                                        ? "text-slate-400"
-                                        : "text-amber-600"
+                                        ? "text-slate-500 group-hover:text-slate-400"
+                                        : "text-gray-500 group-hover:text-gray-600"
                                 }`}
                             >
-                                Longest session
+                                Focus session
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <style>{`
+            {/* Global styles - Matching main page */}
+            <style>
+                {`
+                * {
+                    margin: 0;
+                    padding: 0;
+                    box-sizing: border-box;
+                }
+
+                html, body {
+                    height: 100%;
+                    margin: 0;
+                    padding: 0;
+                }
+
                 input::placeholder {
                     color: ${
                         isDarkMode
                             ? "rgba(148, 163, 184, 0.5)"
-                            : "rgba(217, 119, 6, 0.5)"
+                            : "rgba(107, 114, 128, 0.5)"
                     };
                     font-weight: 400;
                 }
-            `}</style>
+
+                ::-webkit-scrollbar {
+                    width: 6px;
+                }
+
+                ::-webkit-scrollbar-track {
+                    background: ${isDarkMode ? "#1e293b" : "#f1f5f9"};
+                }
+
+                ::-webkit-scrollbar-thumb {
+                    background: ${isDarkMode ? "#475569" : "#cbd5e1"};
+                    border-radius: 3px;
+                }
+
+                ::-webkit-scrollbar-thumb:hover {
+                    background: ${isDarkMode ? "#64748b" : "#94a3b8"};
+                }
+                `}
+            </style>
         </div>
     );
 };

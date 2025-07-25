@@ -1,6 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import LandingPage from "./landing";
+import AppRouter from "./appRouter";
 
 const root = ReactDOM.createRoot(
     document.getElementById("root") as HTMLElement,
@@ -8,6 +8,6 @@ const root = ReactDOM.createRoot(
 
 root.render(
     <React.StrictMode>
-        <LandingPage />
+        <AppRouter />;
     </React.StrictMode>,
 );

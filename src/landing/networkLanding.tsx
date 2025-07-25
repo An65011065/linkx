@@ -1,55 +1,146 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
-    Search,
-    ArrowRight,
-    Moon,
-    Sun,
     ArrowLeft,
-    TrendingUp,
-    Zap,
     GitBranch,
-    Target,
     Globe,
-    Users,
     Activity,
     BarChart3,
-    ChevronDown,
     RotateCcw,
     TrendingDown,
     Focus,
 } from "lucide-react";
+import SearchBar from "./searchbar";
+import FloatingHeader from "./FloatingHeader";
 import GraphVisualization from "../graph/components/GraphVisualization";
-import { useBrowsingAnalytics } from "../graph/components/GraphCanvas/hooks/useBrowsingAnalytics";
+import DataService from "../data/dataService";
+import type { BrowsingSession } from "../data/dataService";
 
 interface NetworkLandingPageProps {
     isDarkMode: boolean;
-    onBack: (page: string) => void;
+    onToggleDarkMode: () => void;
+    currentPage: "main" | "data" | "network";
+    onNavigate: (page: "main" | "data" | "network") => void;
+}
+
+interface AnalyticsData {
+    currentSession: BrowsingSession | null;
+    returnRate: number;
+    longestChain: number;
+    focusEfficiency: number;
+    sessionDepth: number;
+    totalSites: number;
+    totalVisits: number;
+    activeHours: number;
+    loading: boolean;
 }
 
 const NetworkLandingPage: React.FC<NetworkLandingPageProps> = ({
     isDarkMode,
-    onBack,
+    onToggleDarkMode,
+    currentPage,
+    onNavigate,
 }) => {
     const [searchQuery, setSearchQuery] = useState("");
-    const [isSearchFocused, setIsSearchFocused] = useState(false);
+    const [searchType, setSearchType] = useState<"Search" | "Insights">(
+        "Search",
+    );
     const [activeMetric, setActiveMetric] = useState(0);
     const [isGraphMode, setIsGraphMode] = useState(false);
-    const [scrollPosition, setScrollPosition] = useState(0);
-    const [searchType, setSearchType] = useState("graph"); // "graph" or "google"
-    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const [isInitialLoad, setIsInitialLoad] = useState(true);
 
-    // Get real browsing analytics
-    const {
-        metrics,
-        loading: analyticsLoading,
-        error: analyticsError,
-    } = useBrowsingAnalytics();
+    // Real data state
+    const [analyticsData, setAnalyticsData] = useState<AnalyticsData>({
+        currentSession: null,
+        returnRate: 0,
+        longestChain: 0,
+        focusEfficiency: 0,
+        sessionDepth: 0,
+        totalSites: 0,
+        totalVisits: 0,
+        activeHours: 0,
+        loading: true,
+    });
+
+    // Load real data on component mount
+    useEffect(() => {
+        const loadRealData = async () => {
+            try {
+                const dataService = DataService.getInstance();
+                const [sessionAnalytics, detailedAnalytics, currentSession] =
+                    await Promise.all([
+                        dataService.getSessionAnalytics(),
+                        dataService.getDetailedVisitAnalytics(),
+                        dataService.getCurrentSession(),
+                    ]);
+
+                // Calculate network-specific metrics
+                const totalVisits = currentSession.tabSessions.reduce(
+                    (total, tab) => total + tab.urlVisits.length,
+                    0,
+                );
+
+                const totalActiveTime = currentSession.stats.totalTime;
+                const activeHours =
+                    Math.round((totalActiveTime / (1000 * 60 * 60)) * 10) / 10;
+
+                // Calculate return rate (sites visited more than once)
+                const domainVisitCounts = new Map();
+                currentSession.tabSessions.forEach((tab) => {
+                    tab.urlVisits.forEach((visit) => {
+                        const domain = new URL(visit.url).hostname;
+                        domainVisitCounts.set(
+                            domain,
+                            (domainVisitCounts.get(domain) || 0) + 1,
+                        );
+                    });
+                });
+
+                const returningDomains = Array.from(
+                    domainVisitCounts.values(),
+                ).filter((count) => count > 1).length;
+                const returnRate = Math.round(
+                    (returningDomains / domainVisitCounts.size) * 100,
+                );
+
+                // Calculate longest chain (longest single tab session)
+                const longestChain = Math.max(
+                    ...currentSession.tabSessions.map(
+                        (tab) => tab.urlVisits.length,
+                    ),
+                    0,
+                );
+
+                setAnalyticsData({
+                    currentSession,
+                    returnRate,
+                    longestChain,
+                    focusEfficiency: detailedAnalytics.focusEfficiency,
+                    sessionDepth: detailedAnalytics.sessionDepth,
+                    totalSites: currentSession.stats.uniqueDomains,
+                    totalVisits,
+                    activeHours,
+                    loading: false,
+                });
+            } catch (error) {
+                console.error("Error loading analytics data:", error);
+                setAnalyticsData((prev) => ({ ...prev, loading: false }));
+            }
+        };
+
+        loadRealData();
+    }, []);
+
+    // Handle initial load animation
+    useEffect(() => {
+        const timer = setTimeout(() => setIsInitialLoad(false), 100);
+        return () => clearTimeout(timer);
+    }, []);
 
     // Real browsing metrics based on actual data
     const networkMetrics = [
         {
             label: "Return Rate",
-            value: `${metrics.returnRate}%`,
+            value: `${analyticsData.returnRate}%`,
             description: "Sites you revisit regularly",
             icon: RotateCcw,
             color: "emerald",
@@ -57,7 +148,7 @@ const NetworkLandingPage: React.FC<NetworkLandingPageProps> = ({
         },
         {
             label: "Longest Chain",
-            value: `${metrics.longestChain}`,
+            value: `${analyticsData.longestChain}`,
             description: "Deepest browsing rabbit hole",
             icon: GitBranch,
             color: "blue",
@@ -65,22 +156,22 @@ const NetworkLandingPage: React.FC<NetworkLandingPageProps> = ({
         },
         {
             label: "Focus Score",
-            value: `${metrics.focusEfficiency}%`,
+            value: `${analyticsData.focusEfficiency}%`,
             description: "Time spent actively browsing",
             icon: Focus,
             color: "purple",
-            trend: `${metrics.focusEfficiency > 70 ? "+" : ""}${
-                metrics.focusEfficiency - 65
+            trend: `${analyticsData.focusEfficiency > 70 ? "+" : ""}${
+                analyticsData.focusEfficiency - 65
             }%`,
         },
         {
             label: "Avg Depth",
-            value: `${metrics.sessionDepth}`,
+            value: `${analyticsData.sessionDepth}`,
             description: "Average visits per session",
             icon: TrendingDown,
             color: "orange",
-            trend: `${metrics.sessionDepth > 10 ? "+" : ""}${
-                metrics.sessionDepth - 8
+            trend: `${analyticsData.sessionDepth > 10 ? "+" : ""}${
+                analyticsData.sessionDepth - 8
             }`,
         },
     ];
@@ -96,7 +187,6 @@ const NetworkLandingPage: React.FC<NetworkLandingPageProps> = ({
     useEffect(() => {
         const handleScroll = () => {
             const scrollY = window.scrollY;
-            setScrollPosition(scrollY);
             // Switch to graph mode when scrolling past the first page
             const triggerPoint = window.innerHeight * 0.9;
             setIsGraphMode(scrollY > triggerPoint);
@@ -113,7 +203,7 @@ const NetworkLandingPage: React.FC<NetworkLandingPageProps> = ({
 
     const handleSearch = () => {
         if (searchQuery.trim()) {
-            if (searchType === "google") {
+            if (searchType === "Search") {
                 if (searchQuery.includes(".") && !searchQuery.includes(" ")) {
                     window.open(`https://${searchQuery}`, "_blank");
                 } else {
@@ -131,7 +221,7 @@ const NetworkLandingPage: React.FC<NetworkLandingPageProps> = ({
         }
     };
 
-    const getColorClasses = (color, type) => {
+    const getColorClasses = (color: string, type: string) => {
         const colorMap = {
             emerald: {
                 text: isDarkMode ? "text-emerald-400" : "text-emerald-600",
@@ -167,12 +257,34 @@ const NetworkLandingPage: React.FC<NetworkLandingPageProps> = ({
         return colorMap[color]?.[type] || "";
     };
 
+    const getGreeting = () => {
+        const hour = new Date().getHours();
+        if (hour < 12) return "Your network insights";
+        if (hour < 17) return "Your connection patterns";
+        return "Your browsing network";
+    };
+
+    // Show loading state
+    if (analyticsData.loading) {
+        return (
+            <div
+                className={`min-h-screen flex items-center justify-center transition-all duration-500 ${
+                    isDarkMode ? "bg-slate-950" : "bg-gray-50"
+                }`}
+            >
+                <div
+                    className={`animate-spin rounded-full h-12 w-12 border-b-2 ${
+                        isDarkMode ? "border-slate-400" : "border-gray-600"
+                    }`}
+                />
+            </div>
+        );
+    }
+
     return (
         <div
             className={`relative transition-all duration-500 ${
-                isDarkMode
-                    ? "bg-slate-950"
-                    : "bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100"
+                isDarkMode ? "bg-slate-950" : "bg-gray-50"
             }`}
         >
             {/* Fixed Header - shows on scroll */}
@@ -187,7 +299,7 @@ const NetworkLandingPage: React.FC<NetworkLandingPageProps> = ({
                     className={`flex justify-between items-center p-4 backdrop-blur-md border-b ${
                         isDarkMode
                             ? "bg-slate-950/95 border-slate-800"
-                            : "bg-amber-50/95 border-amber-200"
+                            : "bg-gray-50/95 border-gray-200"
                     }`}
                 >
                     <button
@@ -197,7 +309,7 @@ const NetworkLandingPage: React.FC<NetworkLandingPageProps> = ({
                         className={`p-2.5 rounded-xl transition-all duration-200 hover:scale-105 backdrop-blur-sm border ${
                             isDarkMode
                                 ? "bg-slate-800/50 text-slate-400 hover:bg-slate-800/70 border-slate-700/30"
-                                : "bg-white/50 text-amber-600 hover:bg-white/70 border-amber-200/30"
+                                : "bg-white/50 text-gray-600 hover:bg-white/70 border-gray-200/30"
                         }`}
                     >
                         <ArrowLeft size={16} />
@@ -205,297 +317,91 @@ const NetworkLandingPage: React.FC<NetworkLandingPageProps> = ({
 
                     {/* Search bar in header */}
                     <div className="flex-1 max-w-md mx-6">
-                        <div
-                            className={`flex items-center rounded-xl backdrop-blur-xl border transition-all duration-300 ${
-                                isDarkMode
-                                    ? "bg-slate-800/60 border-slate-700/40"
-                                    : "bg-white/80 border-amber-200/50"
-                            } ${isSearchFocused ? "scale-[1.02]" : ""}`}
-                        >
-                            <div className="flex items-center gap-3 px-4 py-2.5 flex-1">
-                                <Search
-                                    size={16}
-                                    className={`transition-colors duration-200 ${
-                                        isSearchFocused
-                                            ? isDarkMode
-                                                ? "text-slate-200"
-                                                : "text-amber-800"
-                                            : isDarkMode
-                                            ? "text-slate-400"
-                                            : "text-amber-500"
-                                    }`}
-                                />
-                                <input
-                                    type="text"
-                                    placeholder={
-                                        searchType === "graph"
-                                            ? "Search network..."
-                                            : "Search web..."
-                                    }
-                                    value={searchQuery}
-                                    onChange={(e) =>
-                                        setSearchQuery(e.target.value)
-                                    }
-                                    onFocus={() => setIsSearchFocused(true)}
-                                    onBlur={() => setIsSearchFocused(false)}
-                                    onKeyPress={(e) =>
-                                        e.key === "Enter" && handleSearch()
-                                    }
-                                    className={`flex-1 bg-transparent outline-none text-sm font-light ${
-                                        isDarkMode
-                                            ? "text-slate-200"
-                                            : "text-amber-900"
-                                    }`}
-                                />
-                                {searchQuery && (
-                                    <button
-                                        onClick={handleSearch}
-                                        className={`transition-all duration-200 hover:scale-110 ${
-                                            isDarkMode
-                                                ? "text-slate-300"
-                                                : "text-amber-600"
-                                        }`}
-                                    >
-                                        <ArrowRight size={16} />
-                                    </button>
-                                )}
-                            </div>
-
-                            {/* Search Type Dropdown */}
-                            <div className="relative">
-                                <button
-                                    className={`flex items-center gap-2 px-3 py-2.5 text-sm font-medium capitalize rounded-r-xl border-l transition-all duration-200 ${
-                                        isDarkMode
-                                            ? "text-slate-300 border-slate-600 hover:bg-slate-700/50"
-                                            : "text-amber-700 border-amber-300 hover:bg-amber-50"
-                                    }`}
-                                    onClick={() =>
-                                        setIsDropdownOpen(!isDropdownOpen)
-                                    }
-                                >
-                                    {searchType}
-                                    <ChevronDown
-                                        size={14}
-                                        className={`transition-transform duration-200 ${
-                                            isDropdownOpen ? "rotate-180" : ""
-                                        }`}
-                                    />
-                                </button>
-
-                                {isDropdownOpen && (
-                                    <div
-                                        className={`absolute right-0 top-full mt-1 w-24 rounded-lg border backdrop-blur-xl z-[10002] ${
-                                            isDarkMode
-                                                ? "bg-slate-800/90 border-slate-700/40"
-                                                : "bg-white/90 border-amber-200/50"
-                                        }`}
-                                    >
-                                        <button
-                                            className={`w-full px-3 py-2 text-left text-sm capitalize rounded-t-lg transition-all duration-200 ${
-                                                searchType === "graph"
-                                                    ? isDarkMode
-                                                        ? "bg-slate-700/50 text-slate-200"
-                                                        : "bg-amber-100 text-amber-800"
-                                                    : isDarkMode
-                                                    ? "text-slate-300 hover:bg-slate-700/30"
-                                                    : "text-amber-700 hover:bg-amber-50"
-                                            }`}
-                                            onClick={() => {
-                                                setSearchType("graph");
-                                                setIsDropdownOpen(false);
-                                            }}
-                                        >
-                                            Graph
-                                        </button>
-                                        <button
-                                            className={`w-full px-3 py-2 text-left text-sm capitalize rounded-b-lg transition-all duration-200 ${
-                                                searchType === "google"
-                                                    ? isDarkMode
-                                                        ? "bg-slate-700/50 text-slate-200"
-                                                        : "bg-amber-100 text-amber-800"
-                                                    : isDarkMode
-                                                    ? "text-slate-300 hover:bg-slate-700/30"
-                                                    : "text-amber-700 hover:bg-amber-50"
-                                            }`}
-                                            onClick={() => {
-                                                setSearchType("google");
-                                                setIsDropdownOpen(false);
-                                            }}
-                                        >
-                                            Google
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
+                        <SearchBar
+                            isDarkMode={isDarkMode}
+                            searchQuery={searchQuery}
+                            onSearchQueryChange={setSearchQuery}
+                            onSearch={handleSearch}
+                            placeholder={
+                                searchType === "Insights"
+                                    ? "Search network..."
+                                    : "Search web..."
+                            }
+                            searchType={searchType}
+                            onSearchTypeChange={setSearchType}
+                            showTypeSelector={true}
+                            isInitialLoad={false}
+                            variant="compact"
+                            animationDelay="0ms"
+                        />
                     </div>
-
-                    <button
-                        className={`p-2.5 rounded-xl transition-all duration-200 hover:scale-105 backdrop-blur-sm border ${
-                            isDarkMode
-                                ? "bg-slate-800/50 text-slate-400 hover:bg-slate-800/70 border-slate-700/30"
-                                : "bg-white/50 text-amber-600 hover:bg-white/70 border-amber-200/30"
-                        }`}
-                    >
-                        {isDarkMode ? <Sun size={16} /> : <Moon size={16} />}
-                    </button>
                 </div>
             </div>
 
             {/* MAIN CONTAINER THAT SPANS EVERYTHING */}
             <div className="relative min-h-screen">
-                {/* Landing Page Header - static */}
-                <div className="flex justify-between items-center p-6">
-                    <div
-                        className={`flex items-center gap-1 p-1 rounded-xl backdrop-blur-sm border ${
-                            isDarkMode
-                                ? "bg-slate-800/40 border-slate-700/30"
-                                : "bg-white/50 border-amber-200/30"
-                        }`}
-                    >
-                        <button
-                            onClick={() => onBack("main")}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
-                                isDarkMode
-                                    ? "text-slate-400 hover:text-slate-300"
-                                    : "text-amber-600 hover:text-amber-700"
-                            }`}
-                        >
-                            Home
-                        </button>
-                        <button
-                            onClick={() => onBack("data")}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
-                                isDarkMode
-                                    ? "text-slate-400 hover:text-slate-300"
-                                    : "text-amber-600 hover:text-amber-700"
-                            }`}
-                        >
-                            Data
-                        </button>
-                        <button
-                            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
-                                isDarkMode
-                                    ? "bg-slate-700/60 text-slate-200"
-                                    : "bg-amber-100/60 text-amber-800"
-                            }`}
-                        >
-                            Network
-                        </button>
-                    </div>
-
-                    <button
-                        className={`p-2.5 rounded-xl transition-all duration-200 hover:scale-105 backdrop-blur-sm border ${
-                            isDarkMode
-                                ? "bg-slate-800/50 text-slate-400 hover:bg-slate-800/70 border-slate-700/30"
-                                : "bg-white/50 text-amber-600 hover:bg-white/70 border-amber-200/30"
-                        }`}
-                    >
-                        {isDarkMode ? <Sun size={16} /> : <Moon size={16} />}
-                    </button>
-                </div>
+                {/* Floating Header Component */}
+                <FloatingHeader
+                    isDarkMode={isDarkMode}
+                    onToggleDarkMode={onToggleDarkMode}
+                    currentPage={currentPage}
+                    onNavigate={onNavigate}
+                    isInitialLoad={isInitialLoad}
+                />
 
                 {/* Main Content */}
-                <div className="flex flex-col items-center px-6">
+                <div className="flex flex-col items-center justify-center min-h-screen px-6 -mt-16">
                     {/* Header */}
-                    <div className="text-center mb-6 animate-in fade-in duration-800">
+                    <div
+                        className={`text-center mb-8 transition-all duration-700 ease-out ${
+                            isInitialLoad
+                                ? "opacity-0 translate-y-4"
+                                : "opacity-100 translate-y-0"
+                        }`}
+                        style={{ animationDelay: "400ms" }}
+                    >
                         <h1
-                            className={`text-4xl font-extralight mb-2 tracking-tight animate-in slide-in-from-top-4 duration-600 delay-200 ${
-                                isDarkMode ? "text-slate-200" : "text-amber-900"
+                            className={`text-xl font-light mb-6 transition-colors duration-500 ${
+                                isDarkMode ? "text-slate-400" : "text-gray-600"
                             }`}
                         >
-                            Network Intelligence
+                            {getGreeting()}
                         </h1>
-                        <p
-                            className={`text-base animate-in fade-in duration-500 delay-400 ${
-                                isDarkMode ? "text-slate-400" : "text-amber-600"
-                            }`}
-                        >
-                            {analyticsLoading
-                                ? "Loading browsing patterns..."
-                                : analyticsError
-                                ? "Error loading data"
-                                : "Real-time analysis of your browsing patterns"}
-                        </p>
-                    </div>
 
-                    {/* Featured Metric - Large Display */}
-                    <div className="mb-8 text-center animate-in zoom-in duration-700 delay-500">
-                        <div className="flex items-center justify-center gap-4 mb-3">
-                            <div
-                                className={`p-3 rounded-2xl ${getColorClasses(
-                                    currentMetric.color,
-                                    "bg",
-                                )} border ${getColorClasses(
-                                    currentMetric.color,
-                                    "border",
-                                )}`}
-                            >
-                                <currentMetric.icon
-                                    size={24}
-                                    className={getColorClasses(
-                                        currentMetric.color,
-                                        "text",
-                                    )}
-                                />
-                            </div>
-                            <div className="text-left">
-                                <div
-                                    className={`text-6xl font-extralight tracking-tight ${getColorClasses(
-                                        currentMetric.color,
-                                        "text",
-                                    )}`}
-                                    style={{
-                                        fontVariantNumeric: "tabular-nums",
-                                    }}
-                                >
-                                    {analyticsLoading
-                                        ? "..."
-                                        : currentMetric.value}
-                                </div>
-                                <div
-                                    className={`text-sm font-medium uppercase tracking-wide ${
-                                        isDarkMode
-                                            ? "text-slate-400"
-                                            : "text-amber-600"
-                                    }`}
-                                >
-                                    {currentMetric.label}
-                                </div>
-                            </div>
-                            <div className="text-left ml-2">
-                                <div
-                                    className={`text-lg font-medium ${getColorClasses(
-                                        currentMetric.color,
-                                        "accent",
-                                    )}`}
-                                >
-                                    {analyticsLoading
-                                        ? "..."
-                                        : currentMetric.trend}
-                                </div>
-                                <div
-                                    className={`text-xs ${
-                                        isDarkMode
-                                            ? "text-slate-500"
-                                            : "text-amber-500"
-                                    }`}
-                                >
-                                    24h change
-                                </div>
-                            </div>
+                        <div
+                            className={`text-7xl font-extralight tracking-tight mb-2 transition-all duration-500 ${
+                                isDarkMode ? "text-slate-200" : "text-gray-900"
+                            }`}
+                            style={{
+                                fontVariantNumeric: "tabular-nums",
+                                textShadow: isDarkMode
+                                    ? "0 0 20px rgba(148, 163, 184, 0.1)"
+                                    : "0 0 20px rgba(0, 0, 0, 0.05)",
+                            }}
+                        >
+                            {analyticsData.loading
+                                ? "..."
+                                : currentMetric.value}
                         </div>
-                        <p
-                            className={`text-sm max-w-sm ${
-                                isDarkMode ? "text-slate-400" : "text-amber-600"
+
+                        <div
+                            className={`text-base transition-colors duration-500 ${
+                                isDarkMode ? "text-slate-500" : "text-gray-500"
                             }`}
                         >
-                            {currentMetric.description}
-                        </p>
+                            {currentMetric.label} - {currentMetric.description}
+                        </div>
                     </div>
 
                     {/* Metric Pills */}
-                    <div className="flex gap-3 mb-8 animate-in fade-in duration-600 delay-700">
+                    <div
+                        className={`flex gap-3 mb-8 transition-all duration-700 ease-out ${
+                            isInitialLoad
+                                ? "opacity-0 translate-y-4"
+                                : "opacity-100 translate-y-0"
+                        }`}
+                        style={{ animationDelay: "500ms" }}
+                    >
                         {networkMetrics.map((metric, index) => (
                             <button
                                 key={metric.label}
@@ -514,7 +420,7 @@ const NetworkLandingPage: React.FC<NetworkLandingPageProps> = ({
                                           )} scale-105`
                                         : isDarkMode
                                         ? "bg-slate-800/40 text-slate-400 border-slate-700/30 hover:bg-slate-800/60"
-                                        : "bg-white/50 text-amber-600 border-amber-200/30 hover:bg-white/70"
+                                        : "bg-white/50 text-gray-600 border-gray-200/30 hover:bg-white/70"
                                 }`}
                             >
                                 {metric.label}
@@ -522,112 +428,107 @@ const NetworkLandingPage: React.FC<NetworkLandingPageProps> = ({
                         ))}
                     </div>
 
-                    {/* Quick Stats Grid */}
-                    <div className="w-full max-w-4xl mb-8 animate-in fade-in duration-600 delay-800">
-                        <div className="grid grid-cols-3 gap-4">
-                            <div
-                                className={`text-center p-4 rounded-xl backdrop-blur-xl border transition-all duration-200 hover:scale-105 ${
-                                    isDarkMode
-                                        ? "bg-slate-800/40 border-slate-700/30"
-                                        : "bg-white/50 border-amber-200/30"
-                                }`}
-                            >
-                                <Globe
-                                    size={20}
-                                    className={`mx-auto mb-2 ${
-                                        isDarkMode
-                                            ? "text-blue-400"
-                                            : "text-blue-600"
-                                    }`}
-                                />
+                    {/* Search using SearchBar component */}
+                    <SearchBar
+                        isDarkMode={isDarkMode}
+                        searchQuery={searchQuery}
+                        onSearchQueryChange={setSearchQuery}
+                        onSearch={handleSearch}
+                        placeholder={
+                            searchType === "Insights"
+                                ? "Search nodes, analyze paths, or explore communities"
+                                : "Search web or enter address"
+                        }
+                        searchType={searchType}
+                        onSearchTypeChange={setSearchType}
+                        showTypeSelector={true}
+                        isInitialLoad={isInitialLoad}
+                        variant="main"
+                        animationDelay="600ms"
+                    />
+
+                    {/* Bottom Stats - Minimal, borderless design matching data page */}
+                    <div
+                        className={`w-full max-w-lg mb-8 transition-all duration-700 ease-out ${
+                            isInitialLoad
+                                ? "opacity-0 translate-y-4"
+                                : "opacity-100 translate-y-0"
+                        }`}
+                        style={{ animationDelay: "700ms" }}
+                    >
+                        <div className="flex justify-between items-end">
+                            <div className="text-center group cursor-pointer">
                                 <div
-                                    className={`text-2xl font-light mb-1 ${
+                                    className={`text-3xl font-extralight mb-1 transition-colors duration-300 ${
                                         isDarkMode
-                                            ? "text-slate-200"
-                                            : "text-amber-900"
+                                            ? "text-slate-200 group-hover:text-blue-400"
+                                            : "text-gray-900 group-hover:text-blue-600"
                                     }`}
+                                    style={{
+                                        fontVariantNumeric: "tabular-nums",
+                                    }}
                                 >
-                                    {analyticsLoading
+                                    {analyticsData.loading
                                         ? "..."
-                                        : metrics.totalSites}
+                                        : analyticsData.totalSites}
                                 </div>
                                 <div
-                                    className={`text-xs font-medium ${
+                                    className={`text-xs font-medium uppercase tracking-wide transition-colors duration-300 ${
                                         isDarkMode
-                                            ? "text-slate-400"
-                                            : "text-amber-600"
+                                            ? "text-slate-500 group-hover:text-slate-400"
+                                            : "text-gray-500 group-hover:text-gray-600"
                                     }`}
                                 >
                                     Sites
                                 </div>
                             </div>
-                            <div
-                                className={`text-center p-4 rounded-xl backdrop-blur-xl border transition-all duration-200 hover:scale-105 ${
-                                    isDarkMode
-                                        ? "bg-slate-800/40 border-slate-700/30"
-                                        : "bg-white/50 border-amber-200/30"
-                                }`}
-                            >
-                                <Activity
-                                    size={20}
-                                    className={`mx-auto mb-2 ${
-                                        isDarkMode
-                                            ? "text-emerald-400"
-                                            : "text-emerald-600"
-                                    }`}
-                                />
+
+                            <div className="text-center group cursor-pointer">
                                 <div
-                                    className={`text-2xl font-light mb-1 ${
+                                    className={`text-3xl font-extralight mb-1 transition-colors duration-300 ${
                                         isDarkMode
-                                            ? "text-slate-200"
-                                            : "text-amber-900"
+                                            ? "text-emerald-400 group-hover:text-emerald-300"
+                                            : "text-emerald-600 group-hover:text-emerald-700"
                                     }`}
+                                    style={{
+                                        fontVariantNumeric: "tabular-nums",
+                                    }}
                                 >
-                                    {analyticsLoading
+                                    {analyticsData.loading
                                         ? "..."
-                                        : metrics.totalVisits}
+                                        : analyticsData.totalVisits}
                                 </div>
                                 <div
-                                    className={`text-xs font-medium ${
+                                    className={`text-xs font-medium uppercase tracking-wide transition-colors duration-300 ${
                                         isDarkMode
-                                            ? "text-slate-400"
-                                            : "text-amber-600"
+                                            ? "text-slate-500 group-hover:text-slate-400"
+                                            : "text-gray-500 group-hover:text-gray-600"
                                     }`}
                                 >
                                     Visits
                                 </div>
                             </div>
-                            <div
-                                className={`text-center p-4 rounded-xl backdrop-blur-xl border transition-all duration-200 hover:scale-105 ${
-                                    isDarkMode
-                                        ? "bg-slate-800/40 border-slate-700/30"
-                                        : "bg-white/50 border-amber-200/30"
-                                }`}
-                            >
-                                <BarChart3
-                                    size={20}
-                                    className={`mx-auto mb-2 ${
-                                        isDarkMode
-                                            ? "text-orange-400"
-                                            : "text-orange-600"
-                                    }`}
-                                />
+
+                            <div className="text-center group cursor-pointer">
                                 <div
-                                    className={`text-2xl font-light mb-1 ${
+                                    className={`text-3xl font-extralight mb-1 transition-colors duration-300 ${
                                         isDarkMode
-                                            ? "text-slate-200"
-                                            : "text-amber-900"
+                                            ? "text-slate-200 group-hover:text-purple-400"
+                                            : "text-gray-900 group-hover:text-purple-600"
                                     }`}
+                                    style={{
+                                        fontVariantNumeric: "tabular-nums",
+                                    }}
                                 >
-                                    {analyticsLoading
+                                    {analyticsData.loading
                                         ? "..."
-                                        : `${metrics.activeHours}h`}
+                                        : `${analyticsData.activeHours}h`}
                                 </div>
                                 <div
-                                    className={`text-xs font-medium ${
+                                    className={`text-xs font-medium uppercase tracking-wide transition-colors duration-300 ${
                                         isDarkMode
-                                            ? "text-slate-400"
-                                            : "text-amber-600"
+                                            ? "text-slate-500 group-hover:text-slate-400"
+                                            : "text-gray-500 group-hover:text-gray-600"
                                     }`}
                                 >
                                     Active Time
@@ -637,154 +538,21 @@ const NetworkLandingPage: React.FC<NetworkLandingPageProps> = ({
                     </div>
                 </div>
 
-                {/* STICKY SEARCH BAR - NOW AT THE TOP LEVEL */}
-                <div className="sticky top-6 z-[10005] flex justify-center px-6 mb-16">
-                    {/* Add a background spacer that reserves space */}
-                    <div className="absolute inset-0 -inset-x-8 -inset-y-4"></div>
-                    <div className="w-full max-w-2xl animate-in slide-in-from-bottom-4 duration-600 delay-900 relative">
-                        {/* Add a backdrop div that extends beyond the search bar */}
-                        <div
-                            className={`absolute inset-0 -inset-x-8 -inset-y-4 rounded-3xl backdrop-blur-xl ${
-                                isDarkMode
-                                    ? "bg-slate-950/90"
-                                    : "bg-amber-50/90"
-                            }`}
-                            style={{ zIndex: -1 }}
-                        />
-                        <div
-                            className={`relative flex items-center rounded-2xl shadow-xl transition-all duration-300 border ${
-                                isDarkMode
-                                    ? "bg-slate-800/95 border-slate-700/40"
-                                    : "bg-white/95 border-amber-200/50"
-                            } ${
-                                isSearchFocused ? "scale-[1.02] shadow-2xl" : ""
-                            }`}
-                        >
-                            <div className="flex items-center gap-4 px-6 py-4 flex-1">
-                                <Search
-                                    size={18}
-                                    className={`transition-colors duration-200 ${
-                                        isSearchFocused
-                                            ? isDarkMode
-                                                ? "text-slate-200"
-                                                : "text-amber-800"
-                                            : isDarkMode
-                                            ? "text-slate-400"
-                                            : "text-amber-500"
-                                    }`}
-                                />
-                                <input
-                                    type="text"
-                                    placeholder={
-                                        searchType === "graph"
-                                            ? "Search nodes, analyze paths, or explore communities"
-                                            : "Search web or enter address"
-                                    }
-                                    value={searchQuery}
-                                    onChange={(e) =>
-                                        setSearchQuery(e.target.value)
-                                    }
-                                    onFocus={() => setIsSearchFocused(true)}
-                                    onBlur={() => setIsSearchFocused(false)}
-                                    onKeyPress={(e) =>
-                                        e.key === "Enter" && handleSearch()
-                                    }
-                                    className={`flex-1 bg-transparent outline-none text-lg font-light ${
-                                        isDarkMode
-                                            ? "text-slate-200"
-                                            : "text-amber-900"
-                                    }`}
-                                />
-                                {searchQuery && (
-                                    <button
-                                        onClick={handleSearch}
-                                        className={`transition-all duration-200 hover:scale-110 ${
-                                            isDarkMode
-                                                ? "text-slate-300"
-                                                : "text-amber-600"
-                                        }`}
-                                    >
-                                        <ArrowRight size={18} />
-                                    </button>
-                                )}
-                            </div>
-
-                            {/* Search Type Dropdown */}
-                            <div className="relative">
-                                <button
-                                    className={`flex items-center gap-2 px-5 py-4 text-sm font-medium capitalize rounded-r-2xl border-l transition-all duration-200 ${
-                                        isDarkMode
-                                            ? "text-slate-300 border-slate-600 hover:bg-slate-700/50"
-                                            : "text-amber-700 border-amber-300 hover:bg-amber-50"
-                                    }`}
-                                    onClick={() =>
-                                        setIsDropdownOpen(!isDropdownOpen)
-                                    }
-                                >
-                                    {searchType}
-                                    <ChevronDown
-                                        size={14}
-                                        className={`transition-transform duration-200 ${
-                                            isDropdownOpen ? "rotate-180" : ""
-                                        }`}
-                                    />
-                                </button>
-
-                                {isDropdownOpen && (
-                                    <div
-                                        className={`absolute right-0 top-full mt-2 w-28 rounded-lg border backdrop-blur-xl z-[10002] shadow-xl ${
-                                            isDarkMode
-                                                ? "bg-slate-800/90 border-slate-700/40"
-                                                : "bg-white/90 border-amber-200/50"
-                                        }`}
-                                    >
-                                        <button
-                                            className={`w-full px-4 py-3 text-left text-sm capitalize rounded-t-lg transition-all duration-200 ${
-                                                searchType === "graph"
-                                                    ? isDarkMode
-                                                        ? "bg-slate-700/50 text-slate-200"
-                                                        : "bg-amber-100 text-amber-800"
-                                                    : isDarkMode
-                                                    ? "text-slate-300 hover:bg-slate-700/30"
-                                                    : "text-amber-700 hover:bg-amber-50"
-                                            }`}
-                                            onClick={() => {
-                                                setSearchType("graph");
-                                                setIsDropdownOpen(false);
-                                            }}
-                                        >
-                                            Graph
-                                        </button>
-                                        <button
-                                            className={`w-full px-4 py-3 text-left text-sm capitalize rounded-b-lg transition-all duration-200 ${
-                                                searchType === "google"
-                                                    ? isDarkMode
-                                                        ? "bg-slate-700/50 text-slate-200"
-                                                        : "bg-amber-100 text-amber-800"
-                                                    : isDarkMode
-                                                    ? "text-slate-300 hover:bg-slate-700/30"
-                                                    : "text-amber-700 hover:bg-amber-50"
-                                            }`}
-                                            onClick={() => {
-                                                setSearchType("google");
-                                                setIsDropdownOpen(false);
-                                            }}
-                                        >
-                                            Google
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
                 {/* GraphVisualization - Fixed container to ensure proper centering */}
-                <div className="w-full h-screen relative z-[9000] bg-transparent">
+                <div
+                    className={`w-full h-screen relative z-[9000] bg-transparent transition-all duration-700 ease-out ${
+                        isInitialLoad
+                            ? "opacity-0 translate-y-4"
+                            : "opacity-100 translate-y-0"
+                    }`}
+                    style={{ animationDelay: "800ms" }}
+                >
                     <GraphVisualization
                         orientation="horizontal"
                         isStandalone={true}
-                        searchTerm={searchType === "graph" ? searchQuery : ""}
+                        searchTerm={
+                            searchType === "Insights" ? searchQuery : ""
+                        }
                         onSearchResults={(count) => {
                             // Optional: show search results count
                             console.log(`Found ${count} results`);
@@ -801,27 +569,50 @@ const NetworkLandingPage: React.FC<NetworkLandingPageProps> = ({
                 </div>
             </div>
 
-            <style>{`
+            {/* Global styles */}
+            <style>
+                {`
                 * {
                     margin: 0;
                     padding: 0;
+                    box-sizing: border-box;
                 }
-                
+
                 html, body {
                     height: 100%;
+                    margin: 0;
+                    padding: 0;
                     overflow-x: hidden;
                     scroll-behavior: smooth;
                 }
-                
+
                 input::placeholder {
                     color: ${
                         isDarkMode
                             ? "rgba(148, 163, 184, 0.5)"
-                            : "rgba(217, 119, 6, 0.5)"
+                            : "rgba(107, 114, 128, 0.5)"
                     };
-                    font-weight: 300;
+                    font-weight: 400;
                 }
-            `}</style>
+
+                ::-webkit-scrollbar {
+                    width: 6px;
+                }
+
+                ::-webkit-scrollbar-track {
+                    background: ${isDarkMode ? "#1e293b" : "#f1f5f9"};
+                }
+
+                ::-webkit-scrollbar-thumb {
+                    background: ${isDarkMode ? "#475569" : "#cbd5e1"};
+                    border-radius: 3px;
+                }
+
+                ::-webkit-scrollbar-thumb:hover {
+                    background: ${isDarkMode ? "#64748b" : "#94a3b8"};
+                }
+                `}
+            </style>
         </div>
     );
 };
