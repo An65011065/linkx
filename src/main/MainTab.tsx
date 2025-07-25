@@ -27,13 +27,17 @@ interface Tab {
     label: string;
 }
 
-const MainTab: React.FC = () => {
+interface MainTabProps {
+    initialDarkMode?: boolean;
+}
+
+const MainTab: React.FC<MainTabProps> = ({ initialDarkMode = true }) => {
     const [activeTab, setActiveTab] = useState<TabType>("dashboard");
     const [networkLoaded, setNetworkLoaded] = useState(false);
     const [showDownloadMenu, setShowDownloadMenu] = useState(false);
     const [isInputFocused, setIsInputFocused] = useState(false);
     const [windowWidth, setWindowWidth] = useState(window.innerWidth);
-    const [isDarkMode, setIsDarkMode] = useState(true);
+    const [isDarkMode, setIsDarkMode] = useState(initialDarkMode);
     const [isNetworkExpanded, setIsNetworkExpanded] = useState(false);
     const [showOnboarding, setShowOnboarding] = useState(false);
 
@@ -475,9 +479,7 @@ const MainTab: React.FC = () => {
 
                 {/* Animation Background Layer */}
                 <div
-                    className={`animation-background animation-container ${
-                        isInputFocused ? "dawn" : ""
-                    }`}
+                    className="animation-background animation-container"
                 >
                     <div id="dappled-light">
                         <div id="glow"></div>

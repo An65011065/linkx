@@ -4,8 +4,8 @@ import { Moon, Sun } from "lucide-react";
 interface FloatingHeaderProps {
     isDarkMode: boolean;
     onToggleDarkMode: () => void;
-    currentPage: "main" | "data" | "network";
-    onNavigate: (page: "main" | "data" | "network") => void;
+    currentPage: "main" | "data" | "network" | "maintab";
+    onNavigate: (page: "main" | "data" | "network" | "maintab") => void;
     isInitialLoad?: boolean;
     className?: string;
 }
@@ -96,6 +96,7 @@ const FloatingHeader: React.FC<FloatingHeaderProps> = ({
                         { key: "main", label: "Home" },
                         { key: "data", label: "Data" },
                         { key: "network", label: "Network" },
+                        { key: "maintab", label: "App" },
                     ].map(({ key, label }) => (
                         <button
                             key={key}

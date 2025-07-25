@@ -10,8 +10,9 @@ import { useNetworkData } from "../graph/hooks/useNetworkData";
 interface NetworkLandingPageProps {
     isDarkMode: boolean;
     onToggleDarkMode: () => void;
-    currentPage: "main" | "data" | "network";
-    onNavigate: (page: "main" | "data" | "network") => void;
+    currentPage: "main" | "data" | "network" | "maintab";
+    onNavigate: (page: "main" | "data" | "network" | "maintab") => void;
+    onSunlitAnimationToggle: (show: boolean) => void;
 }
 
 interface AnalyticsData {
@@ -31,11 +32,18 @@ const NetworkLandingPage: React.FC<NetworkLandingPageProps> = ({
     onToggleDarkMode,
     currentPage,
     onNavigate,
+    onSunlitAnimationToggle,
 }) => {
     const [searchQuery, setSearchQuery] = useState("");
     const [searchType, setSearchType] = useState<
         "Search" | "Insights" | "Network"
     >("Search");
+
+    // Handle sunlit animation when Insights is selected
+    const handleSearchTypeChange = (type: "Search" | "Insights" | "Network") => {
+        setSearchType(type);
+        onSunlitAnimationToggle(type === "Insights");
+    };
     const [activeMetric, setActiveMetric] = useState(0);
     const [isGraphMode, setIsGraphMode] = useState(false);
     const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -300,6 +308,10 @@ const NetworkLandingPage: React.FC<NetworkLandingPageProps> = ({
     return (
         <div
             className={`relative ${isDarkMode ? "bg-slate-950" : "bg-gray-50"}`}
+            style={{
+                zIndex: 1,
+                backgroundColor: searchType === "Insights" ? "transparent" : (isDarkMode ? "#0f172a" : "#f9fafb")
+            }}
         >
             {/* Floating Header */}
             <FloatingHeader
@@ -403,7 +415,7 @@ const NetworkLandingPage: React.FC<NetworkLandingPageProps> = ({
                                 : "Search web or enter address"
                         }
                         searchType={searchType}
-                        onSearchTypeChange={setSearchType}
+                        onSearchTypeChange={handleSearchTypeChange}
                         showTypeSelector={true}
                         isInitialLoad={isInitialLoad}
                         variant="main"

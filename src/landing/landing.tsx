@@ -13,8 +13,9 @@ interface CalendarEvent {
 interface LandingPageProps {
     isDarkMode: boolean;
     onToggleDarkMode: () => void;
-    currentPage: "main" | "data" | "network";
-    onNavigate: (page: "main" | "data" | "network") => void;
+    currentPage: "main" | "data" | "network" | "maintab";
+    onNavigate: (page: "main" | "data" | "network" | "maintab") => void;
+    onSunlitAnimationToggle: (show: boolean) => void;
 }
 
 const LandingPage: React.FC<LandingPageProps> = ({
@@ -22,12 +23,19 @@ const LandingPage: React.FC<LandingPageProps> = ({
     onToggleDarkMode,
     currentPage,
     onNavigate,
+    onSunlitAnimationToggle,
 }) => {
     const [searchQuery, setSearchQuery] = useState("");
     const [currentTime, setCurrentTime] = useState(new Date());
     const [searchType, setSearchType] = useState<"Search" | "Insights">(
         "Search",
     );
+
+    // Handle sunlit animation when Insights is selected
+    const handleSearchTypeChange = (type: "Search" | "Insights") => {
+        setSearchType(type);
+        onSunlitAnimationToggle(type === "Insights");
+    };
     const [showAllEvents, setShowAllEvents] = useState(false);
     const [isInitialLoad, setIsInitialLoad] = useState(true);
 
@@ -125,6 +133,8 @@ const LandingPage: React.FC<LandingPageProps> = ({
                 padding: 0,
                 position: "relative",
                 overflow: "hidden",
+                zIndex: 1,
+                backgroundColor: searchType === "Insights" ? "transparent" : (isDarkMode ? "#0f172a" : "#f9fafb")
             }}
         >
             {/* Floating Header Component */}
@@ -194,7 +204,7 @@ const LandingPage: React.FC<LandingPageProps> = ({
                     onSearch={handleSearch}
                     placeholder="Search or enter address"
                     searchType={searchType}
-                    onSearchTypeChange={setSearchType}
+                    onSearchTypeChange={handleSearchTypeChange}
                     showTypeSelector={true}
                     isInitialLoad={isInitialLoad}
                     variant="main"

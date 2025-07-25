@@ -137,11 +137,11 @@ const SearchBar: React.FC<SearchBarProps> = ({
 
     // Rotating insight placeholders
     const insightPlaceholders = [
-        "Analyze market trends...",
-        "Find patterns in data...",
-        "Generate insights...",
-        "Explore connections...",
-        "Discover opportunities...",
+        "How can I better plan my day for tomorrow?",
+        "What are the most important things I need to do today?",
+        "Is there anything I've been wanting to buy",
+        "Block all social media for an hour",
+        "5 sites that I kept revisiting",
     ];
 
     // Extract domain from URL for display
@@ -231,7 +231,12 @@ const SearchBar: React.FC<SearchBarProps> = ({
 
     // Auto-select Network type when on network page (only on initial load)
     useEffect(() => {
-        if (isNetworkPage && onSearchTypeChange && searchType !== "Network" && searchType === "Search") {
+        if (
+            isNetworkPage &&
+            onSearchTypeChange &&
+            searchType !== "Network" &&
+            searchType === "Search"
+        ) {
             onSearchTypeChange("Network");
         }
     }, [isNetworkPage, onSearchTypeChange]);
@@ -277,36 +282,38 @@ const SearchBar: React.FC<SearchBarProps> = ({
 
     const truncateTitle = (title: string, maxLength: number = 40) => {
         if (title.length <= maxLength) return title;
-        return title.substring(0, maxLength).trim() + '...';
+        return title.substring(0, maxLength).trim() + "...";
     };
 
     const scrollToGraph = useCallback(() => {
-        const graphElement = document.querySelector('[data-graph-section]') as HTMLElement;
+        const graphElement = document.querySelector(
+            "[data-graph-section]",
+        ) as HTMLElement;
         if (graphElement) {
-            graphElement.scrollIntoView({ 
-                behavior: 'smooth', 
-                block: 'start'
+            graphElement.scrollIntoView({
+                behavior: "smooth",
+                block: "start",
             });
         } else {
-            window.scrollTo({ 
-                top: window.innerHeight, 
-                behavior: 'smooth' 
+            window.scrollTo({
+                top: window.innerHeight,
+                behavior: "smooth",
             });
         }
     }, []);
 
     // Handle network URL selection
     const handleNetworkUrlSelect = (suggestion: UrlSuggestion) => {
-        console.log('📋 Dropdown item selected:', suggestion.title);
+        console.log("📋 Dropdown item selected:", suggestion.title);
         const truncatedTitle = truncateTitle(suggestion.title);
         onSearchQueryChange(truncatedTitle); // Show truncated tab title in search bar
         setShowNetworkSuggestions(false);
         setIsSearchFocused(false);
         onNetworkUrlSelect?.(suggestion.url, suggestion.id);
-        
+
         // Scroll to graph when dropdown item is selected
         if (isNetworkPage) {
-            console.log('🔽 Dropdown selection - triggering scroll');
+            console.log("🔽 Dropdown selection - triggering scroll");
             setTimeout(() => {
                 scrollToGraph();
             }, 100);
@@ -360,12 +367,16 @@ const SearchBar: React.FC<SearchBarProps> = ({
     const handleKeyPress = (e: React.KeyboardEvent) => {
         // handleKeyDown already handles Enter for network suggestions
         if (searchType !== "Network" && e.key === "Enter") {
-            console.log('⏎ Enter key pressed - triggering search and scroll');
+            console.log("⏎ Enter key pressed - triggering search and scroll");
             onSearch();
-            
+
             // Scroll to graph when Enter is pressed
-            if (isNetworkPage && (searchType === "Insights" || searchType === "Network") && searchQuery.trim()) {
-                console.log('🔽 Enter key - triggering scroll');
+            if (
+                isNetworkPage &&
+                (searchType === "Insights" || searchType === "Network") &&
+                searchQuery.trim()
+            ) {
+                console.log("🔽 Enter key - triggering scroll");
                 setTimeout(() => {
                     scrollToGraph();
                 }, 100);
@@ -560,8 +571,15 @@ const SearchBar: React.FC<SearchBarProps> = ({
                             onClick={() => {
                                 onSearch();
                                 // Trigger scroll to graph if it's a search on network page
-                                if (isNetworkPage && (searchType === "Insights" || searchType === "Network") && searchQuery.trim()) {
-                                    console.log('🟡 Yellow button clicked - triggering scroll');
+                                if (
+                                    isNetworkPage &&
+                                    (searchType === "Insights" ||
+                                        searchType === "Network") &&
+                                    searchQuery.trim()
+                                ) {
+                                    console.log(
+                                        "🟡 Yellow button clicked - triggering scroll",
+                                    );
                                     setTimeout(() => {
                                         scrollToGraph();
                                     }, 100);

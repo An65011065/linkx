@@ -1,27 +1,4 @@
-/* Animation keyframes */
-@keyframes dayToDawn {
-    0% {
-        background-color: var(--day);
-    }
-    30% {
-        background-color: var(--morning);
-    }
-    100% {
-        background-color: var(--dawn);
-    }
-}
-
-@keyframes dawnToDay {
-    0% {
-        background-color: var(--dawn);
-    }
-    70% {
-        background-color: var(--morning);
-    }
-    100% {
-        background-color: var(--day);
-    }
-}
+/* Removed keyframe animations - keeping static day theme only */
 
 @keyframes billow {
     0% {
@@ -43,10 +20,7 @@
 
 .animation-container {
     --day: #fffdfa;
-    --dawn: #9fb3bf;
-    --morning: #e8f4f8;
     --light: var(--day);
-    --dark: var(--day);
     --shadow: #d4d4d4;
     --bounce-light: #f5efe6;
     --timing-fn: cubic-bezier(0.4, 0, 0.2, 1);
@@ -58,14 +32,7 @@
     height: 100vh;
     z-index: -1;
     background-color: var(--light);
-    transition: background-color 1.5s var(--timing-fn);
     overflow: hidden;
-}
-
-.animation-container.dawn {
-    --light: var(--dawn);
-    --shadow: #7a8892;
-    --bounce-light: #c5d9e2;
 }
 
 #dappled-light {
@@ -108,7 +75,6 @@
 
 .perspective {
     position: absolute;
-    transition: transform 1.7s var(--timing-fn), opacity 1s ease;
     top: -30vh;
     right: 0;
     width: 80vw;
@@ -122,28 +88,6 @@
         -0.0625,
         0,
         0.0008,
-        0,
-        1,
-        0,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        0,
-        1
-    );
-}
-
-.dawn .perspective {
-    opacity: 0.15;
-    transform: matrix3d(
-        0.8333,
-        0.0833,
-        0,
-        0.0003,
         0,
         1,
         0,
@@ -175,12 +119,7 @@
     flex-direction: column;
     align-items: end;
     gap: 60px;
-    transition: gap 1s var(--timing-fn);
     height: 100%;
-}
-
-.dawn #blinds > .shutters {
-    gap: 40px;
 }
 
 #blinds > .vertical {
@@ -200,11 +139,6 @@
 .shutter {
     width: 100%;
     height: 40px;
-    transition: height 1s var(--timing-fn);
-}
-
-.dawn .shutter {
-    height: 60px;
 }
 
 #leaves {

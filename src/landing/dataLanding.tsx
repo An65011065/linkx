@@ -14,8 +14,9 @@ interface DomainData {
 interface DataLandingPageProps {
     isDarkMode: boolean;
     onToggleDarkMode: () => void;
-    currentPage: "main" | "data" | "network";
-    onNavigate: (page: "main" | "data" | "network") => void;
+    currentPage: "main" | "data" | "network" | "maintab";
+    onNavigate: (page: "main" | "data" | "network" | "maintab") => void;
+    onSunlitAnimationToggle: (show: boolean) => void;
 }
 
 interface AnalyticsData {
@@ -33,11 +34,18 @@ const DataLandingPage: React.FC<DataLandingPageProps> = ({
     onToggleDarkMode,
     currentPage,
     onNavigate,
+    onSunlitAnimationToggle,
 }) => {
     const [searchQuery, setSearchQuery] = useState("");
     const [searchType, setSearchType] = useState<"Search" | "Insights">(
         "Search",
     );
+
+    // Handle sunlit animation when Insights is selected
+    const handleSearchTypeChange = (type: "Search" | "Insights") => {
+        setSearchType(type);
+        onSunlitAnimationToggle(type === "Insights");
+    };
     const [isInitialLoad, setIsInitialLoad] = useState(true);
 
     // Real data state
@@ -190,6 +198,8 @@ const DataLandingPage: React.FC<DataLandingPageProps> = ({
                 padding: 0,
                 position: "relative",
                 overflow: "hidden",
+                zIndex: 1,
+                backgroundColor: searchType === "Insights" ? "transparent" : (isDarkMode ? "#0f172a" : "#f9fafb")
             }}
         >
             {/* Floating Header Component */}
@@ -308,7 +318,7 @@ const DataLandingPage: React.FC<DataLandingPageProps> = ({
                     onSearch={handleSearch}
                     placeholder="Search or enter address"
                     searchType={searchType}
-                    onSearchTypeChange={setSearchType}
+                    onSearchTypeChange={handleSearchTypeChange}
                     showTypeSelector={true}
                     isInitialLoad={isInitialLoad}
                     variant="main"
