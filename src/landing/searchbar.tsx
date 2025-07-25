@@ -382,7 +382,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
 
     return (
         <div
-            className={`w-full max-w-2xl mb-12 relative transition-all duration-700 ease-out ${
+            className={`w-full max-w-2xl mb-12 relative transition-all duration-700 ease-out z-[9999] ${
                 isInitialLoad
                     ? "opacity-0 translate-y-4 scale-95"
                     : "opacity-100 translate-y-0 scale-100"
@@ -486,7 +486,6 @@ const SearchBar: React.FC<SearchBarProps> = ({
                                             ? "bg-slate-900/95"
                                             : "bg-white/95"
                                     }`}
-                                    style={{ backdropFilter: "blur(12px)" }}
                                 >
                                     {getAvailableSearchTypes().map((type) => (
                                         <button
@@ -545,10 +544,10 @@ const SearchBar: React.FC<SearchBarProps> = ({
                 networkSuggestions.length > 0 && (
                     <div
                         ref={suggestionsRef}
-                        className={`absolute top-full left-0 right-0 mt-2 rounded-xl backdrop-blur-xl border shadow-xl overflow-hidden z-50 ${
+                        className={`absolute top-full left-0 right-0 mt-2 rounded-xl  border shadow-xl overflow-hidden z-[9999] ${
                             isDarkMode
                                 ? "bg-slate-800/95 border-slate-700/40"
-                                : "bg-white/95 border-gray-200/50"
+                                : "bg-white border-gray-200/50"
                         }`}
                     >
                         <div className="max-h-64 overflow-y-auto">
@@ -605,17 +604,6 @@ const SearchBar: React.FC<SearchBarProps> = ({
                                     </div>
                                 </button>
                             ))}
-                        </div>
-
-                        {/* Footer with navigation tip */}
-                        <div
-                            className={`px-4 py-2 text-xs border-t ${
-                                isDarkMode
-                                    ? "bg-slate-900/50 border-slate-700/30 text-slate-500"
-                                    : "bg-gray-50/50 border-gray-200/30 text-gray-600"
-                            }`}
-                        >
-                            Press ↑↓ to navigate, Enter to select, Esc to close
                         </div>
                     </div>
                 )}
