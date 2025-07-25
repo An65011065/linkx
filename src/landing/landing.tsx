@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Calendar, ChevronDown, ArrowRight, Moon, Sun } from "lucide-react";
+import { Calendar, ChevronDown, Moon, Sun } from "lucide-react";
+import SearchBar from "./searchbar";
 
 interface CalendarEvent {
     id: string;
@@ -7,58 +8,6 @@ interface CalendarEvent {
     time: string;
     color: string;
 }
-
-// Text animation component for insights
-const AnimatedText: React.FC<{
-    text: string;
-    animation: "karaoke" | "filling";
-    isDarkMode: boolean;
-}> = ({ text, animation, isDarkMode }) => {
-    const ref = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        const element = ref.current;
-        if (!element) return;
-
-        // Set up the characters
-        element.textContent = "";
-        [...text].forEach((char) => {
-            const span = document.createElement("span");
-            span.className = "char";
-            span.textContent = char === " " ? "\u00A0" : char; // Non-breaking space for proper spacing
-            span.setAttribute("data-char", char === " " ? "\u00A0" : char);
-            element.appendChild(span);
-        });
-
-        // Trigger animation
-        const chars = element.querySelectorAll(".char");
-        chars.forEach((char, index) => {
-            (char as HTMLElement).style.setProperty("--reveal", "0");
-            setTimeout(() => {
-                (char as HTMLElement).style.setProperty("--reveal", "1");
-            }, index * 30);
-        });
-
-        return () => {
-            // Clean up on unmount
-            chars.forEach((char) => {
-                (char as HTMLElement).style.setProperty("--reveal", "0");
-            });
-        };
-    }, [text]);
-
-    return (
-        <div
-            ref={ref}
-            className={`${animation} ${
-                isDarkMode ? "dark" : "light"
-            } text-xl font-light`}
-            style={{ position: "relative" }}
-        >
-            {text}
-        </div>
-    );
-};
 
 const LandingPage: React.FC = () => {
     const [isDarkMode, setIsDarkMode] = useState(false);
@@ -70,16 +19,20 @@ const LandingPage: React.FC = () => {
     const [searchType, setSearchType] = useState<"Search" | "Insights">(
         "Search",
     );
-    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [showAllEvents, setShowAllEvents] = useState(false);
-    const [isSearchFocused, setIsSearchFocused] = useState(false);
+    const [isInitialLoad, setIsInitialLoad] = useState(true);
 
-    // Refs for positioning
-    const searchRef = useRef<HTMLDivElement>(null);
-    const dropdownRef = useRef<HTMLDivElement>(null);
+    // Refs for positioning and animation
     const calendarRef = useRef<HTMLDivElement>(null);
+    const mainContentRef = useRef<HTMLDivElement>(null);
+    const navContainerRef = useRef<HTMLDivElement>(null);
+    const [indicatorStyle, setIndicatorStyle] = useState({
+        width: 0,
+        left: 0,
+        opacity: 0,
+    });
 
-    // Mock calendar events - replace with real data
+    // Mock calendar events
     const upcomingEvents: CalendarEvent[] = [
         {
             id: "1",
@@ -102,15 +55,45 @@ const LandingPage: React.FC = () => {
     ];
     const nextEvent = upcomingEvents[0];
 
-    // Rotating insight placeholders
-    const insightPlaceholders = [
-        "Analyze market trends...",
-        "Find patterns in data...",
-        "Generate insights...",
-        "Explore connections...",
-        "Discover opportunities...",
-    ];
-    const [currentPlaceholderIndex, setCurrentPlaceholderIndex] = useState(0);
+    // Update indicator position based on active button
+    useEffect(() => {
+        const updateIndicator = () => {
+            if (!navContainerRef.current) return;
+
+            const activeButton = navContainerRef.current.querySelector(
+                `[data-page="${currentPage}"]`,
+            ) as HTMLButtonElement;
+            if (activeButton) {
+                const containerRect =
+                    navContainerRef.current.getBoundingClientRect();
+                const buttonRect = activeButton.getBoundingClientRect();
+
+                const left = buttonRect.left - containerRect.left - 4;
+                const width = buttonRect.width;
+
+                setTimeout(() => {
+                    setIndicatorStyle({
+                        left,
+                        width,
+                        opacity: 1,
+                    });
+                }, 10);
+            }
+        };
+
+        updateIndicator();
+
+        const handleResize = () => updateIndicator();
+        window.addEventListener("resize", handleResize);
+
+        return () => window.removeEventListener("resize", handleResize);
+    }, [currentPage]);
+
+    // Handle initial load animation
+    useEffect(() => {
+        const timer = setTimeout(() => setIsInitialLoad(false), 100);
+        return () => clearTimeout(timer);
+    }, []);
 
     // Update time every minute
     useEffect(() => {
@@ -118,27 +101,9 @@ const LandingPage: React.FC = () => {
         return () => clearInterval(timer);
     }, []);
 
-    // Rotate placeholder text - faster switching
-    useEffect(() => {
-        if (searchType === "Insights" && !isSearchFocused) {
-            const interval = setInterval(() => {
-                setCurrentPlaceholderIndex(
-                    (prev) => (prev + 1) % insightPlaceholders.length,
-                );
-            }, 2500); // Faster switching - 2.5 seconds total
-            return () => clearInterval(interval);
-        }
-    }, [searchType, insightPlaceholders.length, isSearchFocused]);
-
-    // Close dropdowns when clicking outside
+    // Close calendar dropdown when clicking outside
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
-            if (
-                dropdownRef.current &&
-                !dropdownRef.current.contains(event.target as Node)
-            ) {
-                setIsDropdownOpen(false);
-            }
             if (
                 calendarRef.current &&
                 !calendarRef.current.contains(event.target as Node)
@@ -148,9 +113,8 @@ const LandingPage: React.FC = () => {
         }
 
         document.addEventListener("mousedown", handleClickOutside);
-        return () => {
+        return () =>
             document.removeEventListener("mousedown", handleClickOutside);
-        };
     }, []);
 
     const handleSearch = () => {
@@ -182,20 +146,9 @@ const LandingPage: React.FC = () => {
         return "Good evening";
     };
 
-    // Handle input focus - clear placeholder
-    const handleSearchFocus = () => {
-        setIsSearchFocused(true);
-    };
-
-    // Handle input blur - restore placeholder if empty
-    const handleSearchBlur = () => {
-        setIsSearchFocused(false);
-    };
-
     return (
-        // Fixed: Added global reset styles and proper full-screen coverage
         <div
-            className={`min-h-screen h-screen w-full transition-all duration-300 ${
+            className={`min-h-screen h-screen w-full transition-all duration-700 ease-out ${
                 isDarkMode ? "bg-slate-950" : "bg-gray-50"
             }`}
             style={{
@@ -205,21 +158,44 @@ const LandingPage: React.FC = () => {
                 overflow: "hidden",
             }}
         >
-            {/* Simple Floating Header - Just Navigation + Dark Mode */}
-            <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50">
+            {/* Floating header with navigation */}
+            <div
+                className={`fixed top-4 left-1/2 transform -translate-x-1/2 z-50 transition-all duration-500 ease-out ${
+                    isInitialLoad
+                        ? "opacity-0 translate-y-[-10px]"
+                        : "opacity-100 translate-y-0"
+                }`}
+                style={{ animationDelay: "200ms" }}
+            >
                 <div
-                    className={`flex items-center gap-2 px-3 py-2 rounded-xl backdrop-blur-md border ${
+                    className={`flex items-center gap-2 px-3 py-2 rounded-xl backdrop-blur-md border transition-all duration-500 hover:shadow-lg ${
                         isDarkMode
-                            ? "bg-slate-900/80 border-slate-700/50"
-                            : "bg-white/80 border-gray-200/50"
+                            ? "bg-slate-900/80 border-slate-700/50 hover:bg-slate-900/90"
+                            : "bg-white/80 border-gray-200/50 hover:bg-white/90"
                     }`}
                 >
-                    {/* Navigation Pills */}
+                    {/* Navigation with dynamic indicator */}
                     <div
-                        className={`flex gap-1 p-1 rounded-lg ${
+                        ref={navContainerRef}
+                        className={`relative flex p-1 rounded-lg ${
                             isDarkMode ? "bg-slate-800/50" : "bg-gray-100/50"
                         }`}
                     >
+                        <div
+                            className={`absolute top-1 bottom-1 rounded transition-all duration-300 ease-out pointer-events-none ${
+                                isDarkMode
+                                    ? "bg-slate-700"
+                                    : "bg-white shadow-sm"
+                            }`}
+                            style={{
+                                width: `${indicatorStyle.width}px`,
+                                transform: `translateX(${indicatorStyle.left}px)`,
+                                opacity: indicatorStyle.opacity,
+                                transition:
+                                    "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                            }}
+                        />
+
                         {[
                             { key: "main", label: "Home" },
                             { key: "data", label: "Data" },
@@ -227,12 +203,13 @@ const LandingPage: React.FC = () => {
                         ].map(({ key, label }) => (
                             <button
                                 key={key}
+                                data-page={key}
                                 onClick={() => setCurrentPage(key as any)}
-                                className={`px-3 py-1 rounded text-xs font-medium transition-all ${
+                                className={`relative z-10 px-3 py-1.5 rounded text-xs font-medium transition-all duration-300 whitespace-nowrap ${
                                     currentPage === key
                                         ? isDarkMode
-                                            ? "bg-slate-700 text-slate-200"
-                                            : "bg-white text-gray-800 shadow-sm"
+                                            ? "text-slate-200"
+                                            : "text-gray-800"
                                         : isDarkMode
                                         ? "text-slate-400 hover:text-slate-300"
                                         : "text-gray-600 hover:text-gray-800"
@@ -242,41 +219,77 @@ const LandingPage: React.FC = () => {
                             </button>
                         ))}
                     </div>
-                    {/* Dark Mode Toggle */}
+
+                    {/* Dark mode toggle */}
                     <button
                         onClick={() => setIsDarkMode(!isDarkMode)}
-                        className={`p-2 rounded-lg transition-all ${
+                        className={`p-2 rounded-lg transition-all duration-300 hover:scale-105 active:scale-95 ${
                             isDarkMode
-                                ? "text-slate-400 hover:bg-slate-800/50"
-                                : "text-gray-600 hover:bg-gray-100"
+                                ? "text-slate-400 hover:bg-slate-800/50 hover:text-slate-300"
+                                : "text-gray-600 hover:bg-gray-100 hover:text-gray-800"
                         }`}
                     >
-                        {isDarkMode ? <Sun size={16} /> : <Moon size={16} />}
+                        <div className="relative">
+                            <Sun
+                                size={16}
+                                className={`absolute transition-all duration-300 ${
+                                    isDarkMode
+                                        ? "opacity-0 rotate-90 scale-0"
+                                        : "opacity-100 rotate-0 scale-100"
+                                }`}
+                            />
+                            <Moon
+                                size={16}
+                                className={`transition-all duration-300 ${
+                                    isDarkMode
+                                        ? "opacity-100 rotate-0 scale-100"
+                                        : "opacity-0 rotate-90 scale-0"
+                                }`}
+                            />
+                        </div>
                     </button>
                 </div>
             </div>
-            {/* Main Content - Pushed higher for better visual balance */}
-            <div className="flex flex-col items-center justify-center min-h-screen px-6 -mt-16">
-                {/* Greeting */}
-                <div className="text-center mb-8">
+
+            {/* Main content with staggered animations */}
+            <div
+                ref={mainContentRef}
+                className="flex flex-col items-center justify-center min-h-screen px-6 -mt-16"
+            >
+                {/* Greeting with fade-in animation */}
+                <div
+                    className={`text-center mb-8 transition-all duration-700 ease-out ${
+                        isInitialLoad
+                            ? "opacity-0 translate-y-4"
+                            : "opacity-100 translate-y-0"
+                    }`}
+                    style={{ animationDelay: "400ms" }}
+                >
                     <h1
-                        className={`text-xl font-light mb-6 ${
+                        className={`text-xl font-light mb-6 transition-colors duration-500 ${
                             isDarkMode ? "text-slate-400" : "text-gray-600"
                         }`}
                     >
                         {getGreeting()}
                     </h1>
-                    {/* Large Time */}
+
+                    {/* Enhanced time display */}
                     <div
-                        className={`text-7xl font-extralight tracking-tight mb-2 ${
+                        className={`text-7xl font-extralight tracking-tight mb-2 transition-all duration-500 ${
                             isDarkMode ? "text-slate-200" : "text-gray-900"
                         }`}
-                        style={{ fontVariantNumeric: "tabular-nums" }}
+                        style={{
+                            fontVariantNumeric: "tabular-nums",
+                            textShadow: isDarkMode
+                                ? "0 0 20px rgba(148, 163, 184, 0.1)"
+                                : "0 0 20px rgba(0, 0, 0, 0.05)",
+                        }}
                     >
                         {formatTime(currentTime)}
                     </div>
+
                     <div
-                        className={`text-base ${
+                        className={`text-base transition-colors duration-500 ${
                             isDarkMode ? "text-slate-500" : "text-gray-500"
                         }`}
                     >
@@ -287,171 +300,52 @@ const LandingPage: React.FC = () => {
                         })}
                     </div>
                 </div>
-                {/* Search Bar - More compact and with relative positioning */}
-                <div
-                    className="w-full max-w-2xl mb-12 relative"
-                    ref={searchRef}
-                >
-                    <div
-                        className={`rounded-2xl backdrop-blur-md border transition-all duration-300 ${
-                            isDarkMode
-                                ? "bg-slate-900/50 border-slate-700/50"
-                                : "bg-white/70 border-gray-200/50"
-                        } ${isSearchFocused ? "shadow-xl" : "shadow-sm"}`}
-                    >
-                        <div className="relative">
-                            <input
-                                type="text"
-                                placeholder={
-                                    searchType === "Search"
-                                        ? "Search or enter address"
-                                        : ""
-                                }
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                onFocus={handleSearchFocus}
-                                onBlur={handleSearchBlur}
-                                onKeyPress={(e) =>
-                                    e.key === "Enter" && handleSearch()
-                                }
-                                className={`w-full bg-transparent outline-none px-8 py-5 text-lg pr-32 ${
-                                    isDarkMode
-                                        ? "text-slate-200"
-                                        : "text-gray-800"
-                                }`}
-                            />
-                            {/* Animated Text for Insights placeholder */}
-                            {searchType === "Insights" &&
-                                !searchQuery &&
-                                !isSearchFocused && (
-                                    <div
-                                        className="absolute left-8 top-5 pointer-events-none overflow-hidden"
-                                        style={{ minWidth: "200px" }}
-                                        key={currentPlaceholderIndex} // Force re-render for instant switching
-                                    >
-                                        <AnimatedText
-                                            text={
-                                                insightPlaceholders[
-                                                    currentPlaceholderIndex
-                                                ]
-                                            }
-                                            animation={
-                                                currentPlaceholderIndex % 2 ===
-                                                0
-                                                    ? "karaoke"
-                                                    : "filling"
-                                            }
-                                            isDarkMode={isDarkMode}
-                                        />
-                                    </div>
-                                )}
-                            {/* Bottom right controls */}
-                            <div className="absolute bottom-4 right-4 flex items-center gap-2">
-                                {/* Search Type Picker - Minimal Design */}
-                                <div className="relative" ref={dropdownRef}>
-                                    <button
-                                        onClick={() =>
-                                            setIsDropdownOpen(!isDropdownOpen)
-                                        }
-                                        className={`flex items-center gap-1 px-2 py-1 text-sm transition-all ${
-                                            isDarkMode
-                                                ? "text-slate-400 hover:text-slate-300"
-                                                : "text-gray-500 hover:text-gray-700"
-                                        }`}
-                                    >
-                                        {searchType}
-                                        <ChevronDown
-                                            size={12}
-                                            className={`transition-transform ${
-                                                isDropdownOpen
-                                                    ? "rotate-180"
-                                                    : ""
-                                            }`}
-                                        />
-                                    </button>
-                                    {/* Minimal dropdown - no borders or shadows */}
-                                    {isDropdownOpen && (
-                                        <div
-                                            className={`absolute top-full right-0 mt-1 w-20 rounded-md overflow-hidden z-10 ${
-                                                isDarkMode
-                                                    ? "bg-slate-900/90"
-                                                    : "bg-white/90"
-                                            }`}
-                                            style={{
-                                                backdropFilter: "blur(12px)",
-                                            }}
-                                        >
-                                            {["Search", "Insights"].map(
-                                                (type) => (
-                                                    <button
-                                                        key={type}
-                                                        onClick={() => {
-                                                            setSearchType(
-                                                                type as any,
-                                                            );
-                                                            setIsDropdownOpen(
-                                                                false,
-                                                            );
-                                                        }}
-                                                        className={`w-full px-3 py-2 text-left text-sm capitalize transition-all ${
-                                                            searchType === type
-                                                                ? isDarkMode
-                                                                    ? "text-slate-200"
-                                                                    : "text-gray-800"
-                                                                : isDarkMode
-                                                                ? "text-slate-400 hover:text-slate-300"
-                                                                : "text-gray-500 hover:text-gray-700"
-                                                        }`}
-                                                    >
-                                                        {type}
-                                                    </button>
-                                                ),
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                                {/* Send Button - Always visible */}
-                                <button
-                                    onClick={handleSearch}
-                                    className={`p-2 rounded-lg transition-all hover:scale-105 ${
-                                        searchQuery
-                                            ? "bg-yellow-500 text-black"
-                                            : "bg-yellow-400 text-gray-900"
-                                    }`}
-                                >
-                                    <ArrowRight
-                                        size={16}
-                                        color={
-                                            searchQuery
-                                                ? "black"
-                                                : "currentColor"
-                                        }
-                                    />
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
 
-                {/* What's Next - Calendar Events - FIXED: Absolute positioning to prevent layout shift */}
+                {/* Search bar using SearchBar component */}
+                <SearchBar
+                    isDarkMode={isDarkMode}
+                    searchQuery={searchQuery}
+                    onSearchQueryChange={setSearchQuery}
+                    onSearch={handleSearch}
+                    placeholder="Search or enter address"
+                    searchType={searchType}
+                    onSearchTypeChange={setSearchType}
+                    showTypeSelector={true}
+                    isInitialLoad={isInitialLoad}
+                    variant="main"
+                    animationDelay="600ms"
+                />
+
+                {/* Enhanced calendar section */}
                 {nextEvent ? (
-                    <div className="relative" style={{ minHeight: "40px" }}>
+                    <div
+                        className={`relative transition-all duration-700 ease-out ${
+                            isInitialLoad
+                                ? "opacity-0 translate-y-4"
+                                : "opacity-100 translate-y-0"
+                        }`}
+                        style={{ minHeight: "40px", animationDelay: "800ms" }}
+                    >
                         <div className="absolute top-0 left-1/2 transform -translate-x-1/2">
                             <div
-                                className="flex items-center px-2 py-2 cursor-pointer transition-all hover:opacity-80"
+                                className={`flex items-center px-4 py-3 cursor-pointer transition-all duration-300 hover:scale-105 active:scale-95 rounded-xl ${
+                                    isDarkMode
+                                        ? "hover:bg-slate-900/30"
+                                        : "hover:bg-white/50"
+                                }`}
                                 onClick={() => setShowAllEvents(!showAllEvents)}
                                 style={{ minWidth: "280px" }}
                             >
                                 <Calendar
                                     size={18}
-                                    className={
+                                    className={`transition-all duration-300 ${
                                         isDarkMode
                                             ? "text-slate-400"
                                             : "text-gray-600"
-                                    }
+                                    } ${showAllEvents ? "text-blue-500" : ""}`}
                                 />
                                 <span
-                                    className={`font-medium ml-3 ${
+                                    className={`font-medium ml-3 transition-colors duration-300 ${
                                         isDarkMode
                                             ? "text-slate-200"
                                             : "text-gray-800"
@@ -460,7 +354,7 @@ const LandingPage: React.FC = () => {
                                     {nextEvent.title}
                                 </span>
                                 <span
-                                    className={`text-sm ml-auto ${
+                                    className={`text-sm ml-auto transition-colors duration-300 ${
                                         isDarkMode
                                             ? "text-slate-400"
                                             : "text-gray-600"
@@ -470,8 +364,10 @@ const LandingPage: React.FC = () => {
                                 </span>
                                 <ChevronDown
                                     size={16}
-                                    className={`transition-transform ml-2 ${
-                                        showAllEvents ? "rotate-180" : ""
+                                    className={`transition-all duration-300 ml-2 ${
+                                        showAllEvents
+                                            ? "rotate-180 text-blue-500"
+                                            : ""
                                     } ${
                                         isDarkMode
                                             ? "text-slate-400"
@@ -480,134 +376,123 @@ const LandingPage: React.FC = () => {
                                 />
                             </div>
 
-                            {/* FIXED: Show all events inline without popup styling */}
-                            {showAllEvents && upcomingEvents.length > 1 && (
+                            {/* Enhanced events list */}
+                            <div
+                                className={`overflow-hidden transition-all duration-500 ease-out ${
+                                    showAllEvents
+                                        ? "max-h-96 opacity-100"
+                                        : "max-h-0 opacity-0"
+                                }`}
+                            >
                                 <div className="mt-2 space-y-1">
-                                    {upcomingEvents.slice(1).map((event) => (
-                                        <div
-                                            key={event.id}
-                                            className="flex items-center px-2 py-2"
-                                            style={{ minWidth: "280px" }}
-                                        >
-                                            {/* Empty space to align with main calendar icon */}
+                                    {upcomingEvents
+                                        .slice(1)
+                                        .map((event, index) => (
                                             <div
-                                                style={{ width: "18px" }}
-                                            ></div>
-                                            <span
-                                                className={`font-medium ml-3 ${
+                                                key={event.id}
+                                                className={`flex items-center px-4 py-3 rounded-lg transition-all duration-300 hover:scale-105 ${
                                                     isDarkMode
-                                                        ? "text-slate-200"
-                                                        : "text-gray-800"
-                                                }`}
-                                            >
-                                                {event.title}
-                                            </span>
-                                            <span
-                                                className={`text-sm ${
-                                                    isDarkMode
-                                                        ? "text-slate-400"
-                                                        : "text-gray-600"
+                                                        ? "hover:bg-slate-900/30"
+                                                        : "hover:bg-white/50"
                                                 }`}
                                                 style={{
-                                                    marginLeft: "auto",
-                                                    marginRight: "26px",
+                                                    minWidth: "280px",
+                                                    animationDelay: `${
+                                                        (index + 1) * 100
+                                                    }ms`,
+                                                    transform: showAllEvents
+                                                        ? "translateY(0)"
+                                                        : "translateY(-10px)",
+                                                    opacity: showAllEvents
+                                                        ? 1
+                                                        : 0,
+                                                    transition: `all 0.3s ease-out ${
+                                                        (index + 1) * 100
+                                                    }ms`,
                                                 }}
                                             >
-                                                {event.time}
-                                            </span>
-                                        </div>
-                                    ))}
+                                                <div
+                                                    style={{ width: "18px" }}
+                                                ></div>
+                                                <span
+                                                    className={`font-medium ml-3 transition-colors duration-300 ${
+                                                        isDarkMode
+                                                            ? "text-slate-200"
+                                                            : "text-gray-800"
+                                                    }`}
+                                                >
+                                                    {event.title}
+                                                </span>
+                                                <span
+                                                    className={`text-sm transition-colors duration-300 ${
+                                                        isDarkMode
+                                                            ? "text-slate-400"
+                                                            : "text-gray-600"
+                                                    }`}
+                                                    style={{
+                                                        marginLeft: "auto",
+                                                        marginRight: "26px",
+                                                    }}
+                                                >
+                                                    {event.time}
+                                                </span>
+                                            </div>
+                                        ))}
                                 </div>
-                            )}
+                            </div>
                         </div>
                     </div>
                 ) : (
                     <div
-                        className={`text-center ${
-                            isDarkMode ? "text-slate-500" : "text-gray-500"
-                        }`}
+                        className={`text-center transition-all duration-700 ease-out ${
+                            isInitialLoad
+                                ? "opacity-0 translate-y-4"
+                                : "opacity-100 translate-y-0"
+                        } ${isDarkMode ? "text-slate-500" : "text-gray-500"}`}
+                        style={{ animationDelay: "800ms" }}
                     >
                         <Calendar
                             size={20}
-                            className="mx-auto mb-2 opacity-50"
+                            className="mx-auto mb-2 opacity-50 transition-opacity duration-300 hover:opacity-70"
                         />
                         <p className="text-sm">No upcoming events</p>
                     </div>
                 )}
             </div>
 
-            {/* CSS for text animations */}
-            <style jsx>{`
-                /* Global reset */
+            {/* Global styles */}
+            <style>
+                {`
                 * {
                     margin: 0;
                     padding: 0;
                     box-sizing: border-box;
                 }
 
-                html,
-                body {
+                html, body {
                     height: 100%;
                     margin: 0;
                     padding: 0;
                 }
 
-                /* Karaoke animation */
-                .karaoke {
-                    margin-bottom: 10px;
+                ::-webkit-scrollbar {
+                    width: 6px;
                 }
 
-                .karaoke .char {
-                    color: ${isDarkMode
-                        ? "hsla(0, 0%, 60%, 0.25)"
-                        : "hsla(0, 0%, 50%, 0.25)"};
-                    position: relative;
-                    display: inline-block;
+                ::-webkit-scrollbar-track {
+                    background: ${isDarkMode ? "#1e293b" : "#f1f5f9"};
                 }
 
-                .karaoke .char:after {
-                    content: attr(data-char);
-                    position: absolute;
-                    left: 0;
-                    top: 0;
-                    color: ${isDarkMode
-                        ? "hsl(0, 0%, 60%)"
-                        : "hsl(0, 0%, 50%)"};
-                    visibility: visible;
-                    clip-path: inset(
-                        0 calc((100 - (var(--reveal, 0) * 100)) * 1%) 0 0
-                    );
-                    transition: clip-path 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+                ::-webkit-scrollbar-thumb {
+                    background: ${isDarkMode ? "#475569" : "#cbd5e1"};
+                    border-radius: 3px;
                 }
 
-                /* Filling animation */
-                .filling {
-                    margin-bottom: 10px;
+                ::-webkit-scrollbar-thumb:hover {
+                    background: ${isDarkMode ? "#64748b" : "#94a3b8"};
                 }
-
-                .filling .char {
-                    color: ${isDarkMode
-                        ? "hsla(0, 0%, 60%, 0.25)"
-                        : "hsla(0, 0%, 50%, 0.25)"};
-                    position: relative;
-                    display: inline-block;
-                }
-
-                .filling .char:after {
-                    content: attr(data-char);
-                    position: absolute;
-                    left: 0;
-                    top: 0;
-                    color: ${isDarkMode
-                        ? "hsl(0, 0%, 60%)"
-                        : "hsl(0, 0%, 50%)"};
-                    visibility: visible;
-                    clip-path: inset(
-                        calc((100 - (var(--reveal, 0) * 100)) * 1%) 0 0 0
-                    );
-                    transition: clip-path 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-                }
-            `}</style>
+                `}
+            </style>
         </div>
     );
 };
