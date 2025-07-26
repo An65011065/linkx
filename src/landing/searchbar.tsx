@@ -568,7 +568,9 @@ const SearchBar: React.FC<SearchBarProps> = ({
 
                         {/* Enhanced send button */}
                         <button
-                            onClick={() => {
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
                                 onSearch();
                                 // Trigger scroll to graph if it's a search on network page
                                 if (

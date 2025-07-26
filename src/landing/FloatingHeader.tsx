@@ -4,8 +4,8 @@ import { Moon, Sun } from "lucide-react";
 interface FloatingHeaderProps {
     isDarkMode: boolean;
     onToggleDarkMode: () => void;
-    currentPage: "main" | "data" | "network" | "maintab";
-    onNavigate: (page: "main" | "data" | "network" | "maintab") => void;
+    currentPage: "main" | "data" | "network" | "maintab" | "insights";
+    onNavigate: (page: "main" | "data" | "network" | "maintab" | "insights", query?: string) => void;
     isInitialLoad?: boolean;
     className?: string;
 }

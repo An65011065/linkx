@@ -2,34 +2,35 @@ import React, { useState } from "react";
 import LandingPage from "./landing";
 import DataLandingPage from "./dataLanding";
 import NetworkLandingPage from "./networkLanding";
+import InsightsLandingPage from "./insightsLanding";
 import MainTab from "../main/MainTab";
 import "../main/styles/sunlit-window.css";
 
 const AppRouter: React.FC = () => {
     const [isDarkMode, setIsDarkMode] = useState(false);
-    const [currentPage, setCurrentPage] = useState<"main" | "data" | "network" | "maintab">(
+    const [currentPage, setCurrentPage] = useState<"main" | "data" | "network" | "maintab" | "insights">(
         "main",
     );
-    const [showSunlitAnimation, setShowSunlitAnimation] = useState(false);
+    const [insightsQuery, setInsightsQuery] = useState("");
 
     const handleToggleDarkMode = () => {
         setIsDarkMode(!isDarkMode);
     };
 
-    const handleNavigate = (page: "main" | "data" | "network" | "maintab") => {
+    const handleNavigate = (page: "main" | "data" | "network" | "maintab" | "insights", query?: string) => {
         setCurrentPage(page);
+        if (page === "insights" && query) {
+            setInsightsQuery(query);
+        }
     };
 
-    const handleSunlitAnimationToggle = (show: boolean) => {
-        setShowSunlitAnimation(show);
-    };
 
     // Render the appropriate page based on currentPage state
     return (
         <>
-            {/* Sunlit Window Animation Background */}
-            {showSunlitAnimation && (
-                <div className="animation-container" style={{
+            {/* Sunlit Window Animation Background - Show for all landing pages */}
+            {currentPage !== "maintab" && (
+                <div className={`animation-container ${isDarkMode ? 'night-mode' : ''}`} style={{
                     position: 'fixed',
                     top: 0,
                     left: 0,
@@ -120,7 +121,6 @@ const AppRouter: React.FC = () => {
                                 onToggleDarkMode={handleToggleDarkMode}
                                 currentPage={currentPage}
                                 onNavigate={handleNavigate}
-                                onSunlitAnimationToggle={handleSunlitAnimationToggle}
                             />
                         );
                     case "data":
@@ -130,7 +130,6 @@ const AppRouter: React.FC = () => {
                                 onToggleDarkMode={handleToggleDarkMode}
                                 currentPage={currentPage}
                                 onNavigate={handleNavigate}
-                                onSunlitAnimationToggle={handleSunlitAnimationToggle}
                             />
                         );
                     case "network":
@@ -140,11 +139,20 @@ const AppRouter: React.FC = () => {
                                 onToggleDarkMode={handleToggleDarkMode}
                                 currentPage={currentPage}
                                 onNavigate={handleNavigate}
-                                onSunlitAnimationToggle={handleSunlitAnimationToggle}
                             />
                         );
                     case "maintab":
                         return <MainTab initialDarkMode={isDarkMode} />;
+                    case "insights":
+                        return (
+                            <InsightsLandingPage
+                                isDarkMode={isDarkMode}
+                                onToggleDarkMode={handleToggleDarkMode}
+                                currentPage={currentPage}
+                                onNavigate={handleNavigate}
+                                initialQuery={insightsQuery}
+                            />
+                        );
                     default:
                         return (
                             <LandingPage
@@ -152,7 +160,6 @@ const AppRouter: React.FC = () => {
                                 onToggleDarkMode={handleToggleDarkMode}
                                 currentPage={currentPage}
                                 onNavigate={handleNavigate}
-                                onSunlitAnimationToggle={handleSunlitAnimationToggle}
                             />
                         );
                 }

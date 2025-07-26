@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import FlowModal from "./FlowModal";
+import { CalendarDataProvider } from "./CalendarDataProvider";
 
 interface AuthUser {
     uid: string;
@@ -142,7 +143,11 @@ const FlowContainer: React.FC = () => {
     }
 
     // Only render FlowModal - no more LoginScreen
-    return <FlowModal user={user} onClose={handleClose} />;
+    return (
+        <CalendarDataProvider>
+            <FlowModal onClose={handleClose} />
+        </CalendarDataProvider>
+    );
 };
 
 export default FlowContainer;

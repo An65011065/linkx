@@ -1,5 +1,11 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { GitBranch, RotateCcw, TrendingDown, Focus } from "lucide-react";
+import {
+    GitBranch,
+    RotateCcw,
+    TrendingDown,
+    Focus,
+    ChevronDown,
+} from "lucide-react";
 import SearchBar from "./searchbar";
 import FloatingHeader from "./FloatingHeader";
 import GraphVisualization from "../graph/components/GraphVisualization";
@@ -10,9 +16,11 @@ import { useNetworkData } from "../graph/hooks/useNetworkData";
 interface NetworkLandingPageProps {
     isDarkMode: boolean;
     onToggleDarkMode: () => void;
-    currentPage: "main" | "data" | "network" | "maintab";
-    onNavigate: (page: "main" | "data" | "network" | "maintab") => void;
-    onSunlitAnimationToggle: (show: boolean) => void;
+    currentPage: "main" | "data" | "network" | "maintab" | "insights";
+    onNavigate: (
+        page: "main" | "data" | "network" | "maintab" | "insights",
+        query?: string,
+    ) => void;
 }
 
 interface AnalyticsData {
@@ -32,17 +40,17 @@ const NetworkLandingPage: React.FC<NetworkLandingPageProps> = ({
     onToggleDarkMode,
     currentPage,
     onNavigate,
-    onSunlitAnimationToggle,
 }) => {
     const [searchQuery, setSearchQuery] = useState("");
     const [searchType, setSearchType] = useState<
         "Search" | "Insights" | "Network"
     >("Search");
 
-    // Handle sunlit animation when Insights is selected
-    const handleSearchTypeChange = (type: "Search" | "Insights" | "Network") => {
+    // Handle search type change
+    const handleSearchTypeChange = (
+        type: "Search" | "Insights" | "Network",
+    ) => {
         setSearchType(type);
-        onSunlitAnimationToggle(type === "Insights");
     };
     const [activeMetric, setActiveMetric] = useState(0);
     const [isGraphMode, setIsGraphMode] = useState(false);
@@ -204,14 +212,14 @@ const NetworkLandingPage: React.FC<NetworkLandingPageProps> = ({
 
     const truncateTitle = (title: string, maxLength: number = 40) => {
         if (title.length <= maxLength) return title;
-        return title.substring(0, maxLength).trim() + '...';
+        return title.substring(0, maxLength).trim() + "...";
     };
 
     const handleNetworkUrlSelect = (url: string, nodeId: string) => {
-        console.log('🔗 Network URL selected:', url, nodeId);
+        console.log("🔗 Network URL selected:", url, nodeId);
         setSelectedNodeId(nodeId);
         // Find the node to get its title instead of just the domain
-        const selectedNode = networkNodes?.find(node => node.id === nodeId);
+        const selectedNode = networkNodes?.find((node) => node.id === nodeId);
         const displayText = selectedNode?.title || new URL(url).hostname;
         const truncatedTitle = truncateTitle(displayText);
         setSearchQuery(truncatedTitle);
@@ -220,25 +228,27 @@ const NetworkLandingPage: React.FC<NetworkLandingPageProps> = ({
     };
 
     const scrollToGraph = useCallback(() => {
-        console.log('🔽 Scroll to graph triggered');
-        const graphElement = document.querySelector('[data-graph-section]') as HTMLElement;
+        console.log("🔽 Scroll to graph triggered");
+        const graphElement = document.querySelector(
+            "[data-graph-section]",
+        ) as HTMLElement;
         if (graphElement) {
-            console.log('📍 Graph element found, scrolling...');
-            graphElement.scrollIntoView({ 
-                behavior: 'smooth', 
-                block: 'start'
+            console.log("📍 Graph element found, scrolling...");
+            graphElement.scrollIntoView({
+                behavior: "smooth",
+                block: "start",
             });
         } else {
-            console.log('❌ Graph element not found, using fallback');
-            window.scrollTo({ 
-                top: window.innerHeight, 
-                behavior: 'smooth' 
+            console.log("❌ Graph element not found, using fallback");
+            window.scrollTo({
+                top: window.innerHeight,
+                behavior: "smooth",
             });
         }
     }, []);
 
     const handleSearch = () => {
-        console.log('🔍 Search triggered:', searchQuery, 'Type:', searchType);
+        console.log("🔍 Search triggered:", searchQuery, "Type:", searchType);
         if (searchQuery.trim()) {
             if (searchType === "Search") {
                 if (searchQuery.includes(".") && !searchQuery.includes(" ")) {
@@ -252,11 +262,11 @@ const NetworkLandingPage: React.FC<NetworkLandingPageProps> = ({
                     );
                 }
             } else if (searchType === "Insights") {
-                console.log('📊 Insights search - triggering scroll');
+                console.log("📊 Insights search - triggering scroll");
                 handleGraphSearch(searchQuery);
                 scrollToGraph();
             } else if (searchType === "Network") {
-                console.log('🌐 Network search - triggering scroll');
+                console.log("🌐 Network search - triggering scroll");
                 handleGraphSearch(searchQuery);
                 scrollToGraph();
             }
@@ -310,7 +320,7 @@ const NetworkLandingPage: React.FC<NetworkLandingPageProps> = ({
             className={`relative ${isDarkMode ? "bg-slate-950" : "bg-gray-50"}`}
             style={{
                 zIndex: 1,
-                backgroundColor: searchType === "Insights" ? "transparent" : (isDarkMode ? "#0f172a" : "#f9fafb")
+                backgroundColor: "transparent",
             }}
         >
             {/* Floating Header */}
@@ -323,7 +333,7 @@ const NetworkLandingPage: React.FC<NetworkLandingPageProps> = ({
             />
 
             {/* Main Content */}
-            <div className="min-h-screen flex flex-col items-center justify-center px-6 -mt-16">
+            <div className="h-screen flex flex-col items-center justify-center px-6 -mt-16 relative">
                 {/* Header */}
                 <div
                     className={`text-center mb-8 transition-all duration-700 ease-out ${
@@ -503,21 +513,45 @@ const NetworkLandingPage: React.FC<NetworkLandingPageProps> = ({
                         </div>
                     </div>
                 </div>
+
+                {/* Scroll to Graph Indicator */}
+                <div className="absolute bottom-0 transform flex items-center gap-2">
+                    <span
+                        className={`text-sm font-medium ${
+                            isDarkMode ? "text-slate-400" : "text-gray-600"
+                        }`}
+                    >
+                        Scroll to see your network graph
+                    </span>
+                    <button
+                        onClick={scrollToGraph}
+                        className={`p-1 transition-all duration-300 hover:scale-110 ${
+                            isDarkMode ? "text-slate-400 hover:text-slate-300" : "text-gray-600 hover:text-gray-800"
+                        }`}
+                    >
+                        <ChevronDown size={20} />
+                    </button>
+                </div>
             </div>
 
             {/* GraphVisualization */}
             <div
                 data-graph-section
-                className={`w-full h-screen relative z-[9000] transition-all duration-700 ease-out ${
+                className={`w-full transition-all duration-700 ease-out ${
                     isInitialLoad
                         ? "opacity-0 translate-y-4"
                         : "opacity-100 translate-y-0"
                 }`}
-                style={{ animationDelay: "800ms" }}
+                style={{
+                    animationDelay: "800ms",
+                    height: "100vh",
+                    marginTop: "100vh",
+                }}
             >
                 <GraphVisualization
                     orientation="horizontal"
                     isStandalone={true}
+                    isDarkMode={isDarkMode}
                     searchTerm={searchQuery}
                     selectedNodeId={selectedNodeId}
                     onSearchResults={(count) =>
@@ -531,14 +565,8 @@ const NetworkLandingPage: React.FC<NetworkLandingPageProps> = ({
                             scrollToGraph();
                         }
                     }}
-                    className="w-full h-full"
-                    style={{
-                        position: "absolute",
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                    }}
+                    className="w-full h-full !h-full"
+                    style={{ height: "100%" }}
                 />
             </div>
 

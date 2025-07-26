@@ -52,6 +52,7 @@ export interface GraphVisualizationProps extends BaseComponentProps {
     isStandalone?: boolean;
     searchTerm?: string;
     selectedNodeId?: string | null;
+    isDarkMode?: boolean;
     onSearchResults?: (count: number) => void;
     onSearchChange?: (term: string) => void;
 }
@@ -141,7 +142,6 @@ export interface ActionButtonsProps
     extends BaseComponentProps,
         GraphStateProps {
     isEvolutionMode: boolean;
-    onToggleTheme: () => void;
     onToggleEvolution: () => void;
     onToggleOrientation: () => void;
     onExpand: () => void;

@@ -20,9 +20,12 @@
 
 .animation-container {
     --day: #fffdfa;
+    --night: #0f0f23;
     --light: var(--day);
     --shadow: #d4d4d4;
+    --shadow-night: #1a1a2e;
     --bounce-light: #f5efe6;
+    --bounce-light-night: #16213e;
     --timing-fn: cubic-bezier(0.4, 0, 0.2, 1);
 
     position: fixed;
@@ -33,6 +36,13 @@
     z-index: -1;
     background-color: var(--light);
     overflow: hidden;
+}
+
+/* Night mode styling */
+.animation-container.night-mode {
+    --light: var(--night);
+    --shadow: var(--shadow-night);
+    --bounce-light: var(--bounce-light-night);
 }
 
 #dappled-light {

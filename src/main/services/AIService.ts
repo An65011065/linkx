@@ -21,15 +21,58 @@ interface PageContent {
     extractedAt: string;
 }
 
+interface AssistantResponse {
+    text: string;
+    isDirectAnswer: boolean;
+}
+
+type ThreadState = "routing" | "analyzing";
+
+interface ThreadCache {
+    state: ThreadState;
+    browsingDataSent: boolean;
+    preparedData?: any;
+}
+
 class AIService {
     private static instance: AIService;
     private chatFunction;
     private currentThreadId: string | null = null;
     private generalThreadId: string | null = null; // Separate thread for general/page analysis
 
+    // Two-stage routing system
+    private insightsThreadId: string | null = null;
+    private insightsThreadCache: ThreadCache = {
+        state: "routing",
+        browsingDataSent: false,
+        preparedData: null,
+    };
+
+    // Assistant IDs
+    private routerAssistantId = "asst_Ax5k70D5tpJQdhrPxmfuH9Nu";
+    private dataAnalyzerAssistantId = "asst_oGJq9HXdbQ5VoLRuE8JdgvQQ";
+
+    // Performance optimizations
+    private connectionCache = new Map<string, any>();
+    private abortController: AbortController | null = null;
+
     private constructor() {
         const functions = getFunctions(app);
         this.chatFunction = httpsCallable(functions, "chatWithOpenAI");
+
+        // Preload browsing data for faster insights responses
+        this.preloadBrowsingData();
+    }
+
+    private async preloadBrowsingData(): Promise<void> {
+        try {
+            const browsingContext = await this.getAllBrowsingData();
+            if (browsingContext) {
+                this.insightsThreadCache.preparedData = browsingContext;
+            }
+        } catch (error) {
+            console.error("Error preloading browsing data:", error);
+        }
     }
 
     public static getInstance(): AIService {
@@ -38,6 +81,202 @@ class AIService {
         }
         return AIService.instance;
     }
+
+    // ===== TWO-STAGE ROUTING SYSTEM FOR INSIGHTS =====
+
+    // Query Router (Stage 1) - Fast initial routing
+    private async queryRouter(
+        userMessage: string,
+        signal?: AbortSignal,
+    ): Promise<AssistantResponse> {
+        try {
+            const requestPayload = {
+                userMessage,
+                threadId: null, // Always use fresh context for router
+                assistantType: "query_router", // Use existing supported type
+                assistantId: this.routerAssistantId,
+            };
+
+            console.log("🔀 ROUTER: Routing query:", userMessage);
+            const response = (await this.chatFunction(
+                requestPayload,
+            )) as ChatResponse;
+
+            const isDirectAnswer =
+                response.data?.output_text?.trim().toUpperCase() !== "YES";
+
+            console.log(
+                "🔀 ROUTER: Response:",
+                response.data?.output_text,
+                "| Direct answer:",
+                isDirectAnswer,
+            );
+
+            return {
+                text: response.data?.output_text || "Unable to route query",
+                isDirectAnswer,
+            };
+        } catch (error) {
+            if (signal?.aborted) {
+                throw new Error("Request cancelled");
+            }
+            console.error("Router error:", error);
+            throw new Error("Router service unavailable");
+        }
+    }
+
+    // Data Analyzer (Stage 2) - Deep analysis with browsing data
+    private async dataAnalyzer(
+        userMessage: string,
+        signal?: AbortSignal,
+    ): Promise<string> {
+        try {
+            let payload = userMessage;
+
+            // Include browsing data only on first call for this thread
+            if (
+                !this.insightsThreadCache.browsingDataSent &&
+                this.insightsThreadCache.preparedData
+            ) {
+                const browsingContext = this.insightsThreadCache.preparedData;
+                const visits = browsingContext.today?.allVisits || [];
+                const sortedVisits = [...visits].sort(
+                    (a, b) => b.startTime - a.startTime,
+                );
+
+                const browsingDataText = `BROWSING DATA:
+Summary: ${sortedVisits.length} visits, ${
+                    browsingContext.today?.totalActiveMinutes || 0
+                } active minutes, ${
+                    browsingContext.today?.tabSessions || 0
+                } sessions on ${browsingContext.today?.date || "today"}
+
+Recent visits: ${sortedVisits
+                    .slice(0, 50)
+                    .map(
+                        (visit) =>
+                            `${visit.domain} - "${visit.title}" (${
+                                visit.activeTimeMinutes
+                            }min at ${new Date(
+                                visit.startTime,
+                            ).toLocaleTimeString()})`,
+                    )
+                    .join("\n")}
+
+USER QUESTION: ${userMessage}`;
+
+                payload = browsingDataText;
+                this.insightsThreadCache.browsingDataSent = true;
+            }
+
+            const requestPayload = {
+                userMessage: payload,
+                threadId: this.insightsThreadId,
+                assistantType: "data_analyzer",
+                assistantId: this.dataAnalyzerAssistantId,
+            };
+
+            console.log(
+                "📊 ANALYZER: Processing with browsing data. Thread:",
+                this.insightsThreadId,
+            );
+            const response = (await this.chatFunction(
+                requestPayload,
+            )) as ChatResponse;
+
+            // Store thread ID for future messages
+            if (response.data?.threadId) {
+                this.insightsThreadId = response.data.threadId;
+            }
+
+            return response.data?.output_text || "Unable to analyze data";
+        } catch (error) {
+            if (signal?.aborted) {
+                throw new Error("Request cancelled");
+            }
+            console.error("Data analyzer error:", error);
+            throw new Error("Analysis service unavailable");
+        }
+    }
+
+    // Main insights method with two-stage routing
+    public async generateInsightsResponse(message: string): Promise<string> {
+        try {
+            console.log("=".repeat(80));
+            console.log(
+                "🚀 NEW INSIGHTS REQUEST - TWO-STAGE ROUTING",
+                this.insightsThreadCache.state,
+            );
+            console.log("=".repeat(80));
+
+            // Cancel any pending requests
+            if (this.abortController) {
+                this.abortController.abort();
+            }
+            this.abortController = new AbortController();
+
+            let finalResponse: string;
+
+            // Performance optimization: Skip router if already in analyzing state
+            if (this.insightsThreadCache.state === "analyzing") {
+                console.log(
+                    "⚡ FAST PATH: Skipping router, going directly to analyzer",
+                );
+                finalResponse = await this.dataAnalyzer(
+                    message,
+                    this.abortController.signal,
+                );
+            } else {
+                // Stage 1: Query Router
+                console.log("🔀 STAGE 1: Query Router");
+                const routerResponse = await this.queryRouter(
+                    message,
+                    this.abortController.signal,
+                );
+
+                if (routerResponse.isDirectAnswer) {
+                    // Router provided direct answer
+                    console.log("✅ ROUTER: Direct answer provided");
+                    finalResponse = routerResponse.text;
+                } else {
+                    // Router said "YES" - proceed to Stage 2
+                    console.log("📊 STAGE 2: Data Analyzer (Router said YES)");
+                    this.insightsThreadCache.state = "analyzing";
+
+                    // Ensure data is ready
+                    if (!this.insightsThreadCache.preparedData) {
+                        console.log("📊 Preparing browsing data...");
+                        this.insightsThreadCache.preparedData =
+                            await this.getAllBrowsingData();
+                    }
+
+                    finalResponse = await this.dataAnalyzer(
+                        message,
+                        this.abortController.signal,
+                    );
+                }
+            }
+
+            console.log("✅ INSIGHTS REQUEST COMPLETED");
+            return finalResponse;
+        } catch (error) {
+            console.error("❌ INSIGHTS REQUEST FAILED:", error);
+            throw error;
+        }
+    }
+
+    // Reset insights conversation
+    public resetInsightsConversation(): void {
+        this.insightsThreadId = null;
+        this.insightsThreadCache = {
+            state: "routing",
+            browsingDataSent: false,
+            preparedData: this.insightsThreadCache.preparedData, // Keep preloaded data
+        };
+        console.log("🔄 Insights conversation reset");
+    }
+
+    // ===== END TWO-STAGE ROUTING SYSTEM =====
 
     // 🆕 UPDATED: Accept page content as parameter instead of extracting it
     public async generateGeneralResponse(
@@ -308,6 +547,18 @@ class AIService {
     public resetAllConversations(): void {
         this.currentThreadId = null;
         this.generalThreadId = null;
+        this.resetInsightsConversation();
+
+        // Clean up connections
+        this.connectionCache.forEach((connection) => {
+            try {
+                connection.close?.();
+            } catch (error) {
+                console.warn("Error closing connection:", error);
+            }
+        });
+        this.connectionCache.clear();
+
         console.log("🔄 All conversations reset - thread IDs cleared");
     }
 

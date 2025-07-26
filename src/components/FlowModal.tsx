@@ -1,6 +1,7 @@
 // src/components/FlowModal.tsx
 import React, { useState, useEffect } from "react";
 import { Plus, X, Check, RefreshCw } from "lucide-react";
+import { useCalendarData, CalendarEvent, AuthUser } from "./CalendarDataProvider";
 
 interface Task {
     id: string;
@@ -10,49 +11,32 @@ interface Task {
     dueDate: "yesterday" | "today" | "tomorrow";
 }
 
-interface CalendarEvent {
-    id: string;
-    title: string;
-    start: Date;
-    end: Date;
-    location?: string;
-    description?: string;
-    attendees?: string[];
-    completed?: boolean;
-}
-
-interface AuthUser {
-    uid: string;
-    email: string;
-    displayName: string | null;
-    photoURL: string | null;
-    accessToken: string;
-    refreshToken: string | null;
-    plan: string;
-    subscriptionEnd: string | null;
-    createdAt: number;
-}
-
 const FlowModal: React.FC<{
-    user: AuthUser | null;
     onClose: () => void;
-}> = ({ user, onClose }) => {
+}> = ({ onClose }) => {
     const [tasks, setTasks] = useState<Task[]>([]);
     const [newTaskTitle, setNewTaskTitle] = useState("");
     const [currentView, setCurrentView] = useState<
         "yesterday" | "today" | "tomorrow"
     >("today");
-    const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
-    const [isLoadingEvents, setIsLoadingEvents] = useState(false);
+    const { user, calendarEvents, isLoading: isLoadingEvents, loadCalendarEvents } = useCalendarData();
     const [selectedTime, setSelectedTime] = useState("");
     const [isMinimized, setIsMinimized] = useState(false);
 
     useEffect(() => {
         loadTasks();
-        if (user) {
-            loadCalendarEvents();
-        }
-    }, [user]);
+    }, []);
+
+    // Debug logging for FlowModal data
+    useEffect(() => {
+        console.log('🔥 FlowModal data update:', {
+            user: user ? user.email : 'none',
+            userHasAccessToken: user ? !!user.accessToken : false,
+            calendarEventsCount: calendarEvents.length,
+            isLoadingEvents,
+            currentView
+        });
+    }, [user, calendarEvents, isLoadingEvents, currentView]);
 
     const loadTasks = async () => {
         try {
@@ -64,82 +48,6 @@ const FlowModal: React.FC<{
         } catch (error) {
             console.error("Error loading tasks:", error);
             setTasks([]);
-        }
-    };
-
-    const loadCalendarEvents = async () => {
-        if (!user?.accessToken) return;
-
-        setIsLoadingEvents(true);
-        try {
-            const now = new Date();
-            const startOfYesterday = new Date(now);
-            startOfYesterday.setDate(now.getDate() - 1);
-            startOfYesterday.setHours(0, 0, 0, 0);
-            const endOfTomorrow = new Date(now);
-            endOfTomorrow.setDate(endOfTomorrow.getDate() + 1);
-            endOfTomorrow.setHours(23, 59, 59, 999);
-
-            const url =
-                `https://www.googleapis.com/calendar/v3/calendars/primary/events?` +
-                new URLSearchParams({
-                    timeMin: startOfYesterday.toISOString(),
-                    timeMax: endOfTomorrow.toISOString(),
-                    singleEvents: "true",
-                    orderBy: "startTime",
-                    maxResults: "50",
-                });
-
-            const response = await fetch(url, {
-                headers: {
-                    Authorization: `Bearer ${user.accessToken}`,
-                    "Content-Type": "application/json",
-                },
-            });
-
-            if (!response.ok)
-                throw new Error(`Calendar API error: ${response.status}`);
-
-            const data = await response.json();
-            const result = await chrome.storage.local.get([
-                "calendarEventStates",
-            ]);
-            const eventStates = result.calendarEventStates
-                ? JSON.parse(result.calendarEventStates)
-                : {};
-
-            const events: CalendarEvent[] =
-                data.items?.map(
-                    (
-                        item: Record<string, unknown> & {
-                            id: string;
-                            summary?: string;
-                            start: { dateTime?: string; date?: string };
-                            end: { dateTime?: string; date?: string };
-                            location?: string;
-                            description?: string;
-                            attendees?: { email: string }[];
-                        },
-                    ) => ({
-                        id: item.id,
-                        title: item.summary || "No title",
-                        start: new Date(item.start.dateTime || item.start.date),
-                        end: new Date(item.end.dateTime || item.end.date),
-                        location: item.location,
-                        description: item.description,
-                        attendees:
-                            item.attendees?.map((attendee) => attendee.email) ||
-                            [],
-                        completed: eventStates[item.id] || false,
-                    }),
-                ) || [];
-
-            setCalendarEvents(events);
-        } catch (error) {
-            console.error("Failed to load calendar events:", error);
-            setCalendarEvents([]);
-        } finally {
-            setIsLoadingEvents(false);
         }
     };
 
@@ -330,14 +238,6 @@ const FlowModal: React.FC<{
     };
 
     const toggleCalendarEvent = async (eventId: string) => {
-        const updatedEvents = calendarEvents.map((event) =>
-            event.id === eventId
-                ? { ...event, completed: !event.completed }
-                : event,
-        );
-
-        setCalendarEvents(updatedEvents);
-
         try {
             const result = await chrome.storage.local.get([
                 "calendarEventStates",
@@ -346,14 +246,15 @@ const FlowModal: React.FC<{
                 ? JSON.parse(result.calendarEventStates)
                 : {};
 
-            const event = updatedEvents.find((e) => e.id === eventId);
-            if (event) {
-                eventStates[eventId] = event.completed;
-            }
+            // Toggle the event state
+            eventStates[eventId] = !eventStates[eventId];
 
             await chrome.storage.local.set({
                 calendarEventStates: JSON.stringify(eventStates),
             });
+
+            // Refresh calendar events to reflect the change
+            await loadCalendarEvents();
         } catch (error) {
             console.error("Error storing event state:", error);
         }
@@ -387,10 +288,8 @@ const FlowModal: React.FC<{
                 }
 
                 console.log("✅ Calendar event deleted:", taskId);
-                setCalendarEvents((prev) =>
-                    prev.filter((event) => event.id !== taskId),
-                );
-
+                
+                // Clean up event state
                 const result = await chrome.storage.local.get([
                     "calendarEventStates",
                 ]);
@@ -401,6 +300,9 @@ const FlowModal: React.FC<{
                 await chrome.storage.local.set({
                     calendarEventStates: JSON.stringify(eventStates),
                 });
+
+                // Refresh calendar events
+                await loadCalendarEvents();
             } catch (error) {
                 console.error("❌ Error deleting calendar event:", error);
                 return;
@@ -431,6 +333,11 @@ const FlowModal: React.FC<{
         });
     };
 
+    // Check if an event has passed
+    const isEventPast = (eventStart: Date) => {
+        return eventStart < new Date();
+    };
+
     const getItemsToDisplay = () => {
         if (user && currentView !== "yesterday") {
             const now = new Date();
@@ -439,22 +346,40 @@ const FlowModal: React.FC<{
             const tomorrow = new Date(now);
             tomorrow.setDate(tomorrow.getDate() + 1);
 
-            return calendarEvents.filter((event) => {
+            console.log('🔥 FlowModal filtering calendar events:', {
+                totalEvents: calendarEvents.length,
+                currentView,
+                todayStr: now.toDateString(),
+                tomorrowStr: tomorrow.toDateString(),
+                yesterdayStr: yesterday.toDateString()
+            });
+
+            const filteredEvents = calendarEvents.filter((event) => {
+                const eventDateStr = event.start.toDateString();
+                console.log('🔥 Checking event:', event.title, 'date:', eventDateStr);
+                
                 if (currentView === "today") {
-                    return event.start.toDateString() === now.toDateString();
+                    const matches = eventDateStr === now.toDateString();
+                    console.log('🔥 Today match:', matches);
+                    return matches;
                 } else if (currentView === "tomorrow") {
-                    return (
-                        event.start.toDateString() === tomorrow.toDateString()
-                    );
+                    const matches = eventDateStr === tomorrow.toDateString();
+                    console.log('🔥 Tomorrow match:', matches);
+                    return matches;
                 } else if (currentView === "yesterday") {
-                    return (
-                        event.start.toDateString() === yesterday.toDateString()
-                    );
+                    const matches = eventDateStr === yesterday.toDateString();
+                    console.log('🔥 Yesterday match:', matches);
+                    return matches;
                 }
                 return false;
             });
+
+            console.log('🔥 Filtered events for', currentView, ':', filteredEvents.length);
+            return filteredEvents;
         } else {
-            return getTasksForView();
+            const tasks = getTasksForView();
+            console.log('🔥 Using local tasks:', tasks.length);
+            return tasks;
         }
     };
 
@@ -500,7 +425,7 @@ const FlowModal: React.FC<{
                     <h1 className="flow-title">What's next</h1>
                     {isMinimized && todayItems.length > 0 && (
                         <div className="flow-header-preview">
-                            {todayItems.slice(0, 2).map((item, index) => (
+                            {todayItems.slice(0, 4).map((item, index) => (
                                 <span key={item.id} className="preview-item">
                                     {user
                                         ? formatEventTime(
@@ -509,13 +434,13 @@ const FlowModal: React.FC<{
                                         : "•"}{" "}
                                     {item.title}
                                     {index <
-                                        Math.min(todayItems.length, 2) - 1 &&
+                                        Math.min(todayItems.length, 4) - 1 &&
                                         ", "}
                                 </span>
                             ))}
-                            {todayItems.length > 2 && (
+                            {todayItems.length > 4 && (
                                 <span className="more-items">
-                                    +{todayItems.length - 2} more
+                                    +{todayItems.length - 4} more
                                 </span>
                             )}
                         </div>
@@ -583,11 +508,9 @@ const FlowModal: React.FC<{
                     {!isLoadingEvents && currentTasks.length === 0 && (
                         <div className="flow-empty">
                             <p>
-                                No{" "}
-                                {user && currentView !== "yesterday"
-                                    ? "events"
-                                    : "tasks"}{" "}
-                                for {currentView}
+                                {user && currentView !== "yesterday" 
+                                    ? `No events on your Google Calendar for ${currentView}`
+                                    : `No tasks for ${currentView}`}
                             </p>
                         </div>
                     )}
@@ -628,7 +551,10 @@ const FlowModal: React.FC<{
                                                     .completed
                                                     ? "completed"
                                                     : ""
-                                            }`}
+                                            } ${isEventPast((item as CalendarEvent).start) ? "opacity-60" : ""}`}
+                                            style={{
+                                                textDecoration: isEventPast((item as CalendarEvent).start) ? "line-through" : "none"
+                                            }}
                                         >
                                             {item.title}
                                         </span>

@@ -2,20 +2,13 @@ import React, { useState, useEffect, useRef } from "react";
 import { Calendar, ChevronDown } from "lucide-react";
 import SearchBar from "./searchbar";
 import FloatingHeader from "./FloatingHeader";
-
-interface CalendarEvent {
-    id: string;
-    title: string;
-    time: string;
-    color: string;
-}
+import { useCalendarData, CalendarEvent, AuthUser } from "../components/CalendarDataProvider";
 
 interface LandingPageProps {
     isDarkMode: boolean;
     onToggleDarkMode: () => void;
-    currentPage: "main" | "data" | "network" | "maintab";
-    onNavigate: (page: "main" | "data" | "network" | "maintab") => void;
-    onSunlitAnimationToggle: (show: boolean) => void;
+    currentPage: "main" | "data" | "network" | "maintab" | "insights";
+    onNavigate: (page: "main" | "data" | "network" | "maintab" | "insights", query?: string) => void;
 }
 
 const LandingPage: React.FC<LandingPageProps> = ({
@@ -23,18 +16,27 @@ const LandingPage: React.FC<LandingPageProps> = ({
     onToggleDarkMode,
     currentPage,
     onNavigate,
-    onSunlitAnimationToggle,
 }) => {
     const [searchQuery, setSearchQuery] = useState("");
     const [currentTime, setCurrentTime] = useState(new Date());
     const [searchType, setSearchType] = useState<"Search" | "Insights">(
         "Search",
     );
+    const { user, calendarEvents, isLoading } = useCalendarData();
 
-    // Handle sunlit animation when Insights is selected
+    // Debug logging for Landing page
+    useEffect(() => {
+        console.log('🏠 Landing page data update:', {
+            user: user ? user.email : 'none',
+            userHasAccessToken: user ? !!user.accessToken : false,
+            calendarEventsCount: calendarEvents.length,
+            isLoading
+        });
+    }, [user, calendarEvents, isLoading]);
+
+    // Handle search type change
     const handleSearchTypeChange = (type: "Search" | "Insights") => {
         setSearchType(type);
-        onSunlitAnimationToggle(type === "Insights");
     };
     const [showAllEvents, setShowAllEvents] = useState(false);
     const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -43,28 +45,59 @@ const LandingPage: React.FC<LandingPageProps> = ({
     const calendarRef = useRef<HTMLDivElement>(null);
     const mainContentRef = useRef<HTMLDivElement>(null);
 
-    // Mock calendar events
-    const upcomingEvents: CalendarEvent[] = [
+    const formatEventTime = (date: Date) => {
+        return date.toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true,
+        });
+    };
+
+    // Fallback to hardcoded events if no calendar events loaded and no user
+    const hardcodedEvents = [
         {
             id: "1",
             title: "Team Standup",
-            time: "10:00 AM",
-            color: "bg-blue-500",
+            start: new Date(Date.now() + 2 * 60 * 60 * 1000), // 2 hours from now
+            end: new Date(Date.now() + 3 * 60 * 60 * 1000),
+            location: "",
+            description: "",
         },
         {
-            id: "2",
+            id: "2", 
             title: "Design Review",
-            time: "2:30 PM",
-            color: "bg-green-500",
-        },
-        {
-            id: "3",
-            title: "Client Call",
-            time: "4:00 PM",
-            color: "bg-purple-500",
+            start: new Date(Date.now() + 5 * 60 * 60 * 1000), // 5 hours from now
+            end: new Date(Date.now() + 6 * 60 * 60 * 1000),
+            location: "",
+            description: "",
         },
     ];
-    const nextEvent = upcomingEvents[0];
+
+    // Show all events for today and tomorrow, including past ones
+    const getFilteredEvents = () => {
+        const now = new Date();
+        const startOfToday = new Date(now);
+        startOfToday.setHours(0, 0, 0, 0);
+        const endOfTomorrow = new Date(now);
+        endOfTomorrow.setDate(endOfTomorrow.getDate() + 1);
+        endOfTomorrow.setHours(23, 59, 59, 999);
+        
+        return calendarEvents
+            .filter(event => event.start >= startOfToday && event.start <= endOfTomorrow)
+            .sort((a, b) => a.start.getTime() - b.start.getTime());
+    };
+
+    // Check if an event has passed
+    const isEventPast = (eventStart: Date) => {
+        return eventStart < new Date();
+    };
+
+    const filteredEvents = getFilteredEvents();
+    const eventsToShow = filteredEvents.length > 0 ? filteredEvents : (user ? [] : hardcodedEvents);
+    
+    // Find the next upcoming event (not past)
+    const nextUpcomingEvent = eventsToShow.find(event => !isEventPast(event.start));
+    const nextEvent = nextUpcomingEvent || eventsToShow[0]; // Fallback to first event if all are past
 
     // Handle initial load animation
     useEffect(() => {
@@ -95,16 +128,18 @@ const LandingPage: React.FC<LandingPageProps> = ({
     }, []);
 
     const handleSearch = () => {
+        if (searchType === "Insights") {
+            onNavigate("insights", searchQuery);
+            return;
+        }
+        
         if (searchQuery.trim()) {
             if (searchQuery.includes(".") && !searchQuery.includes(" ")) {
-                window.open(`https://${searchQuery}`, "_blank");
+                window.location.href = `https://${searchQuery}`;
             } else {
-                window.open(
-                    `https://www.google.com/search?q=${encodeURIComponent(
-                        searchQuery,
-                    )}`,
-                    "_blank",
-                );
+                window.location.href = `https://www.google.com/search?q=${encodeURIComponent(
+                    searchQuery,
+                )}`;
             }
         }
     };
@@ -134,7 +169,7 @@ const LandingPage: React.FC<LandingPageProps> = ({
                 position: "relative",
                 overflow: "hidden",
                 zIndex: 1,
-                backgroundColor: searchType === "Insights" ? "transparent" : (isDarkMode ? "#0f172a" : "#f9fafb")
+                backgroundColor: "transparent"
             }}
         >
             {/* Floating Header Component */}
@@ -245,7 +280,7 @@ const LandingPage: React.FC<LandingPageProps> = ({
                                         isDarkMode
                                             ? "text-slate-200"
                                             : "text-gray-800"
-                                    }`}
+                                    } ${isEventPast(nextEvent.start) ? "line-through opacity-60" : ""}`}
                                 >
                                     {nextEvent.title}
                                 </span>
@@ -256,7 +291,7 @@ const LandingPage: React.FC<LandingPageProps> = ({
                                             : "text-gray-600"
                                     }`}
                                 >
-                                    {nextEvent.time}
+                                    {formatEventTime(nextEvent.start)}
                                 </span>
                                 <ChevronDown
                                     size={16}
@@ -281,7 +316,7 @@ const LandingPage: React.FC<LandingPageProps> = ({
                                 }`}
                             >
                                 <div className="mt-2 space-y-1">
-                                    {upcomingEvents
+                                    {eventsToShow
                                         .slice(1)
                                         .map((event, index) => (
                                             <div
@@ -315,7 +350,7 @@ const LandingPage: React.FC<LandingPageProps> = ({
                                                         isDarkMode
                                                             ? "text-slate-200"
                                                             : "text-gray-800"
-                                                    }`}
+                                                    } ${isEventPast(event.start) ? "line-through opacity-60" : ""}`}
                                                 >
                                                     {event.title}
                                                 </span>
@@ -330,7 +365,7 @@ const LandingPage: React.FC<LandingPageProps> = ({
                                                         marginRight: "26px",
                                                     }}
                                                 >
-                                                    {event.time}
+                                                    {formatEventTime(event.start)}
                                                 </span>
                                             </div>
                                         ))}
@@ -340,7 +375,7 @@ const LandingPage: React.FC<LandingPageProps> = ({
                     </div>
                 ) : (
                     <div
-                        className={`text-center transition-all duration-700 ease-out ${
+                        className={`flex items-center justify-center transition-all duration-700 ease-out ${
                             isInitialLoad
                                 ? "opacity-0 translate-y-4"
                                 : "opacity-100 translate-y-0"
@@ -349,9 +384,9 @@ const LandingPage: React.FC<LandingPageProps> = ({
                     >
                         <Calendar
                             size={20}
-                            className="mx-auto mb-2 opacity-50 transition-opacity duration-300 hover:opacity-70"
+                            className="mr-2 opacity-50 transition-opacity duration-300 hover:opacity-70"
                         />
-                        <p className="text-sm">No upcoming events</p>
+                        <p className="text-sm">No events on your Google Calendar today</p>
                     </div>
                 )}
             </div>

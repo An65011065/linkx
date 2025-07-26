@@ -14,9 +14,8 @@ interface DomainData {
 interface DataLandingPageProps {
     isDarkMode: boolean;
     onToggleDarkMode: () => void;
-    currentPage: "main" | "data" | "network" | "maintab";
-    onNavigate: (page: "main" | "data" | "network" | "maintab") => void;
-    onSunlitAnimationToggle: (show: boolean) => void;
+    currentPage: "main" | "data" | "network" | "maintab" | "insights";
+    onNavigate: (page: "main" | "data" | "network" | "maintab" | "insights", query?: string) => void;
 }
 
 interface AnalyticsData {
@@ -34,17 +33,15 @@ const DataLandingPage: React.FC<DataLandingPageProps> = ({
     onToggleDarkMode,
     currentPage,
     onNavigate,
-    onSunlitAnimationToggle,
 }) => {
     const [searchQuery, setSearchQuery] = useState("");
     const [searchType, setSearchType] = useState<"Search" | "Insights">(
         "Search",
     );
 
-    // Handle sunlit animation when Insights is selected
+    // Handle search type change
     const handleSearchTypeChange = (type: "Search" | "Insights") => {
         setSearchType(type);
-        onSunlitAnimationToggle(type === "Insights");
     };
     const [isInitialLoad, setIsInitialLoad] = useState(true);
 
@@ -148,16 +145,18 @@ const DataLandingPage: React.FC<DataLandingPageProps> = ({
     };
 
     const handleSearch = () => {
+        if (searchType === "Insights") {
+            onNavigate("insights", searchQuery);
+            return;
+        }
+        
         if (searchQuery.trim()) {
             if (searchQuery.includes(".") && !searchQuery.includes(" ")) {
-                window.open(`https://${searchQuery}`, "_blank");
+                window.location.href = `https://${searchQuery}`;
             } else {
-                window.open(
-                    `https://www.google.com/search?q=${encodeURIComponent(
-                        searchQuery,
-                    )}`,
-                    "_blank",
-                );
+                window.location.href = `https://www.google.com/search?q=${encodeURIComponent(
+                    searchQuery,
+                )}`;
             }
         }
     };
@@ -199,7 +198,7 @@ const DataLandingPage: React.FC<DataLandingPageProps> = ({
                 position: "relative",
                 overflow: "hidden",
                 zIndex: 1,
-                backgroundColor: searchType === "Insights" ? "transparent" : (isDarkMode ? "#0f172a" : "#f9fafb")
+                backgroundColor: "transparent"
             }}
         >
             {/* Floating Header Component */}

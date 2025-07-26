@@ -35,13 +35,12 @@ const GraphVisualization: React.FC<GraphVisualizationProps> = ({
     isStandalone = false,
     searchTerm = "",
     selectedNodeId = null,
+    isDarkMode = false,
     onSearchResults,
     onSearchChange,
     className,
     style,
 }) => {
-    // Theme state
-    const [isDarkMode, setIsDarkMode] = useState(false);
 
     // View state
     const [viewOrientation, setViewOrientation] = useState<
@@ -239,9 +238,6 @@ const GraphVisualization: React.FC<GraphVisualizationProps> = ({
         }
     }, [selectedNode, clearPath]);
 
-    const handleToggleTheme = useCallback(() => {
-        setIsDarkMode(!isDarkMode);
-    }, [isDarkMode]);
 
     const handleToggleOrientation = useCallback(() => {
         setViewOrientation(
@@ -334,7 +330,7 @@ const GraphVisualization: React.FC<GraphVisualizationProps> = ({
                 ref={containerRef}
                 className={`w-full h-screen flex items-center justify-center transition-all duration-300 ${
                     isDarkMode
-                        ? "bg-gradient-to-br from-gray-900 to-slate-800"
+                        ? "bg-[#0f0f23]"
                         : "bg-gray-50"
                 } ${className || ""}`}
                 style={style}
@@ -351,7 +347,7 @@ const GraphVisualization: React.FC<GraphVisualizationProps> = ({
                 ref={containerRef}
                 className={`w-full h-screen flex items-center justify-center transition-all duration-300 ${
                     isDarkMode
-                        ? "bg-gradient-to-br from-gray-900 to-slate-800"
+                        ? "bg-[#0f0f23]"
                         : "bg-gradient-to-br from-amber-50 to-orange-50"
                 } ${className || ""}`}
                 style={style}
@@ -372,7 +368,7 @@ const GraphVisualization: React.FC<GraphVisualizationProps> = ({
                 ref={containerRef}
                 className={`w-full h-screen flex items-center justify-center transition-all duration-300 ${
                     isDarkMode
-                        ? "bg-gradient-to-br from-gray-900 to-slate-800"
+                        ? "bg-[#0f0f23]"
                         : "bg-gradient-to-br from-amber-50 to-orange-50"
                 } ${className || ""}`}
                 style={style}
@@ -397,7 +393,7 @@ const GraphVisualization: React.FC<GraphVisualizationProps> = ({
                 ref={containerRef}
                 className={`w-full h-screen transition-all duration-300 ${
                     isDarkMode
-                        ? "bg-gradient-to-br from-gray-900 to-slate-800"
+                        ? "bg-[#0f0f23]"
                         : "bg-gradient-to-br from-amber-50 to-orange-50"
                 } ${className || ""}`}
                 style={style}
@@ -410,7 +406,7 @@ const GraphVisualization: React.FC<GraphVisualizationProps> = ({
             ref={containerRef}
             className={`w-full h-screen relative overflow-hidden transition-all duration-300 ${
                 isDarkMode
-                    ? "bg-gradient-to-br from-gray-900 to-slate-800"
+                    ? "bg-gradient-to-br from-[#0f0f23] to-[#1a1a2e]"
                     : "bg-gray-50"
             } ${className || ""}`}
             style={style}
@@ -461,7 +457,6 @@ const GraphVisualization: React.FC<GraphVisualizationProps> = ({
                         isDarkMode={isDarkMode}
                         viewOrientation={viewOrientation}
                         isEvolutionMode={isEvolutionMode}
-                        onToggleTheme={handleToggleTheme}
                         onToggleEvolution={handleToggleEvolution}
                         onToggleOrientation={handleToggleOrientation}
                         onExpand={handleExpand}

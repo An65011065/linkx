@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import Insights from "./Insights";
 import DashboardTab from "../dashboard/components/DashboardTab";
 import GraphVisualization from "../graph/components/GraphVisualization";
 import { downloadSessionData } from "../data/useExtensionData";
@@ -245,7 +244,9 @@ const MainTab: React.FC<MainTabProps> = ({ initialDarkMode = true }) => {
             switch (activeTab) {
                 case "insights":
                     return (
-                        <Insights onInputFocusChange={handleInputFocusChange} />
+                        <div className="w-full h-full flex items-center justify-center text-gray-500">
+                            <p>Insights moved to landing page</p>
+                        </div>
                     );
                 case "dashboard":
                     return <DashboardTab isDarkMode={isDarkMode} />;
@@ -479,7 +480,7 @@ const MainTab: React.FC<MainTabProps> = ({ initialDarkMode = true }) => {
 
                 {/* Animation Background Layer */}
                 <div
-                    className="animation-background animation-container"
+                    className={`animation-background animation-container ${isDarkMode ? 'night-mode' : ''}`}
                 >
                     <div id="dappled-light">
                         <div id="glow"></div>

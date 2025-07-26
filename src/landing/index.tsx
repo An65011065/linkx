@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import AppRouter from "./appRouter";
+import { CalendarDataProvider } from "../components/CalendarDataProvider";
 
 const root = ReactDOM.createRoot(
     document.getElementById("root") as HTMLElement,
@@ -8,6 +9,8 @@ const root = ReactDOM.createRoot(
 
 root.render(
     <React.StrictMode>
-        <AppRouter />;
+        <CalendarDataProvider>
+            <AppRouter />
+        </CalendarDataProvider>
     </React.StrictMode>,
 );

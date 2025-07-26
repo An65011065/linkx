@@ -36,7 +36,7 @@ function createCleanCSV(data) {
     // Add summary as first data row (5 columns to match headers)
     const summaryRow = [
         "SUMMARY_DATA",
-        `Total visits: ${sortedVisites.length}, Active minutes: ${data.today.totalActiveMinutes}, Sessions: ${data.today.tabSessions}`,
+        `Total visits: ${sortedVisits.length}, Active minutes: ${data.today.totalActiveMinutes}, Sessions: ${data.today.tabSessions}`,
         data.today.date,
         "Summary",
         data.today.totalActiveMinutes,
@@ -77,6 +77,8 @@ exports.chatWithOpenAI = onCall(
             browsing: "asst_oGJq9HXdbQ5VoLRuE8JdgvRQ",
             summarise: "asst_y1LZY5JHQX3YZiAXyVs1Iiif",
             page_analysis: "asst_Wed1vBDeodu3B1ATQYLeqksz",
+            query_router: "asst_Ax5k70D5tpJQdhrPxmfuH9Nu",
+            data_analyzer: "asst_oGJq9HXdbQ5VoLRuE8JdgvRQ",
             asst_YxsrXIl2Ro9POndtudAi1GUk: "asst_YxsrXIl2Ro9POndtudAi1GUk",
         };
 
