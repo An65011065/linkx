@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from "react";
-import { Moon, Sun } from "lucide-react";
+import { Moon, Sun, Settings } from "lucide-react";
 
 interface FloatingHeaderProps {
     isDarkMode: boolean;
@@ -96,7 +96,6 @@ const FloatingHeader: React.FC<FloatingHeaderProps> = ({
                         { key: "main", label: "Home" },
                         { key: "data", label: "Data" },
                         { key: "network", label: "Network" },
-                        { key: "maintab", label: "App" },
                     ].map(({ key, label }) => (
                         <button
                             key={key}
@@ -116,6 +115,9 @@ const FloatingHeader: React.FC<FloatingHeaderProps> = ({
                         </button>
                     ))}
                 </div>
+
+                {/* Subtle divider */}
+                <div className={`w-px h-4 ${isDarkMode ? "bg-slate-700" : "bg-gray-300"}`} />
 
                 {/* Dark mode toggle */}
                 <button
@@ -144,6 +146,18 @@ const FloatingHeader: React.FC<FloatingHeaderProps> = ({
                             }`}
                         />
                     </div>
+                </button>
+
+                {/* Settings button */}
+                <button
+                    onClick={() => window.location.href = '/src/settings/settings.html'}
+                    className={`p-2 rounded-lg transition-all duration-300 hover:scale-105 active:scale-95 ${
+                        isDarkMode
+                            ? "text-slate-400 hover:bg-slate-800/50 hover:text-slate-300"
+                            : "text-gray-600 hover:bg-gray-100 hover:text-gray-800"
+                    }`}
+                >
+                    <Settings size={16} />
                 </button>
             </div>
         </div>

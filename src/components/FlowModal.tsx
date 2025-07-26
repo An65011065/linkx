@@ -19,7 +19,7 @@ const FlowModal: React.FC<{
     const [currentView, setCurrentView] = useState<
         "yesterday" | "today" | "tomorrow"
     >("today");
-    const { user, calendarEvents, isLoading: isLoadingEvents, loadCalendarEvents } = useCalendarData();
+    const { user, calendarEvents, isLoading: isLoadingEvents, error, loadCalendarEvents } = useCalendarData();
     const [selectedTime, setSelectedTime] = useState("");
     const [isMinimized, setIsMinimized] = useState(false);
 
@@ -132,7 +132,7 @@ const FlowModal: React.FC<{
                 await createCalendarEvent(newTaskTitle.trim());
                 setNewTaskTitle("");
                 setSelectedTime("");
-                await loadCalendarEvents();
+                await loadCalendarEvents(true); // Force refresh to get newly created event
             } catch (error) {
                 console.error("❌ Failed to create calendar event:", error);
                 await createLocalTask();
@@ -254,7 +254,7 @@ const FlowModal: React.FC<{
             });
 
             // Refresh calendar events to reflect the change
-            await loadCalendarEvents();
+            await loadCalendarEvents(true); // Force refresh after state change
         } catch (error) {
             console.error("Error storing event state:", error);
         }
@@ -302,7 +302,7 @@ const FlowModal: React.FC<{
                 });
 
                 // Refresh calendar events
-                await loadCalendarEvents();
+                await loadCalendarEvents(true); // Force refresh after deletion
             } catch (error) {
                 console.error("❌ Error deleting calendar event:", error);
                 return;
@@ -508,10 +508,29 @@ const FlowModal: React.FC<{
                     {!isLoadingEvents && currentTasks.length === 0 && (
                         <div className="flow-empty">
                             <p>
-                                {user && currentView !== "yesterday" 
-                                    ? `No events on your Google Calendar for ${currentView}`
-                                    : `No tasks for ${currentView}`}
+                                {error ? `Calendar error: ${error}` :
+                                    user && currentView !== "yesterday" 
+                                        ? `No events on your Google Calendar for ${currentView}`
+                                        : `No tasks for ${currentView}`}
                             </p>
+                            {error && (
+                                <button
+                                    onClick={() => loadCalendarEvents(true)}
+                                    className="flow-retry-btn"
+                                    style={{
+                                        marginTop: '8px',
+                                        padding: '4px 8px',
+                                        fontSize: '11px',
+                                        background: 'rgba(218, 165, 32, 0.15)',
+                                        border: 'none',
+                                        borderRadius: '4px',
+                                        color: 'rgba(160, 82, 45, 0.8)',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    Retry
+                                </button>
+                            )}
                         </div>
                     )}
 

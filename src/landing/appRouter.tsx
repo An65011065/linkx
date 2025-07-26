@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import LandingPage from "./landing";
 import DataLandingPage from "./dataLanding";
 import NetworkLandingPage from "./networkLanding";
@@ -7,14 +7,39 @@ import MainTab from "../main/MainTab";
 import "../main/styles/sunlit-window.css";
 
 const AppRouter: React.FC = () => {
-    const [isDarkMode, setIsDarkMode] = useState(false);
+    // Initialize with user preference, fallback to system preference
+    const [isDarkMode, setIsDarkMode] = useState(() => {
+        const saved = localStorage.getItem('theme-preference');
+        if (saved === 'dark') return true;
+        if (saved === 'light') return false;
+        // No saved preference - use system
+        return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    });
     const [currentPage, setCurrentPage] = useState<"main" | "data" | "network" | "maintab" | "insights">(
         "main",
     );
     const [insightsQuery, setInsightsQuery] = useState("");
 
+    // Listen for system theme changes (only if no manual override)
+    useEffect(() => {
+        const saved = localStorage.getItem('theme-preference');
+        if (saved || !window.matchMedia) return; // User has manual preference or no media query support
+        
+        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        
+        const handleChange = (e: MediaQueryListEvent) => {
+            setIsDarkMode(e.matches);
+        };
+
+        mediaQuery.addEventListener('change', handleChange);
+        return () => mediaQuery.removeEventListener('change', handleChange);
+    }, []);
+
     const handleToggleDarkMode = () => {
-        setIsDarkMode(!isDarkMode);
+        const newMode = !isDarkMode;
+        setIsDarkMode(newMode);
+        // Save user preference
+        localStorage.setItem('theme-preference', newMode ? 'dark' : 'light');
     };
 
     const handleNavigate = (page: "main" | "data" | "network" | "maintab" | "insights", query?: string) => {

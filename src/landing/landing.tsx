@@ -19,10 +19,10 @@ const LandingPage: React.FC<LandingPageProps> = ({
 }) => {
     const [searchQuery, setSearchQuery] = useState("");
     const [currentTime, setCurrentTime] = useState(new Date());
-    const [searchType, setSearchType] = useState<"Search" | "Insights">(
+    const [searchType, setSearchType] = useState<"Search" | "Ask">(
         "Search",
     );
-    const { user, calendarEvents, isLoading } = useCalendarData();
+    const { user, calendarEvents, isLoading, error } = useCalendarData();
 
     // Debug logging for Landing page
     useEffect(() => {
@@ -35,7 +35,7 @@ const LandingPage: React.FC<LandingPageProps> = ({
     }, [user, calendarEvents, isLoading]);
 
     // Handle search type change
-    const handleSearchTypeChange = (type: "Search" | "Insights") => {
+    const handleSearchTypeChange = (type: "Search" | "Ask") => {
         setSearchType(type);
     };
     const [showAllEvents, setShowAllEvents] = useState(false);
@@ -128,7 +128,7 @@ const LandingPage: React.FC<LandingPageProps> = ({
     }, []);
 
     const handleSearch = () => {
-        if (searchType === "Insights") {
+        if (searchType === "Ask") {
             onNavigate("insights", searchQuery);
             return;
         }
@@ -384,9 +384,11 @@ const LandingPage: React.FC<LandingPageProps> = ({
                     >
                         <Calendar
                             size={20}
-                            className="mr-2 opacity-50 transition-opacity duration-300 hover:opacity-70"
+                            className={`mr-2 opacity-50 transition-opacity duration-300 hover:opacity-70 ${error ? "text-red-400" : ""}`}
                         />
-                        <p className="text-sm">No events on your Google Calendar today</p>
+                        <p className="text-sm">
+                            {error ? `Calendar error: ${error}` : "No events on your Google Calendar today"}
+                        </p>
                     </div>
                 )}
             </div>

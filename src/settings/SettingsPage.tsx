@@ -55,7 +55,7 @@ const SettingsPage = () => {
     };
 
     const handleGoBack = () => {
-        console.log("Going back to main interface");
+        window.location.href = '/src/landing/landing.html';
     };
 
     const handleLogout = () => {

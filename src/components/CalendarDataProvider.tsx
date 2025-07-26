@@ -27,7 +27,9 @@ interface CalendarDataContextType {
     user: AuthUser | null;
     calendarEvents: CalendarEvent[];
     isLoading: boolean;
+    error: string | null;
     loadCalendarEvents: () => Promise<void>;
+    clearError: () => void;
 }
 
 const CalendarDataContext = createContext<CalendarDataContextType | undefined>(undefined);
@@ -48,6 +50,12 @@ export const CalendarDataProvider: React.FC<CalendarDataProviderProps> = ({ chil
     const [user, setUser] = useState<AuthUser | null>(null);
     const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
     const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [lastFetchTime, setLastFetchTime] = useState<number>(0);
+    const [cachedEvents, setCachedEvents] = useState<CalendarEvent[]>([]);
+    
+    // Cache duration: 5 minutes
+    const CACHE_DURATION = 5 * 60 * 1000;
 
     // Load user from storage - check multiple possible storage keys
     useEffect(() => {
@@ -108,33 +116,79 @@ export const CalendarDataProvider: React.FC<CalendarDataProviderProps> = ({ chil
         loadUser();
     }, []);
 
+    // Load cached events from storage on mount
+    useEffect(() => {
+        const loadCachedEvents = async () => {
+            try {
+                const result = await chrome.storage.local.get(['cachedCalendarEvents', 'lastCalendarFetch']);
+                if (result.cachedCalendarEvents && result.lastCalendarFetch) {
+                    const cachedTime = result.lastCalendarFetch;
+                    const now = Date.now();
+                    
+                    if (now - cachedTime < CACHE_DURATION) {
+                        console.log('📊 Using cached calendar events');
+                        const cached = JSON.parse(result.cachedCalendarEvents).map((event: any) => ({
+                            ...event,
+                            start: new Date(event.start),
+                            end: new Date(event.end)
+                        }));
+                        setCachedEvents(cached);
+                        setCalendarEvents(cached);
+                        setLastFetchTime(cachedTime);
+                    }
+                }
+            } catch (error) {
+                console.error('📊 Error loading cached events:', error);
+            }
+        };
+        loadCachedEvents();
+    }, []);
+
     // Load calendar events when user changes
     useEffect(() => {
         if (user) {
             console.log('📊 User changed, loading calendar events...');
-            loadCalendarEvents();
+            const now = Date.now();
+            // Only fetch if cache is expired or empty
+            if (now - lastFetchTime > CACHE_DURATION || cachedEvents.length === 0) {
+                loadCalendarEvents();
+            } else {
+                console.log('📊 Using cached events, not fetching');
+                setCalendarEvents(cachedEvents);
+            }
         } else {
             console.log('📊 No user, clearing calendar events');
             setCalendarEvents([]);
+            setError(null);
         }
     }, [user]);
 
-    const loadCalendarEvents = async () => {
+    const loadCalendarEvents = async (forceRefresh = false) => {
         if (!user?.accessToken) {
             console.log('📊 No access token available, user:', user);
             setCalendarEvents([]);
+            setError('No access token available');
+            return;
+        }
+
+        // Check cache first unless force refresh
+        const now = Date.now();
+        if (!forceRefresh && now - lastFetchTime < CACHE_DURATION && cachedEvents.length > 0) {
+            console.log('📊 Using cached events, skipping API call');
+            setCalendarEvents(cachedEvents);
             return;
         }
 
         console.log('📊 Loading calendar events for user:', user.email);
         setIsLoading(true);
+        setError(null);
         
         try {
-            const now = new Date();
+            const currentDate = new Date();
             // Start from beginning of today to include all past events from today
-            const startOfToday = new Date(now);
+            const startOfToday = new Date(currentDate);
             startOfToday.setHours(0, 0, 0, 0);
-            const endOfTomorrow = new Date(now);
+            const endOfTomorrow = new Date(currentDate);
             endOfTomorrow.setDate(endOfTomorrow.getDate() + 1);
             endOfTomorrow.setHours(23, 59, 59, 999);
 
@@ -162,7 +216,23 @@ export const CalendarDataProvider: React.FC<CalendarDataProviderProps> = ({ chil
             if (!response.ok) {
                 const errorText = await response.text();
                 console.error('📊 Calendar API error:', errorText);
-                throw new Error(`Calendar API error: ${response.status} - ${errorText}`);
+                
+                if (response.status === 401) {
+                    setError('Authentication expired. Please log in again.');
+                } else if (response.status === 403) {
+                    setError('Calendar access denied. Please check permissions.');
+                } else if (response.status >= 500) {
+                    setError('Google Calendar service is temporarily unavailable.');
+                } else {
+                    setError(`Unable to load calendar events (${response.status})`);
+                }
+                
+                // If we have cached events and this is a temporary error, keep showing them
+                if (cachedEvents.length > 0 && response.status >= 500) {
+                    console.log('📊 Using cached events due to server error');
+                    setCalendarEvents(cachedEvents);
+                }
+                return;
             }
 
             const data = await response.json();
@@ -192,25 +262,54 @@ export const CalendarDataProvider: React.FC<CalendarDataProviderProps> = ({ chil
 
             console.log('📊 Setting calendar events:', events.length);
             setCalendarEvents(events);
+            setCachedEvents(events);
+            setLastFetchTime(now);
+            
+            // Cache the events
+            try {
+                await chrome.storage.local.set({
+                    cachedCalendarEvents: JSON.stringify(events),
+                    lastCalendarFetch: now
+                });
+                console.log('📊 Events cached successfully');
+            } catch (cacheError) {
+                console.error('📊 Failed to cache events:', cacheError);
+            }
+            
         } catch (error) {
             console.error('📊 Failed to load calendar events:', error);
-            setCalendarEvents([]);
+            setError('Failed to connect to Google Calendar. Please check your connection.');
+            
+            // If we have cached events, keep showing them
+            if (cachedEvents.length > 0) {
+                console.log('📊 Using cached events due to network error');
+                setCalendarEvents(cachedEvents);
+            } else {
+                setCalendarEvents([]);
+            }
         } finally {
             setIsLoading(false);
         }
+    };
+
+    const clearError = () => {
+        setError(null);
     };
 
     const value: CalendarDataContextType = {
         user,
         calendarEvents,
         isLoading,
+        error,
         loadCalendarEvents,
+        clearError,
     };
 
     console.log('📊 CalendarDataProvider rendering with:', {
         user: user ? user.email : 'none',
         eventCount: calendarEvents.length,
-        isLoading
+        isLoading,
+        error: error || 'none'
     });
 
     return (

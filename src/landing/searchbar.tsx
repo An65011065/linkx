@@ -8,8 +8,8 @@ interface SearchBarProps {
     onSearchQueryChange: (query: string) => void;
     onSearch: () => void;
     placeholder?: string;
-    searchType?: "Search" | "Insights" | "Network";
-    onSearchTypeChange?: (type: "Search" | "Insights" | "Network") => void;
+    searchType?: "Search" | "Ask" | "Network";
+    onSearchTypeChange?: (type: "Search" | "Ask" | "Network") => void;
     showTypeSelector?: boolean;
     isInitialLoad?: boolean;
     animationDelay?: string;
@@ -241,9 +241,9 @@ const SearchBar: React.FC<SearchBarProps> = ({
         }
     }, [isNetworkPage, onSearchTypeChange]);
 
-    // Rotate placeholder text for insights
+    // Rotate placeholder text for Ask
     useEffect(() => {
-        if (searchType === "Insights" && !isSearchFocused && showTypeSelector) {
+        if (searchType === "Ask" && !isSearchFocused && showTypeSelector) {
             const interval = setInterval(() => {
                 setCurrentPlaceholderIndex(
                     (prev) => (prev + 1) % insightPlaceholders.length,
@@ -373,7 +373,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
             // Scroll to graph when Enter is pressed
             if (
                 isNetworkPage &&
-                (searchType === "Insights" || searchType === "Network") &&
+                (searchType === "Ask" || searchType === "Network") &&
                 searchQuery.trim()
             ) {
                 console.log("🔽 Enter key - triggering scroll");
@@ -418,12 +418,12 @@ const SearchBar: React.FC<SearchBarProps> = ({
         if (searchType === "Search" || !showTypeSelector) {
             return placeholder;
         }
-        return ""; // For Insights with animated placeholder
+        return ""; // For Ask with animated placeholder
     };
 
     // Get available search types based on context
     const getAvailableSearchTypes = () => {
-        const baseTypes = ["Search", "Insights"];
+        const baseTypes = ["Search", "Ask"];
         if (isNetworkPage) {
             return ["Network", ...baseTypes];
         }
@@ -458,7 +458,30 @@ const SearchBar: React.FC<SearchBarProps> = ({
                         type="text"
                         placeholder={getPlaceholderText()}
                         value={searchQuery}
-                        onChange={(e) => onSearchQueryChange(e.target.value)}
+                        onChange={(e) => {
+                            const value = e.target.value;
+                            
+                            // Handle /ask trigger
+                            if (value.toLowerCase().startsWith('/ask')) {
+                                if (onSearchTypeChange && searchType !== 'Ask') {
+                                    onSearchTypeChange('Ask');
+                                }
+                                // Remove /ask from the search query
+                                const cleanValue = value.slice(4).trim();
+                                onSearchQueryChange(cleanValue);
+                            }
+                            // Handle /search trigger
+                            else if (value.toLowerCase().startsWith('/search')) {
+                                if (onSearchTypeChange && searchType !== 'Search') {
+                                    onSearchTypeChange('Search');
+                                }
+                                // Remove /search from the search query
+                                const cleanValue = value.slice(7).trim();
+                                onSearchQueryChange(cleanValue);
+                            } else {
+                                onSearchQueryChange(value);
+                            }
+                        }}
                         onFocus={() => setIsSearchFocused(true)}
                         onBlur={() => {
                             // Delay to allow for suggestion clicks
@@ -475,8 +498,8 @@ const SearchBar: React.FC<SearchBarProps> = ({
                         }`}
                     />
 
-                    {/* Enhanced animated placeholder for insights */}
-                    {searchType === "Insights" &&
+                    {/* Enhanced animated placeholder for Ask */}
+                    {searchType === "Ask" &&
                         !searchQuery &&
                         !isSearchFocused &&
                         showTypeSelector && (
@@ -544,7 +567,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
                                                 onSearchTypeChange(
                                                     type as
                                                         | "Search"
-                                                        | "Insights"
+                                                        | "Ask"
                                                         | "Network",
                                                 );
                                                 setIsDropdownOpen(false);
@@ -575,7 +598,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
                                 // Trigger scroll to graph if it's a search on network page
                                 if (
                                     isNetworkPage &&
-                                    (searchType === "Insights" ||
+                                    (searchType === "Ask" ||
                                         searchType === "Network") &&
                                     searchQuery.trim()
                                 ) {

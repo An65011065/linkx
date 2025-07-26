@@ -43,12 +43,12 @@ const NetworkLandingPage: React.FC<NetworkLandingPageProps> = ({
 }) => {
     const [searchQuery, setSearchQuery] = useState("");
     const [searchType, setSearchType] = useState<
-        "Search" | "Insights" | "Network"
+        "Search" | "Ask" | "Network"
     >("Search");
 
     // Handle search type change
     const handleSearchTypeChange = (
-        type: "Search" | "Insights" | "Network",
+        type: "Search" | "Ask" | "Network",
     ) => {
         setSearchType(type);
     };
@@ -261,8 +261,8 @@ const NetworkLandingPage: React.FC<NetworkLandingPageProps> = ({
                         "_blank",
                     );
                 }
-            } else if (searchType === "Insights") {
-                console.log("📊 Insights search - triggering scroll");
+            } else if (searchType === "Ask") {
+                console.log("📊 Ask search - triggering scroll");
                 handleGraphSearch(searchQuery);
                 scrollToGraph();
             } else if (searchType === "Network") {
@@ -420,7 +420,7 @@ const NetworkLandingPage: React.FC<NetworkLandingPageProps> = ({
                         placeholder={
                             searchType === "Network"
                                 ? "Search for any website from your browsing history..."
-                                : searchType === "Insights"
+                                : searchType === "Ask"
                                 ? "Search nodes, analyze paths, or explore communities"
                                 : "Search web or enter address"
                         }
@@ -559,7 +559,7 @@ const NetworkLandingPage: React.FC<NetworkLandingPageProps> = ({
                     }
                     onSearchChange={(term) => {
                         setSearchQuery(term);
-                        setSearchType("Insights");
+                        setSearchType("Ask");
                         // Auto-scroll when search changes in the graph
                         if (term.trim()) {
                             scrollToGraph();
